@@ -1,23 +1,19 @@
 #include <Arduino.h>
 
-//------------------- Rotary Encoder
-// Rotary Encoder
-#define PIN_ENCODER_CLK 17
-#define PIN_ENCODER_DT 16
-#define PIN_ENCODER_SW 18
+#include "defines.h"
 
+//------------------- Rotary Encoder
 #include "RotaryEncoder.h"
 RotaryEncoder rotaryEncoder = RotaryEncoder(PIN_ENCODER_CLK, PIN_ENCODER_DT, PIN_ENCODER_SW, ROTARY_ENCODER_STEPS_PER_NOTCH);
 #define ROTARY_ENCODER_SERVICE_INTERVAL_IN_MSEC 1  // 1msec
 
 #define __USE_ROTARY_ENCODER_IN_HW_TIMER
+
 #ifdef __USE_ROTARY_ENCODER_IN_HW_TIMER
 // Pico Hardware timer a Rotary encoder olvasására
 #include <RPi_Pico_TimerInterrupt.h>
 RPI_PICO_Timer ITimer1(1);
-#endif
 
-#ifdef __USE_ROTARY_ENCODER_IN_HW_TIMER
 /**
  * Hardware timer interrupt service routine a rotaryhoz
  */
