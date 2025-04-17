@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#include "defines.h"
+#include "utils.h"
 
 //------------------- Rotary Encoder
 #include "RotaryEncoder.h"
@@ -23,7 +23,9 @@ bool hardwareTimerHandler1(struct repeating_timer *t) {
 }
 #endif
 
-//------------------- Rotary Encoder
+//------------------- EEPROM Config
+#include "Config.h"
+Config config;
 
 /**
  * setup() - a program kezdőpontja
@@ -41,6 +43,13 @@ void setup() {
     // Pico HW Timer1 beállítása a rotaryhoz
     ITimer1.attachInterruptInterval(ROTARY_ENCODER_SERVICE_INTERVAL_IN_MSEC * 1000, hardwareTimerHandler1);
 #endif
+
+    // Beeper beállítása
+    Utils::beepInit();
+
+    // TFT LED háttérvilágítás kimenet
+    pinMode(PIN_TFT_BACKGROUND_LED, OUTPUT);
+    analogWrite(PIN_TFT_BACKGROUND_LED, TFT_BACKGROUND_LED_MAX_BRIGHTNESS);
 }
 
 /**
