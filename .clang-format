@@ -1,0 +1,6 @@
+BasedOnStyle: Google
+ColumnLimit: 180
+SeparateDefinitionBlocks: Always
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: true
+IndentWidth: 4
