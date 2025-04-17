@@ -86,6 +86,6 @@ void mergeArrays(const T *source1, uint8_t length1, const T *source2, uint8_t le
     }
 }
 
-}  // namespace Utils
+};  // namespace Utils
 
 #endif  // __UTILS_H
