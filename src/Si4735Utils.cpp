@@ -129,7 +129,7 @@ void Si4735Utils::setStep() {
 
     // This command should work only for SSB mode
     BandTable& currentBand = band.getCurrentBand();
-    uint8_t currMod = currentBand.varData.currMod;
+    uint8_t currMod = currentBand.currMod;
 
     if (rtv::bfoOn && (currMod == LSB or currMod == USB or currMod == CW)) {
         if (config.data.currentBFOStep == 1)
