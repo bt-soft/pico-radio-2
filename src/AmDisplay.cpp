@@ -138,12 +138,12 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                 rtv::freqDec = 0;
             }
 
-            if (rtv::freqDec <= -16000) {
-                rtv::freqDec = rtv::freqDec + 16000;         // freqDec = 0
-                int16_t freqPlus16 = currentFrequency + 16;  // freqPlus16 = 14073
+            if (rtv::freqDec <= -16000) {  // Felfelé átfordulás ága
+                rtv::freqDec = rtv::freqDec + 16000;
+                int16_t freqPlus16 = currentFrequency + 16;
                 Si4735Utils::hardwareAudioMuteOn();
                 si4735.setFrequency(freqPlus16);
-                delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától
+                delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától a kijelzett érték
             }
 
         } else {
@@ -156,12 +156,12 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                 rtv::freqDec = 0;
             }
 
-            if (rtv::freqDec >= 16000) {                    // Lefelé átfordulás ága
-                rtv::freqDec = rtv::freqDec - 16000;        // freqDec = 0
-                int16_t freqMin16 = currentFrequency - 16;  // freqMin16 = 14042
+            if (rtv::freqDec >= 16000) {  // Lefelé átfordulás ága
+                rtv::freqDec = rtv::freqDec - 16000;
+                int16_t freqMin16 = currentFrequency - 16;
                 Si4735Utils::hardwareAudioMuteOn();
                 si4735.setFrequency(freqMin16);
-                delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától
+                delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától a kijelzett érték
             }
         }
 

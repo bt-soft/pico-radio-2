@@ -214,7 +214,7 @@ void setup() {
     tft.setTextColor(TFT_GREEN, TFT_COLOR_BACKGROUND);
     tft.print(F("Si473X addr:  0x"));
     tft.println(si4735Addr, HEX);
-    delay(1500);
+    //delay(1500);
 
     //--------------------------------------------------------------------
 

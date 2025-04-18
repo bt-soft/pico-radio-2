@@ -202,7 +202,7 @@ void Band::loadSSB() {
     delay(50);
 
     si4735.setI2CFastMode();  // Recommended
-    // si4735.setI2CFastModeCustom(500000); // It is a test and may crash.
+                              // si4735.setI2CFastModeCustom(500000); // It is a test and may crash.
     si4735.downloadPatch(ssb_patch_content, sizeof(ssb_patch_content));
     si4735.setI2CStandardMode();  // goes back to default (100KHz)
     delay(50);
@@ -278,7 +278,7 @@ void Band::useBand() {
         // Antenna tuning capacitor beállítása (FM esetén antenna tuning capacitor nem kell)
         currentBand.varData.antCap = getDefaultAntCapValue();
         si4735.setTuneFrequencyAntennaCapacitor(currentBand.varData.antCap);
-        delay(100);
+        // delay(100);
 
         si4735.setFM(currentBand.pConstData->minimumFreq, currentBand.pConstData->maximumFreq, currentBand.varData.currFreq, currentBand.varData.currStep);
         si4735.setFMDeEmphasis(1);
@@ -292,7 +292,7 @@ void Band::useBand() {
         //  Antenna capacitor beállítása
         currentBand.varData.antCap = getDefaultAntCapValue();  // Sima AM esetén antenna tuning capacitor nem kell
         si4735.setTuneFrequencyAntennaCapacitor(currentBand.varData.antCap);
-        delay(100);
+        // delay(100);
 
         if (ssbLoaded) {
             // SSB vagy CW mód
@@ -324,7 +324,7 @@ void Band::useBand() {
             rtv::CWShift = false;  // AM módban biztosan nincs CW shift
         }
     }
-    delay(100);
+    // delay(100);
 }
 
 /**
