@@ -206,6 +206,7 @@ void setup() {
             ;
     }
     si4735.setDeviceI2CAddress(si4735Addr == 0x11 ? 0 : 1);  // Sets the I2C Bus Address, erre is szükség van...
+    si4735.setAudioMuteMcuPin(PIN_AUDIO_MUTE);  // Audio Mute pin
 
     // Megtaláltuk az SI4735-öt, kiírjuk az I2C címét a képernyőre
     tft.setFreeFont();
@@ -220,8 +221,6 @@ void setup() {
     rtv::freqstep = 1000;  // hz
     rtv::freqDec = config.data.currentBFO;
 
-    // Band + Si4735 init
-    si4735.setAudioMuteMcuPin(PIN_AUDIO_MUTE);  // Audio Mute pin
 
     // Kezdő képernyőtípus beállítása
     ::newDisplay = band.getCurrentBandType() == FM_BAND_TYPE ? DisplayBase::DisplayType::fm : DisplayBase::DisplayType::am;

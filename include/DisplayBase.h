@@ -213,8 +213,6 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
      */
     virtual void processDialogButtonResponse(TftButton::ButtonTouchEvent &event) {
 
-        DEBUG("DisplayBase::processDialogButtonResponse() -> id: %d, label: %s, state: %s\n", event.id, event.label, TftButton::decodeState(event.state));
-
         // Töröljük a dialógot
         delete this->pDialog;
         this->pDialog = nullptr;
@@ -242,6 +240,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 };
 
 // Globális változó az aktuális kijelző váltásának jelzésére (a főprogramban deklarálva)
+// A képenyő váltáskor használjuk, hogy jelezzük, hogy a loop()-ban van képernyő váltás
 extern DisplayBase::DisplayType newDisplay;
 
 #endif  //__DISPLAY_BASE_H

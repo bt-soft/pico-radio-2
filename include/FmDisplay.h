@@ -11,11 +11,6 @@
  */
 class FmDisplay : public DisplayBase {
    private:
-    // bool ledState = false;
-    // int volume = 5;
-    // float temperature = 22.5;
-    // int antCapValue = 0;
-    //
     Rds *pRds;
     SMeter *pSMeter;
     SevenSegmentFreq *pSevenSegmentFreq;
@@ -60,14 +55,6 @@ class FmDisplay : public DisplayBase {
      * Aktuális képernyő típusának lekérdezése
      */
     inline DisplayBase::DisplayType getDisplayType() override { return DisplayBase::DisplayType::fm; };
-
-    // /**
-    //  *
-    //  */
-    // void ledStateChanged(double newValue) {
-    //     ledState = static_cast<bool>(newValue);
-    //     digitalWrite(LED_BUILTIN, ledState);
-    // }
 };
 
 #endif  //__FMDISPLAY_H

@@ -31,13 +31,6 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"RDS", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(config.data.rdsEnabled)},  //
         {"Freq", TftButton::ButtonType::Pushable},
-        // //----
-        // {"Popup", TftButton::ButtonType::Pushable},  //
-        // {"Multi", TftButton::ButtonType::Pushable},
-        // //
-        // {"b-Val", TftButton::ButtonType::Pushable},  //
-        // {"i-Val", TftButton::ButtonType::Pushable},  //
-        // {"f-Val", TftButton::ButtonType::Pushable},  //
     };
 
     // Horizontális képernyőgombok legyártása
@@ -122,58 +115,7 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
         BandTable &currentBand = band.getCurrentBand();
         DisplayBase::pDialog = new FrequencyInputDialog(this, DisplayBase::tft, band, currentBand.varData.currFreq);
     }
-    //  else if (STREQ("AM", event.label)) {
-    //     ::newDisplay = DisplayBase::DisplayType::am;
-
-    // } else if (STREQ("Popup", event.label)) {
-    //     // Popup
-    //     DisplayBase::pDialog = new MessageDialog(this, DisplayBase::tft, 280, 130, F("Dialog title"), F("Folytassuk?"), "Aha", "Ne!!");
-
-    // } else if (STREQ("Multi", event.label)) {
-    //     // Multi button Dialog
-    //     const char *buttonLabels[] = {"Opt-1", "Opt-2", "Opt-3", "Opt-4", "Opt-5", "Opt-6", "Opt-7", "Opt-8", "Opt-9", "Opt-10", "Opt-11", "Opt-12"};
-    //     int buttonsCount = ARRAY_ITEM_COUNT(buttonLabels);
-
-    //     DisplayBase::pDialog = new MultiButtonDialog(this, DisplayBase::tft, 400, 180, F("Valasszon opciot!"), buttonLabels, buttonsCount);
-
-    // } else if (STREQ("b-Val", event.label)) {
-    //     // b-ValueChange
-    //     DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 250, 150, F("LED state"), F("Value:"), &ledState, false, true, false,
-    //                                                  [this](double newValue) { this->ledStateChanged(newValue); });
-
-    // } else if (STREQ("i-Val", event.label)) {
-    //     // i-ValueChange
-    //     DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 250, 150, F("Volume"), F("Value:"), &volume, (int)0, (int)63, (int)1);
-
-    // } else if (STREQ("f-Val", event.label)) {
-    //     // f-ValueChange
-    //     DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 250, 150, F("Temperature"), F("Value:"), &temperature, (float)-15.0, (float)+30.0, (float)0.05);
-    // }
 }
-
-// /**
-//  *
-//  */
-// void FmDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent &event) {
-
-//     DEBUG("FmDisplay::processDialogButtonResponse() -> id: %d, label: %s, state: %s\n", event.id, event.label, TftButton::decodeState(event.state));
-
-//     if (event.id == DLG_OK_BUTTON_ID && STREQ("OK", event.label)) {
-//         // Get the entered frequency
-//         uint32_t newFrequency = event.value;
-
-//         // Do something with the new frequency (e.g., tune the radio)
-//         BandTable &currentBand = band.getCurrentBand();
-//         currentBand.varData.currFreq = newFrequency;
-//         si4735.setFrequency(newFrequency);
-
-//         // RDS törlés
-//         pRds->clearRds();
-//     }
-
-//     // Call the base class method to close the dialog and redraw the screen
-//     DisplayBase::processDialogButtonResponse(event);
-// }
 
 /**
  * Touch (nem képrnyő button) esemény lekezelése
@@ -196,9 +138,7 @@ void FmDisplay::showMonoStereo(bool stereo) {
     tft.setTextSize(1);
     tft.setTextDatum(BC_DATUM);
     tft.setTextPadding(0);
-    char buffer[10];  // Useful to handle string
-    sprintf(buffer, "%s", stereo ? "STEREO" : "MONO");
-    tft.drawString(buffer, rtv::freqDispX + 210, rtv::freqDispY + 71);
+    tft.drawString(stereo ? "STEREO" : "MONO", rtv::freqDispX + 210, rtv::freqDispY + 71);
 }
 
 /**

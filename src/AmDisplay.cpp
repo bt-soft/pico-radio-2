@@ -81,9 +81,7 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
 
         // Antenna kapacitás állítása
         int maxValue = band.getCurrentBand().varData.currMod == FM ? 191 : 6143;
-
         int antCapValue = 0;
-
         DisplayBase::pDialog =
             new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Antenna Tuning capacitor"), F("Capacitor value [pF]:"), &antCapValue, (int)0, (int)maxValue,
                                   (int)0,  // A rotary encoder értéke lesz a step
