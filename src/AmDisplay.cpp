@@ -143,7 +143,7 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                 int16_t freqPlus16 = currentFrequency + 16;  // freqPlus16 = 14073
                 Si4735Utils::hardwareAudioMuteOn();
                 si4735.setFrequency(freqPlus16);
-                delay(10);
+                delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától
             }
 
         } else {
@@ -161,7 +161,7 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                 int16_t freqMin16 = currentFrequency - 16;  // freqMin16 = 14042
                 Si4735Utils::hardwareAudioMuteOn();
                 si4735.setFrequency(freqMin16);
-                delay(10);
+                delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától
             }
         }
 
