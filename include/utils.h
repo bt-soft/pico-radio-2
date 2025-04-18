@@ -1,14 +1,11 @@
 #ifndef __UTILS_H
 #define __UTILS_H
 
-#include <Arduino.h>
 #include <TFT_eSPI.h>
 
-#include <cstddef>
+#include <cstring>  // strncpy miatt
 
-#include "defines.h"
-
-// -- -Utils---
+//--- Utils ---
 namespace Utils {
 /**
  * Biztonságos string másolás
@@ -49,7 +46,6 @@ void displayException(TFT_eSPI &tft, const char *msg);
 /**
  *  Pitty hangjelzés
  */
-void beepInit();
 void beepTick();
 void beepError();
 
@@ -86,6 +82,6 @@ void mergeArrays(const T *source1, uint8_t length1, const T *source2, uint8_t le
     }
 }
 
-};  // namespace Utils
+}  // namespace Utils
 
 #endif  // __UTILS_H

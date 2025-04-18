@@ -4,6 +4,7 @@
 #include <SI4735.h>
 
 #include "Config.h"
+#include "defines.h"
 #include "rtVars.h"
 
 // Band index
@@ -22,24 +23,32 @@
 #define CW_DEMOD_MODE LSB       // CW demodulációs mód = LSB + 700Hz offset
 #define CW_SHIFT_FREQUENCY 700  // CW alap offset
 
-struct BandTable {
-    // BandTable állandó része (Nincs értelme a PROGMEM-ben tárolni, Pico-nál nincs ilyen)
-    const char *bandName;        // Sáv neve (PROGMEM mutató)
-    const uint8_t bandType;      // Sáv típusa (FM, MW, LW vagy SW)
-    const uint16_t prefMod;      // Preferált moduláció (AM, FM, USB, LSB, CW)
-    const uint16_t minimumFreq;  // A sáv minimum frekvenciája
-    const uint16_t maximumFreq;  // A sáv maximum frekvenciája
-    const uint16_t defFreq;      // Alapértelmezett frekvencia vagy aktuális frekvencia
-    const uint8_t defStep;       // Alapértelmezett lépésköz (növelés/csökkentés)
-    const bool isHam;            // HAM sáv-e?
+// BandTable állandó része (PROGMEM-ben tároljuk)
+struct BandTableConst {
+    const char *bandName;  // Sáv neve (PROGMEM mutató)
+    uint8_t bandType;      // Sáv típusa (FM, MW, LW vagy SW)
+    uint16_t prefMod;      // Preferált moduláció (AM, FM, USB, LSB, CW)
+    uint16_t minimumFreq;  // A sáv minimum frekvenciája
+    uint16_t maximumFreq;  // A sáv maximum frekvenciája
+    uint16_t defFreq;      // Alapértelmezett frekvencia vagy aktuális frekvencia
+    uint8_t defStep;       // Alapértelmezett lépésköz (növelés/csökkentés)
+    bool isHam;            // HAM sáv-e?
+};
 
-    // BandTable változó része
+// BandTable változó része (RAM-ban tároljuk)
+struct BandTableVar {
     uint16_t currFreq;    // Aktuális frekvencia
     uint8_t currStep;     // Aktuális lépésköz (növelés/csökkentés)
     uint8_t currMod;      // Aktuális mód/modulációs típus (FM, AM, LSB, USB, CW)
     uint16_t antCap;      // Antenna Tuning Capacitor
     int16_t lastBFO;      // Utolsó BFO érték
     int16_t lastmanuBFO;  // Utolsó manuális BFO érték X-Tal segítségével
+};
+
+// A kombinált struktúra az állandó és változó adatok összekapcsolásával
+struct BandTable {
+    const BandTableConst *pConstData;  // PROGMEM-beli állandó adatok
+    BandTableVar varData;              // RAM-ban tárolt változó adatok
 };
 
 // Sávszélesség struktúra (Címke és Érték)
@@ -149,7 +158,7 @@ class Band {
     /**
      * Aktuális mód/modulációs típus (FM, AM, LSB, USB, CW)
      */
-    inline const char *getCurrentBandModeDesc() { return bandModeDesc[getCurrentBand().currMod]; }
+    inline const char *getCurrentBandModeDesc() { return bandModeDesc[getCurrentBand().varData.currMod]; }
 
     /**
      * A lehetséges AM demodulációs módok kigyűjtése
@@ -166,7 +175,7 @@ class Band {
      */
     const char *getCurrentBandWidthLabel() {
         const char *p;
-        uint8_t currMod = getCurrentBand().currMod;
+        uint8_t currMod = getCurrentBand().varData.currMod;
         if (currMod == AM) p = getCurrentBandWidthLabelByIndex(bandWidthAM, config.data.bwIdxAM);
         if (currMod == LSB or currMod == USB or currMod == CW) p = getCurrentBandWidthLabelByIndex(bandWidthSSB, config.data.bwIdxSSB);
         if (currMod == FM) p = getCurrentBandWidthLabelByIndex(bandWidthFM, config.data.bwIdxFM);
@@ -271,19 +280,19 @@ class Band {
         return currentStepStr;
     }
 
-    inline const char *getCurrentBandName() { return (const char *)pgm_read_ptr(&getCurrentBand().bandName); }
+    inline const char *getCurrentBandName() { return (const char *)pgm_read_ptr(&getCurrentBand().pConstData->bandName); }
 
-    inline const uint8_t getCurrentBandType() { return getCurrentBand().bandType; }
+    inline uint8_t getCurrentBandType() { return getCurrentBand().pConstData->bandType; }
 
-    inline const uint16_t getCurrentBandMinimumFreq() { return getCurrentBand().minimumFreq; }
+    inline uint16_t getCurrentBandMinimumFreq() { return getCurrentBand().pConstData->minimumFreq; }
 
-    inline const uint16_t getCurrentBandMaximumFreq() { return getCurrentBand().maximumFreq; }
+    inline uint16_t getCurrentBandMaximumFreq() { return getCurrentBand().pConstData->maximumFreq; }
 
-    inline const uint16_t getCurrentBandDefaultFreq() { return getCurrentBand().defFreq; }
+    inline uint16_t getCurrentBandDefaultFreq() { return getCurrentBand().pConstData->defFreq; }
 
-    inline const uint8_t getCurrentBandDefaultStep() { return getCurrentBand().defStep; }
+    inline uint8_t getCurrentBandDefaultStep() { return getCurrentBand().pConstData->defStep; }
 
-    inline const bool getCurrentBandIsHam() { return getCurrentBand().isHam; }
+    inline bool getCurrentBandIsHam() { return getCurrentBand().pConstData->isHam; }
 
     /**
      *

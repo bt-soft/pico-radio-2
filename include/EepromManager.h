@@ -1,9 +1,12 @@
-#ifndef __EEPROM_MANAGER_H
-#define __EEPROM_MANAGER_H
+#ifndef __EEPROMMANAGER_H
+#define __EEPROMMANAGER_H
+
+// inspiration from https://github.com/bimac/EEPstore/blob/main/src/EEPstore.h
 
 #include <CRC.h>
 #include <EEPROM.h>
 
+#include "defines.h"
 #include "utils.h"
 
 #ifndef EEPROM_SIZE
@@ -111,4 +114,4 @@ class EepromManager {
     }
 };
 
-#endif  // __EEPROM_MANAGER_H
+#endif  // __EEPROMMANAGER_H

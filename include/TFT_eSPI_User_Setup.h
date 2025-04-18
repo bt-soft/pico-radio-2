@@ -1,5 +1,3 @@
-// Stripped down User_Setup.h version for the Pico-Matrix-Touch-Keyboard //
-
 #define ILI9488_DRIVER  // WARNING: Do not connect ILI9488 display SDO to MISO if other devices share the SPI bus (TFT SDO does NOT tristate when CS is high)
 
 #define TFT_MISO 0  // SPI0 RX
@@ -14,12 +12,10 @@
 // Zero esetén nincs Touch!
 // Touch Support
 // #define TOUCH_CS 14 // Chip select pin (T_CS) of touch screen
-
 #else
 #define TFT_CS 20    // Chip select control pin - sima PICO
 #define TFT_DC 22    // Data Command control pin - sima PICO
 #define TFT_RST 21   // Reset pin (could connect to Arduino RESET pin) - sima PICO
-
 // Touch Support
 #define TOUCH_CS 14  // Chip select pin (T_CS) of touch screen
 #endif

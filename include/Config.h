@@ -3,6 +3,10 @@
 
 #include "StoreBase.h"
 
+// TFT háttérvilágítás max érték
+#define TFT_BACKGROUND_LED_MAX_BRIGHTNESS 255
+#define TFT_BACKGROUND_LED_MIN_BRIGHTNESS 5
+
 // --------------------------------
 // Konfig struktúra típusdefiníció
 struct Config_t {

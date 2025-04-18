@@ -1,5 +1,8 @@
-#ifndef __STORE_BASE_H
-#define __STORE_BASE_H
+#ifndef __STOREBASE_H
+#define __STOREBASE_H
+#include <Arduino.h>
+
+#include <list>
 
 #include "EepromManager.h"
 #include "defines.h"
@@ -54,4 +57,4 @@ class StoreBase {
     }
 };
 
-#endif  // __STORE_BASE_H
+#endif  //__STOREBASE_H

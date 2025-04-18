@@ -67,4 +67,4 @@ class Si4735Utils {
     void hardwareAudioMuteOn();
 };
 
-#endif  // __SI4735UTILS_H
+#endif  //__SI4735UTILS_H

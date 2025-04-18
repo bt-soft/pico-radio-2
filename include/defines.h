@@ -28,6 +28,11 @@
 //--- Debug ---
 #define __DEBUG  // Debug mód bekapcsolása
 
+#ifdef __DEBUG
+// #define SHOW_MEMORY_INFO
+// #define MEMORY_INFO_INTERVAL 20 * 1000  // 20mp
+#endif
+
 //--- TFT colors ---
 #define TFT_COLOR(r, g, b) (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3))
 // #define COMPLEMENT_COLOR(color) \

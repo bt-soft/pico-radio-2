@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include "defines.h"
+
 namespace Utils {
 
 /**
@@ -39,7 +41,7 @@ void tftTouchCalibrate(TFT_eSPI &tft, uint16_t (&calData)[5]) {
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     tft.println(txt);
 
-    // TFT_eSPI 'bóti' kalibráció indítása (Az IntelliSense fals hibát jelez, de a kód működik)
+    // TFT_eSPI 'bóti' kalibráció indítása
     tft.calibrateTouch(calData, TFT_YELLOW, TFT_BLACK, 15);
 
     txt = F("Kalibracio befejezodott!");
@@ -89,14 +91,6 @@ void displayException(TFT_eSPI &tft, const char *msg) {
         digitalWrite(LED_BUILTIN, HIGH);
         delay(300);
     }
-}
-
-/**
- * Beeper pin init
- */
-void beepInit() {
-    pinMode(PIN_BEEPER, OUTPUT);
-    digitalWrite(PIN_BEEPER, LOW);
 }
 
 /**
