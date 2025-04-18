@@ -211,10 +211,10 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
         // Kiszámítjuk a pontos frekvenciát Hz-ben a BFO eltolással
         displayFreqHz = (uint32_t)currentFrequency * 1000 - currentBand.varData.lastBFO;
 
-        // CW módban további 700Hz eltolás (ha aktív a CW shift)
-        if (rtv::CWShift) {
-            displayFreqHz -= CW_SHIFT_FREQUENCY;
-        }
+        // // CW módban további 700Hz eltolás (ha aktív a CW shift)
+        // if (rtv::CWShift) {
+        //     displayFreqHz -= CW_SHIFT_FREQUENCY;
+        // }
 
         // Új formázás: kHz érték és a 100Hz/10Hz rész kiszámítása
         long khz_part = displayFreqHz / 1000;            // Egész kHz rész

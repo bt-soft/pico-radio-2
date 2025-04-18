@@ -305,23 +305,6 @@ void Band::useBand() {
                           1,  // SSB/CW esetén a step mindig 1kHz a chipen belül
                           modeForChip);
 
-            // si4735.setSSB(currentBand.pConstData->minimumFreq, currentBand.pConstData->maximumFreq, currentBand.varData.currFreq, currentBand.varData.currStep,
-            //               currentBand.varData.currMod);
-            //  si4735.setSSBAutomaticVolumeControl(1);
-            //  si4735.setSsbSoftMuteMaxAttenuation(0); // Disable Soft Mute for SSB
-            //  si4735.setSSBDspAfc(0);
-            //  si4735.setSSBAvcDivider(3);
-            //  si4735.setSsbSoftMuteMaxAttenuation(8); // Disable Soft Mute for SSB
-            //  si4735.setSBBSidebandCutoffFilter(0);
-            //  si4735.setSSBBfo(currentBFO);
-
-            // Itt van állítva a BFO!!
-            // si4735.setSSBBfo(config.data.currentBFO + config.data.currentBFOmanu);
-
-            // SSB ONLY 1KHz stepsize
-            // currentBand.varData.currStep = 1;
-            // si4735.setFrequencyStep(currentBand.varData.currStep);
-
             // BFO beállítása
             // CW mód: Fix BFO offset (pl. 700 Hz) + manuális finomhangolás
             const int16_t cwBaseOffset = isCWMode ? CW_SHIFT_FREQUENCY : 0;

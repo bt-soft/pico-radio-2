@@ -81,7 +81,9 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
 
         // Antenna kapacitás állítása
         int maxValue = band.getCurrentBand().varData.currMod == FM ? 191 : 6143;
+
         int antCapValue = 0;
+
         DisplayBase::pDialog =
             new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Antenna Tuning capacitor"), F("Capacitor value [pF]:"), &antCapValue, (int)0, (int)maxValue,
                                   (int)0,  // A rotary encoder értéke lesz a step
@@ -137,10 +139,11 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
             }
 
             if (rtv::freqDec <= -16000) {
-                rtv::freqDec = rtv::freqDec + 16000;
-                int16_t freqPlus16 = currentFrequency + 16;
+                rtv::freqDec = rtv::freqDec + 16000;         // freqDec = 0
+                int16_t freqPlus16 = currentFrequency + 16;  // freqPlus16 = 14073
                 Si4735Utils::hardwareAudioMuteOn();
                 si4735.setFrequency(freqPlus16);
+                delay(10);
             }
 
         } else {
@@ -152,21 +155,21 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                 si4735.setFrequency(currentBand.pConstData->minimumFreq);
                 rtv::freqDec = 0;
             }
-            if (rtv::freqDec >= 16000) {
-                rtv::freqDec = rtv::freqDec - 16000;
-                int16_t freqMin16 = currentFrequency - 16;
+
+            if (rtv::freqDec >= 16000) {                    // Lefelé átfordulás ága
+                rtv::freqDec = rtv::freqDec - 16000;        // freqDec = 0
+                int16_t freqMin16 = currentFrequency - 16;  // freqMin16 = 14042
                 Si4735Utils::hardwareAudioMuteOn();
                 si4735.setFrequency(freqMin16);
+                delay(10);
             }
         }
 
         config.data.currentBFO = rtv::freqDec;                 // freqDec a finomhangolás mértéke
         currentBand.varData.lastBFO = config.data.currentBFO;  // Mentsük el a finomhangolást
-
-        // BFO beállítása: CW esetén alap offset + finomhangolás, SSB esetén csak finomhangolás
-        const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;                 // CW alap offset
-        si4735.setSSBBfo(cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu);  // <- Itt állítjuk be a BFO-t Hz-ben!
-
+        const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
+        int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
+        si4735.setSSBBfo(bfoToSet);
         checkAGC();
 
     } else {
@@ -210,11 +213,6 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
 
     // Elmentjük a beállított frekvenciát a Band táblába
     currentBand.varData.currFreq = si4735.getFrequency();
-
-    // Kiszámítjuk a pontos frekvenciát Hz-ben a BFO eltolással
-    uint32_t displayFreqHz = (uint32_t)currentFrequency * 1000 - currentBand.varData.lastBFO;
-    DEBUG("AmDisplay::handleRotary() -> displayFreqHz: %d, currentBand.varData.lastBFO: %d, config.data.currentBFO: %d \n", displayFreqHz, currentBand.varData.lastBFO,
-          config.data.currentBFO);
 
     // Beállítjuk, hogy kell majd új frekvenciakijelzés
     DisplayBase::frequencyChanged = true;

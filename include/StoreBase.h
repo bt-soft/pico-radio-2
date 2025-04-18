@@ -51,8 +51,6 @@ class StoreBase {
             crc = EepromManager<T>::save(r());
             lastCRC = crc;
             DEBUG("StoreBase::checkSave() -> Saving the config to the EEPROM is OK., crc = %d\n", crc);
-        } else {
-            DEBUG("StoreBase::checkSave() -> There is no need to save the config to the EEPROM\n");
         }
     }
 };

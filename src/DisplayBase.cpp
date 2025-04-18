@@ -606,11 +606,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                 BandTable &currentBand = band.getCurrentBand();
                 uint8_t newMod = event.id - DLG_MULTI_BTN_ID_START + 1;  // Az FM-et kihagyjuk!
 
-                // Ha CW módra váltunk, nullázzuk a finomhangolási BFO-t
-                // if (newMod == CW) {
-                //     config.data.currentBFO = 0;
-                // }
-                // CW reset
+                // // Ha CW módra váltunk, akkor nullázzuk a finomhangolási BFO-t
                 if (newMod != CW and rtv::CWShift == true) {
                     currentBand.varData.lastBFO = 0;  // CW_SHIFT_FREQUENCY;
                     config.data.currentBFO = currentBand.varData.lastBFO;
