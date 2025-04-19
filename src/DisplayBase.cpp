@@ -553,7 +553,41 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
     } else if (STREQ("Freq", event.label)) {
         // Open the FrequencyInputDialog
         BandTable &currentBand = band.getCurrentBand();
-        DisplayBase::pDialog = new FrequencyInputDialog(this, DisplayBase::tft, band, currentBand.varData.currFreq);
+        uint16_t currentFreqInternal = currentBand.varData.currFreq;  // A rádió belső formátuma
+
+        DisplayBase::pDialog = new FrequencyInputDialog(this, DisplayBase::tft, band, currentFreqInternal, [this](float freqValue) {
+            // Itt kapjuk meg a dialógusból a float értéket (MHz/kHz)
+            uint16_t targetFreq;  // Ez lesz kHz vagy 10kHz a rádiónak
+            uint8_t bandType = band.getCurrentBandType();
+            const char *unitStr = (bandType == FM_BAND_TYPE || bandType == SW_BAND_TYPE) ? "MHz" : "kHz";  // Meghatározzuk a dialógus által használt unitStr-t
+
+            // Konverzió a rádió egységére (ugyanaz a logika, mint ami a dialógusban volt)
+            if (bandType == FM_BAND_TYPE) {  // Bevitel MHz, cél 10kHz
+                targetFreq = static_cast<uint16_t>(round(freqValue * 100.0));
+            } else {                                // Bevitel kHz vagy MHz, cél kHz
+                if (strcmp(unitStr, "MHz") == 0) {  // SW MHz bevitel
+                    targetFreq = static_cast<uint16_t>(round(freqValue * 1000.0));
+                } else {  // AM/LW kHz bevitel
+                    targetFreq = static_cast<uint16_t>(round(freqValue));
+                }
+            }
+
+            // Band adat frissítése és rádió hangolása ITT történik
+            BandTable &currentBand = band.getCurrentBand();
+            currentBand.varData.currFreq = targetFreq;
+            Si4735Utils::si4735.setFrequency(targetFreq);  // Itt használjuk a Si4735Utils::si4735-öt
+            DEBUG("Frequency set via Dialog to: %d (%s)\n", targetFreq, (bandType == FM_BAND_TYPE) ? "10kHz" : "kHz");
+
+            // Opcionális: BFO nullázás (ha szükséges)
+            // ...
+
+            // Képernyő frissítése (pl. frekvencia kijelző)
+            DisplayBase::frequencyChanged = true;  // Jelezzük a fő loopnak a frissítést
+            // Vagy közvetlen hívás, ha a DisplayBase-nek van ilyen metódusa
+            // updateFrequencyDisplayOnScreen();
+        });
+
+        processed = true;  // Jelöljük, hogy kezeltük az eseményt
     }
 
     else if (STREQ("Setup", event.label)) {              // Beállítások
