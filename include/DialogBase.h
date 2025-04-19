@@ -43,9 +43,6 @@ class DialogBase : public IGuiEvents {
     uint16_t contentY;       // Ehhez az y értékhez igazíthatják a tartalmukat a leszármazottak
 
    public:
-    // static constexpr TftButton::ButtonTouchEvent okButtonTouchEvent = {DLG_CANCEL_BUTTON_ID, "<ok>", TftButton::ButtonState::Pushed};
-    // static constexpr TftButton::ButtonTouchEvent cancelButtonTouchEvent = {DLG_CANCEL_BUTTON_ID, "<cancel>", TftButton::ButtonState::Pushed};
-
     /**
      * Konstruktor
      * @param pParent Szülő képernyő
@@ -76,8 +73,8 @@ class DialogBase : public IGuiEvents {
      */
     virtual void drawDialog() {
 
-        // 'Fátyol' kirajzolása
-        drawOverlay();
+        // 'Fátyol' kirajzolása  az egész képernyőre
+        drawOverlay(0, 0, tft.width(), tft.height());
 
         // Kirajzoljuk a dialógot
         tft.fillRect(x, y, w, h, DLG_BACKGROUND_COLOR);  // háttér
@@ -147,16 +144,36 @@ class DialogBase : public IGuiEvents {
     }
 
    private:
+   private:
     /**
      * Fátyol kirajzolása
+     * @param overlayX overlay X pozíció
+     * @param overlayY overlay Y pozíció
+     * @param overlayW overlay szélesség
+     * @param overlayH overlay magasság
      */
-    inline void drawOverlay() {
+    inline void drawOverlay(uint32_t overlayX, uint32_t overlayY, uint32_t overlayW, uint32_t overlayH, uint16_t color = TFT_COLOR(90, 90, 90)) {
+        // Fátyol kirajzolása
+        uint32_t endX = overlayX + overlayW;  // Vég X koordináta
+        uint32_t endY = overlayY + overlayH;  // Vég Y koordináta
 
-        for (int y = 0; y < tft.height(); y += 2) {
-            for (int x = 0; x < tft.width(); x += 2) {
-                tft.drawPixel(x, y, TFT_COLOR(90, 90, 90));  // Apró pontokkal csinálunk fátyolt
+        for (uint32_t y = overlayY; y < endY; y += 2) {      // Ciklus a vég Y koordinátáig
+            for (uint32_t x = overlayX; x < endX; x += 2) {  // Ciklus a vég X koordinátáig
+                tft.drawPixel(x, y, color);                  // Apró pontokkal csinálunk fátyolt
             }
         }
+    }
+
+   protected:
+    /**
+     * Fátyol kirajzolása
+     * @param overlayX overlay X pozíció
+     * @param overlayY overlay Y pozíció
+     * @param overlayW overlay szélesség
+     * @param overlayH overlay magasság
+     */
+    inline void drawDlgOverlay() {
+        drawOverlay(x, y, w, h, TFT_COLOR(190, 190, 190));  // A dialógus overlay-jét rajzoljuk ki
     }
 };
 

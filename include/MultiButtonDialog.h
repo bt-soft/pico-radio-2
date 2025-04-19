@@ -144,7 +144,7 @@ class MultiButtonDialog : public DialogBase {
             if (buttonsArray[i]->handleTouch(touched, tx, ty)) {
                 // Ha van callback, akkor meghívjuk
                 if (onButtonClicked) {
-                    // onButtonClicked(buttonsArray[i]->getLabel());
+                    DialogBase::drawDlgOverlay();  // Kirajzoljuk a dialógus overlay-t, hogy a gomb lenyomásakor ne legyen lefagyás érzés
                     onButtonClicked(buttonsArray[i]->buildButtonTouchEvent());
                 }
 
