@@ -50,7 +50,7 @@ class TftButton {
     const uint16_t TFT_BUTTON_STATE_BG_COLORS[4] = {
         TFT_COLOR(65, 65, 114),   // normal
         TFT_COLOR(65, 65, 114),   // pushed
-        TFT_COLOR(65, 65, 65),    // disabled
+        TFT_COLOR(95, 95, 95),    // disabled
         TFT_COLOR(243, 179, 105)  // current active
     };
 

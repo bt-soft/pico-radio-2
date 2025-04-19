@@ -40,6 +40,8 @@ class FrequencyInputDialog : public DialogBase {
     TftButton* backspaceButton;
     TftButton* dotButton;
 
+#define FREQ_INPUT_BACKGROUND_COLOR TFT_BLACK
+
     /**
      * @brief Ellenőrzi, hogy a beírt frekvencia a megengedett tartományban van-e
      *
@@ -84,9 +86,9 @@ class FrequencyInputDialog : public DialogBase {
      */
     void updateFrequencyDisplay() {
         // Kijelző terület törlése (háttérszínnel)
-        tft.fillRect(inputDisplayX, inputDisplayY, inputDisplayW, inputDisplayH, DLG_BACKGROUND_COLOR);
+        tft.fillRect(inputDisplayX, inputDisplayY, inputDisplayW, inputDisplayH, FREQ_INPUT_BACKGROUND_COLOR);
         // Keret rajzolása a kijelző terület köré
-        tft.drawRect(inputDisplayX, inputDisplayY, inputDisplayW, inputDisplayH, TFT_WHITE);  // Vagy TFT_SILVER
+        tft.drawRect(inputDisplayX, inputDisplayY, inputDisplayW, inputDisplayH, TFT_WHITE);
         // Mértékegység terület törlése (legyen elég széles)
         tft.fillRect(unitDisplayX, inputDisplayY, 40, inputDisplayH, DLG_BACKGROUND_COLOR);
 
@@ -99,7 +101,7 @@ class FrequencyInputDialog : public DialogBase {
         // Szín meghatározása érvényesség alapján (piros, ha érvénytelen)
         // Az üres stringet is érvényesnek tekintjük a kezdeti állapotban (nem piros)
         bool currentlyValid = isFrequencyValid() || currentInputString.length() == 0;
-        tft.setTextColor(currentlyValid ? TFT_WHITE : TFT_RED, DLG_BACKGROUND_COLOR);
+        tft.setTextColor(currentlyValid ? TFT_WHITE : TFT_RED, FREQ_INPUT_BACKGROUND_COLOR);
 
         // Bevitt string kirajzolása
         tft.drawString(currentInputString, inputDisplayX + inputDisplayW / 2, inputDisplayY + inputDisplayH / 2);
@@ -293,13 +295,10 @@ class FrequencyInputDialog : public DialogBase {
         // Pont gomb a 0 mellé jobbra
         dotButton = new TftButton(id++, tft, startX + 2 * (buttonWidth + buttonGapX), startY + 3 * (buttonHeight + buttonGapY), buttonWidth, buttonHeight, ".",
                                   TftButton::ButtonType::Pushable);
-        // Ha nincs tizedesjegy (kHz mód), akkor a pont gombot letiltjuk
-        if (maxFractionalDigits == 0) {
-            dotButton->setState(TftButton::ButtonState::Disabled);
-        }
 
         // Dialógus kirajzolása (ez hívja az updateFrequencyDisplay-t is)
         drawDialog();
+
         // Kezdeti OK gomb állapot beállítása (lehet, hogy a kezdeti érték érvénytelen?)
         okButton->setState(isFrequencyValid() ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled);
     }
@@ -330,6 +329,11 @@ class FrequencyInputDialog : public DialogBase {
         clearButton->draw();
         backspaceButton->draw();
         dotButton->draw();
+        // Ha nincs tizedesjegy (kHz mód), akkor a pont gombot letiltjuk
+        if (maxFractionalDigits == 0) {
+            dotButton->setState(TftButton::ButtonState::Disabled);
+        }
+
         for (int i = 0; i < 10; i++) {
             if (digitButtons[i]) digitButtons[i]->draw();
         }
