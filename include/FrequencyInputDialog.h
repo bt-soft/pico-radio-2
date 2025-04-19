@@ -7,6 +7,10 @@
 #include "DialogBase.h"
 #include "TftButton.h"
 
+// A dialóg méretei
+#define FREQUENCY_INPUT_DIALOG_H 240
+#define FREQUENCY_INPUT_DIALOG_W 220
+
 /**
  * @brief Frekvencia bevitel dialógus
  * A felhasználó beírhat egy frekvenciát, amit a rádióra állítunk be.
@@ -214,7 +218,7 @@ class FrequencyInputDialog : public DialogBase {
      * @param currentFreq A jelenlegi frekvencia (a rádió belső formátumában: kHz vagy 10kHz)
      */
     FrequencyInputDialog(IDialogParent* pParent, TFT_eSPI& tft, Band& band, uint16_t currentFreq, std::function<void(float)> onFrequencySet = nullptr)
-        : DialogBase(pParent, tft, 280, 240, F("Enter Frequency")), band(band), onFrequencySet(onFrequencySet) {  // currentFreq nem kell a tagváltozókhoz
+        : DialogBase(pParent, tft, FREQUENCY_INPUT_DIALOG_W, FREQUENCY_INPUT_DIALOG_H, F("Enter Frequency")), band(band), onFrequencySet(onFrequencySet) {
 
         BandTable& currentBand = band.getCurrentBand();
         minFreq = currentBand.pConstData->minimumFreq;
@@ -254,52 +258,66 @@ class FrequencyInputDialog : public DialogBase {
 
         initialValueDisplayed = true;  // Kezdetben az iniciális érték van kint
 
-        // Kijelző területének koordinátái (példa)
+        // Kijelző területének koordinátái
         inputDisplayX = x + 10;
-        inputDisplayY = y + DLG_HEADER_H + 5;  // Feljebb hozzuk
-        inputDisplayW = w - 60;                // Keskenyebb, hogy a unit elférjen
-        inputDisplayH = 45;
-        unitDisplayX = inputDisplayX + inputDisplayW + 5;  // Közvetlenül a számok után
-        unitDisplayY = inputDisplayY;                      // Ugyanaz az Y, mint a számnak
+        inputDisplayY = y + DLG_HEADER_H + 5;
+        inputDisplayW = w - 100;  // Szélesség
+        inputDisplayH = 45;       // Magasság
+        unitDisplayX = inputDisplayX + inputDisplayW + 5;
+        unitDisplayY = inputDisplayY;
 
-        // Gombok létrehozása (OK, Cancel)
-        okButton = new TftButton(DLG_OK_BUTTON_ID, tft, x + 10, y + h - DLG_BTN_H - DLG_BUTTON_Y_GAP, 80, DLG_BTN_H, "OK", TftButton::ButtonType::Pushable);
-        cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, x + w - 90, y + h - DLG_BTN_H - DLG_BUTTON_Y_GAP, 80, DLG_BTN_H, "Cancel", TftButton::ButtonType::Pushable);
+        // --- ÚJ GOMB ELRENDEZÉS (3. JAVASLAT) ---
+        uint16_t btnW = 40;         // Gomb szélesség
+        uint16_t btnH = 30;         // Gomb magasság
+        uint16_t gapX = 5;          // Vízszintes rés
+        uint16_t gapY = 5;          // Függőleges rés
+        uint8_t buttonsPerRow = 4;  // Gombok száma egy sorban (1-3, CLR; 4-6, <--; 7-9, .)
 
-        // Számjegy és vezérlő gombok elrendezése (maradhat a régi logika)
-        uint16_t buttonWidth = 40;
-        uint16_t buttonHeight = 30;
-        uint16_t buttonGapX = 5;
-        uint16_t buttonGapY = 5;
-        uint8_t buttonsPerRow = 4;  // 0-9 + CLR, <-- , .
-        uint16_t totalRowWidth = (buttonWidth * buttonsPerRow) + (buttonGapX * (buttonsPerRow - 1));
+        // Teljes szélesség kiszámítása a 4 gombos sorokhoz
+        uint16_t totalRowWidth = (btnW * buttonsPerRow) + (gapX * (buttonsPerRow - 1));
+        // Kezdő X pozíció középre igazításhoz
         uint16_t startX = x + (w - totalRowWidth) / 2;
-        // Y pozíció a frekvencia kijelző alá
-        uint16_t startY = inputDisplayY + inputDisplayH + 15;  // Nagyobb hely a kijelzőnek
+        // Kezdő Y pozíció a frekvencia kijelző alatt
+        uint16_t startY = inputDisplayY + inputDisplayH + 10;  // Kisebb rés itt elég
+
         uint8_t id = DLG_MULTI_BTN_ID_START;
 
-        // 1-9 gombok (3x3 rács)
-        for (int i = 1; i <= 9; i++) {
-            digitButtons[i] = new TftButton(id++, tft, startX + ((i - 1) % 3) * (buttonWidth + buttonGapX), startY + ((i - 1) / 3) * (buttonHeight + buttonGapY), buttonWidth,
-                                            buttonHeight, String(i).c_str(), TftButton::ButtonType::Pushable);
-        }
-        // 0 gomb (középre az utolsó sorba)
-        digitButtons[0] = new TftButton(id++, tft, startX + 1 * (buttonWidth + buttonGapX), startY + 3 * (buttonHeight + buttonGapY), buttonWidth, buttonHeight, "0",
-                                        TftButton::ButtonType::Pushable);
+        // 1. sor: 1, 2, 3, CLR
+        digitButtons[1] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), startY, btnW, btnH, "1", TftButton::ButtonType::Pushable);
+        digitButtons[2] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), startY, btnW, btnH, "2", TftButton::ButtonType::Pushable);
+        digitButtons[3] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), startY, btnW, btnH, "3", TftButton::ButtonType::Pushable);
+        clearButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), startY, btnW, btnH, "CLR", TftButton::ButtonType::Pushable);
 
-        // Vezérlő gombok a 4. oszlopba és a 0 mellé
-        clearButton = new TftButton(id++, tft, startX + 3 * (buttonWidth + buttonGapX), startY + 0 * (buttonHeight + buttonGapY), buttonWidth, buttonHeight, "CLR",
-                                    TftButton::ButtonType::Pushable);
-        backspaceButton = new TftButton(id++, tft, startX + 3 * (buttonWidth + buttonGapX), startY + 1 * (buttonHeight + buttonGapY), buttonWidth, buttonHeight, "<--",
-                                        TftButton::ButtonType::Pushable);
-        // Pont gomb a 0 mellé jobbra
-        dotButton = new TftButton(id++, tft, startX + 2 * (buttonWidth + buttonGapX), startY + 3 * (buttonHeight + buttonGapY), buttonWidth, buttonHeight, ".",
-                                  TftButton::ButtonType::Pushable);
+        // 2. sor: 4, 5, 6, <--
+        uint16_t row2Y = startY + btnH + gapY;
+        digitButtons[4] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), row2Y, btnW, btnH, "4", TftButton::ButtonType::Pushable);
+        digitButtons[5] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), row2Y, btnW, btnH, "5", TftButton::ButtonType::Pushable);
+        digitButtons[6] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), row2Y, btnW, btnH, "6", TftButton::ButtonType::Pushable);
+        backspaceButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), row2Y, btnW, btnH, "<--", TftButton::ButtonType::Pushable);
+
+        // 3. sor: 7, 8, 9, .
+        uint16_t row3Y = row2Y + btnH + gapY;
+        digitButtons[7] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), row3Y, btnW, btnH, "7", TftButton::ButtonType::Pushable);
+        digitButtons[8] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), row3Y, btnW, btnH, "8", TftButton::ButtonType::Pushable);
+        digitButtons[9] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), row3Y, btnW, btnH, "9", TftButton::ButtonType::Pushable);
+        dotButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), row3Y, btnW, btnH, ".", TftButton::ButtonType::Pushable);
+
+        // 4. sor: OK, 0, Cancel
+        uint16_t row4Y = row3Y + btnH + gapY;
+        uint16_t okCancelW = 62;  // OK és Cancel gomb szélessége
+        uint16_t zeroW = btnW;    // 0 gomb szélessége (legyen mint a számoké)
+        uint16_t totalRow4Width = okCancelW + gapX + zeroW + gapX + okCancelW;
+        uint16_t startX_R4 = x + (w - totalRow4Width) / 2;  // Kezdő X a 4. sorhoz (középre)
+
+        okButton = new TftButton(DLG_OK_BUTTON_ID, tft, startX_R4, row4Y, okCancelW, btnH, "OK", TftButton::ButtonType::Pushable);
+        digitButtons[0] = new TftButton(id++, tft, startX_R4 + okCancelW + gapX, row4Y, zeroW, btnH, "0", TftButton::ButtonType::Pushable);
+        cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, startX_R4 + okCancelW + gapX + zeroW + gapX, row4Y, okCancelW, btnH, "Canc", TftButton::ButtonType::Pushable);
+        // --- ELRENDEZÉS VÉGE ---
 
         // Dialógus kirajzolása (ez hívja az updateFrequencyDisplay-t is)
         drawDialog();
 
-        // Kezdeti OK gomb állapot beállítása (lehet, hogy a kezdeti érték érvénytelen?)
+        // Kezdeti OK gomb állapot beállítása
         okButton->setState(isFrequencyValid() ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled);
     }
 
@@ -313,7 +331,8 @@ class FrequencyInputDialog : public DialogBase {
         delete backspaceButton;
         delete dotButton;
         for (int i = 0; i < 10; i++) {
-            if (digitButtons[i]) delete digitButtons[i];  // Biztonsági ellenőrzés
+            // A digitButtons[0] is itt törlődik
+            if (digitButtons[i]) delete digitButtons[i];
         }
     }
 
@@ -323,17 +342,20 @@ class FrequencyInputDialog : public DialogBase {
     void drawDialog() override {
         DialogBase::drawDialog();  // Alap dialógus (keret, cím, háttér, X gomb)
         updateFrequencyDisplay();  // Kezdeti frekvencia string kirajzolása
+
         // Gombok kirajzolása
         okButton->draw();
         cancelButton->draw();
         clearButton->draw();
         backspaceButton->draw();
         dotButton->draw();
+
         // Ha nincs tizedesjegy (kHz mód), akkor a pont gombot letiltjuk
         if (maxFractionalDigits == 0) {
             dotButton->setState(TftButton::ButtonState::Disabled);
         }
 
+        // Számjegy gombok kirajzolása (0-9)
         for (int i = 0; i < 10; i++) {
             if (digitButtons[i]) digitButtons[i]->draw();
         }
@@ -360,35 +382,6 @@ class FrequencyInputDialog : public DialogBase {
                     onFrequencySet(freqValue);  // Átadjuk a float értéket a hívónak
                 }
 
-                // uint16_t targetFreq;  // Ez lesz kHz vagy 10kHz a rádiónak
-                // uint8_t bandType = band.getCurrentBandType();
-                //
-                // // Konverzió a rádió egységére
-                // if (bandType == FM_BAND_TYPE) {  // Bevitel MHz, cél 10kHz
-                //     targetFreq = static_cast<uint16_t>(round(freqValue * 100.0));
-                // } else {                                // Bevitel kHz vagy MHz, cél kHz
-                //     if (strcmp(unitStr, "MHz") == 0) {  // SW MHz bevitel
-                //         targetFreq = static_cast<uint16_t>(round(freqValue * 1000.0));
-                //     } else {  // AM/LW kHz bevitel
-                //         targetFreq = static_cast<uint16_t>(round(freqValue));
-                //     }
-                // }
-                //
-                // Band adat frissítése és rádió hangolása
-                //                 BandTable& currentBand = band.getCurrentBand();
-                //                 currentBand.varData.currFreq = targetFreq;
-                // /////////////////////////////////////////////////////////////
-                // ////                si4735.setFrequency(targetFreq);  // Itt használjuk a Si4735Utils::si4735-öt
-                // DEBUG("Frequency set to: %d (%s)\n", targetFreq, (bandType == FM_BAND_TYPE) ? "10kHz" : "kHz");
-
-                // Opcionális: BFO nullázása SSB/CW módban frekvenciaváltáskor
-                // if (currentBand.varData.currMod == LSB || currentBand.varData.currMod == USB || currentBand.varData.currMod == CW) {
-                //    currentBand.varData.lastBFO = 0;
-                //    config.data.currentBFO = 0;
-                //    // Itt kellene a BFO-t is beállítani az si4735-ben, ha szükséges
-                //    // si4735.setSSBBfo(isCW ? CW_SHIFT_FREQUENCY : 0);
-                // }
-
                 // Szülő értesítése és bezárás
                 pParent->setDialogResponse(okButton->buildButtonTouchEvent());
                 return true;
@@ -396,7 +389,7 @@ class FrequencyInputDialog : public DialogBase {
                 // Ha OK-t nyomtak, de nem érvényes, csak adjunk hangjelzést
                 Utils::beepError();
                 // A gombnyomást kezeltük, de nem csináltunk semmit
-                return true;  // Vagy false? Maradjon true, mert a gombot kezeltük.
+                return true;
             }
         }
 
