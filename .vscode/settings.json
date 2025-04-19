@@ -11,6 +11,7 @@
         "initializer_list": "c",
         "span": "c",
         "text_encoding": "c",
-        "regex": "c"
+        "regex": "c",
+        "chrono": "cpp"
     }
 }
