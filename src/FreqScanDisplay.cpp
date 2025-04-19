@@ -67,7 +67,6 @@ void FreqScanDisplay::drawScreen() {
     scanStep = static_cast<float>(endFrequency - startFrequency) / static_cast<float>(spectrumWidth);
     // Opcionális: Korlátozás a min/max értékekre, de ez megakadályozhatja a teljes sáv megjelenítését
     scanStep = std::max(minScanStep, std::min(maxScanStep, scanStep));
-    DEBUG("Initial scanStep calculated for full band (or limited): %.3f\n", scanStep);
 
     // 2. Sáv közepének kiszámítása
     float bandCenterFreq = static_cast<float>(startFrequency) + (static_cast<float>(endFrequency - startFrequency) / 2.0f);
@@ -84,7 +83,6 @@ void FreqScanDisplay::drawScreen() {
     } else {
         deltaScanLine = 0;
     }
-    DEBUG("Initial deltaScanLine calculated for centering: %.2f\n", deltaScanLine);
 
     // 5. Kezdő kurzor pozíció a spektrum közepén
     currentScanLine = spectrumX + spectrumWidth / 2.0f;
@@ -136,7 +134,6 @@ void FreqScanDisplay::displayLoop() {
 
         // --- Ellenőrzés, hogy az első posScan kiesik-e a tartományból scanEmpty esetén ---
         if (scanEmpty && (posScan < 0 || posScan >= spectrumWidth)) {
-            DEBUG("Initial posScan (%d) out of bounds after scale change, skipping first point.\n", posScan);
             // Nem mérünk/rajzolunk, csak lépünk a következő frekvenciára
             freqUp();
             // scanEmpty igaz marad, a következő ciklusban újra próbálkozunk
@@ -187,7 +184,6 @@ void FreqScanDisplay::displayLoop() {
                     // Ha ez az első érvényes adatpont, jelezzük, hogy a spektrum már nem üres
                     if (scanEmpty) {
                         scanEmpty = false;
-                        DEBUG("First valid scan data point acquired, scanEmpty set to false.\n");
                     }
 
                     // --- Rajzolás ---
@@ -292,7 +288,6 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
                     if ((signalScale * tmpMid) > 10.0f) tmpMid = 10.0f / signalScale;
                     if ((signalScale * tmpMid) < 0.1f) tmpMid = 0.1f / signalScale;
                     signalScale *= tmpMid;
-                    DEBUG("New signal scale: %.2f\n", signalScale);
                     for (int i = 0; i < spectrumWidth; i++) {
                         if (scanValueRSSI[i] < spectrumEndY) {
                             float original_rssi_like = (spectrumEndY - scanValueRSSI[i]) / (signalScale / tmpMid);
@@ -332,7 +327,6 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
                     if (!isDragging) {
                         // Most váltottunk húzás módba
                         isDragging = true;
-                        DEBUG("Drag started.\n");
                         // Ha volt sárga kurzor (előző tap miatt), töröljük
                         if (prevTouchedX != -1) {
                             int oldPrevTouchedX = prevTouchedX;
@@ -347,8 +341,6 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
                         // --- Pásztázás (Panning) ---
                         float oldDelta = deltaScanLine;  // <<<--- DEBUG: Régi érték
                         deltaScanLine -= static_cast<float>(dx);
-                        // <<<--- DEBUG: Delta változás kiírása --->>>
-                        DEBUG("Panning: dx=%d, deltaScanLine: %.2f -> %.2f\n", dx, oldDelta, deltaScanLine);
 
                         // Opcionális: deltaScanLine korlátozása, hogy ne "fusson ki" a képből túlságosan
                         // float minDelta = ...; float maxDelta = ...;
@@ -356,9 +348,8 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
                         // Grafikon és szöveg újrarajzolása az új deltaScanLine értékkel
                         // A true paraméter fontos, mert a frekvenciák megváltoztak a pixeleken!
-                        drawScanGraph(true);                                   // Újrarajzolás az új deltával (törli a régi adatokat is!)
-                        DEBUG("Calling drawScanText(true) after panning.\n");  // <<<--- DEBUG: Hívás jelzése
-                        drawScanText(true);                                    // Kezdő/vég frekvenciák frissítése
+                        drawScanGraph(true);  // Újrarajzolás az új deltával (törli a régi adatokat is!)
+                        drawScanText(true);   // Kezdő/vég frekvenciák frissítése
 
                         // Piros kurzor újrarajzolása az új helyére (a redrawCursors már kezeli ezt)
                         redrawCursors();
@@ -495,22 +486,16 @@ void FreqScanDisplay::startScan() {
     TftButton *stopButton = findButtonByLabel("Stop");
     if (stopButton) stopButton->setState(TftButton::ButtonState::Off);  // Off = enabled but not pushed
 
-    // --- MÓDOSÍTÁS KEZDETE: Szkennelés kezdése a bal szélről ---
-    // Kiszámítjuk a bal szélnek (n=0) megfelelő frekvenciát az AKTUÁLIS deltaScanLine és scanStep alapján
-    // F(n=0) = startFrequency + (0 - spectrumWidth/2 + deltaScanLine) * scanStep
+    // Szkennelés kezdése a bal szélről ---
+    //  Kiszámítjuk a bal szélnek (n=0) megfelelő frekvenciát az AKTUÁLIS deltaScanLine és scanStep alapján
+    //  F(n=0) = startFrequency + (0 - spectrumWidth/2 + deltaScanLine) * scanStep
     double startVisibleFreqDouble = static_cast<double>(startFrequency) + (0.0 - (static_cast<double>(spectrumWidth) / 2.0) + deltaScanLine) * static_cast<double>(scanStep);
     posScanFreq = static_cast<uint16_t>(round(startVisibleFreqDouble));
     posScanFreq = constrain(posScanFreq, startFrequency, endFrequency);  // Biztosítjuk a sávhatárokat
-    DEBUG("Scan starting from left edge frequency: %d kHz\n", posScanFreq);
-
-    // A currentFrequency (kurzor) maradjon ott, ahol volt (pl. a sáv közepén), vagy állítsuk a kezdőre?
-    // Maradjon a sáv közepén, a szkennelés indul a bal szélről.
-    // currentFrequency = posScanFreq; // Ezt nem állítjuk át
 
     posScan = 0;  // A szkennelési index 0-ról indul (bár a displayLoop újraszámolja)
     posScanLast = -1;
     signalScale = 1.5f;  // Alapértelmezett jelerősség skála
-    // --- MÓDOSÍTÁS VÉGE ---
 
     // AGC kikapcsolása szkenneléshez (sample.cpp logika)
     config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);
@@ -520,7 +505,7 @@ void FreqScanDisplay::startScan() {
     drawScanGraph(true);
     drawScanText(true);
 
-    setFreq(currentFrequency);  // Első frekvencia beállítása
+    setFreq(posScanFreq);       // Első frekvencia beállítása
     si4735.setAudioMute(true);  // Némítás szkennelés alatt
 
     // Kurzor eltüntetése (ha volt)
@@ -540,22 +525,21 @@ void FreqScanDisplay::startScan() {
 void FreqScanDisplay::stopScan() {
     if (!scanning) return;  // Már le van állítva
 
-    DEBUG("Stopping scan...\n");
     scanning = false;
     scanPaused = true;
 
     // Állítsuk be a "Pause" gombot On állapotba (szünetel)
-    TftButton *pauseButton = findButtonByLabel("Pause");
+    TftButton *pauseButton = DisplayBase::findButtonByLabel("Pause");
     if (pauseButton) pauseButton->setState(TftButton::ButtonState::On);
     // Stop gomb tiltása, Start engedélyezése
-    TftButton *startButton = findButtonByLabel("Start");
+    TftButton *startButton = DisplayBase::findButtonByLabel("Start");
     if (startButton) startButton->setState(TftButton::ButtonState::Off);  // Off = enabled
-    TftButton *stopButton = findButtonByLabel("Stop");
+    TftButton *stopButton = DisplayBase::findButtonByLabel("Stop");
     if (stopButton) stopButton->setState(TftButton::ButtonState::Disabled);
 
     // AGC visszaállítása
     config.data.agcGain = scanAGC;
-    checkAGC();
+    Si4735Utils::checkAGC();
 
     // Hang visszaállítása (ha némítva volt)
     si4735.setAudioMute(rtv::muteStat);  // Vissza az eredeti némítási állapotba
@@ -570,20 +554,19 @@ void FreqScanDisplay::stopScan() {
     DEBUG("Scan stopped at %d kHz\n", currentFrequency);
 
     // Gombok újrarajzolása a frissített állapotokkal
-    drawScreenButtons();
+    DisplayBase::drawScreenButtons();
 }
 
 /**
  * Szkennelés szüneteltetése/folytatása
  */
 void FreqScanDisplay::pauseScan() {
-    DEBUG("Scan %s\n", scanPaused ? "paused" : "resumed");
     int currentX = static_cast<int>(currentScanLine);  // Piros kurzor X pozíciója
 
     if (scanPaused) {  // Most lett szüneteltetve
         // AGC visszaállítása, hang vissza, step vissza...
         config.data.agcGain = scanAGC;
-        checkAGC();
+        Si4735Utils::checkAGC();
         si4735.setAudioMute(rtv::muteStat);
         uint8_t step = band.getCurrentBand().varData.currStep;
         si4735.setFrequencyStep(step);
@@ -599,9 +582,8 @@ void FreqScanDisplay::pauseScan() {
         // AGC ki, hang némít, scan step beállít...
         scanAGC = config.data.agcGain;
         config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);
-        checkAGC();
+        Si4735Utils::checkAGC();
         si4735.setAudioMute(true);
-        // si4735.setFrequencyStep(1); // Ezt kivettük, mert a freqUp kezeli a scanStep-et
 
         // Frekvencia beállítása a következő szkennelési pontra
         setFreq(posScanFreq);
@@ -613,7 +595,6 @@ void FreqScanDisplay::pauseScan() {
         } else {
             eraseCursor(currentX);  // Piros kurzor törlése
         }
-        // prevRssiY = spectrumEndY; // Már nem használt
     }
 }
 
@@ -621,7 +602,6 @@ void FreqScanDisplay::pauseScan() {
  * Szkennelési skála (lépésköz) váltása
  */
 void FreqScanDisplay::changeScanScale() {
-    DEBUG("Changing scan scale...\n");
     bool was_paused = scanPaused;
     // Ha futott a szkennelés, ideiglenesen szüneteltetjük logikailag is
     if (scanning && !was_paused) {
@@ -634,13 +614,12 @@ void FreqScanDisplay::changeScanScale() {
     scanStep *= 2.0f;
     if (scanStep > maxScanStep) scanStep = minScanStep;
     if (scanStep < minScanStep) scanStep = minScanStep;
-    DEBUG("New scan step: %.3f kHz\n", scanStep);
 
     // deltaScanLine újraszámítása, hogy a képernyő közepe ugyanaz a frekvencia maradjon
     // A currentFrequency-t használjuk középpontnak, ha szünetelt, egyébként a posScanFreq-et
     float freqAtCenter = was_paused ? static_cast<float>(currentFrequency) : static_cast<float>(posScanFreq);
 
-    // --- JAVÍTOTT deltaScanLine SZÁMÍTÁS ---
+    // deltaScanLine Számítás
     if (scanStep != 0) {  // Osztás nullával elkerülése
         // deltaScanLine = (freqAtCenter - startFrequency) / scanStep; // Régi
         // Új: deltaScanLine azt mutatja meg, hány 'scanStep' lépésre van a freqAtCenter a startFrequency-től.
@@ -649,8 +628,6 @@ void FreqScanDisplay::changeScanScale() {
     } else {
         deltaScanLine = 0;  // Hiba vagy alapértelmezett eset
     }
-    DEBUG("New deltaScanLine: %.2f\n", deltaScanLine);
-    // --- JAVÍTÁS VÉGE ---
 
     // Grafikon és szöveg újrarajzolása...
     // prevRssiY = spectrumEndY; // Már nem használt
@@ -661,21 +638,20 @@ void FreqScanDisplay::changeScanScale() {
     if (scanning && !was_paused) {
         // Ha a szkennelés futott, a folytatáshoz a LÁTHATÓ tartomány elejére ugrunk
 
-        // Kiszámítjuk a bal szélnek (n=0) megfelelő frekvenciát
-        // A frekvencia képlete: F(n) = startFrequency + (n - spectrumWidth/2 + deltaScanLine) * scanStep
+        // Szkennelés újraindítása a bal szélről ---
+        //  Kiszámítjuk a bal szélnek (n=0) megfelelő frekvenciát az ÚJ skála és delta alapján
+        //  A frekvencia képlete: F(n) = startFrequency + (n - spectrumWidth/2 + deltaScanLine) * scanStep
         double startVisibleFreqDouble = static_cast<double>(startFrequency) + (0.0 - (static_cast<double>(spectrumWidth) / 2.0) + deltaScanLine) * static_cast<double>(scanStep);
         posScanFreq = static_cast<uint16_t>(round(startVisibleFreqDouble));
-        posScanFreq = constrain(posScanFreq, startFrequency, endFrequency);
+        posScanFreq = constrain(posScanFreq, startFrequency, endFrequency);  // Biztosítjuk a sávhatárokat
 
-        posScan = 0;
+        posScan = 0;  // Kezdő index
         posScanLast = -1;
         scanEmpty = true;      // Az új nézetben még nincs adatunk
         setFreq(posScanFreq);  // Rádiót a kezdő frekvenciára hangoljuk
 
         // Folytatás előkészítése
         scanPaused = false;  // Visszaállítjuk a logikai állapotot
-        pauseScan();         // Meghívjuk a pauseScan-t a folytatáshoz szükséges beállításokhoz (AGC, mute)
-                             // A kurzort nem kell rajzolni, mert a szkennelés folytatódik
 
     } else {
         // Ha szünetelt, a kurzort újra ki kell rajzolni pirossal az új helyen
@@ -692,7 +668,6 @@ void FreqScanDisplay::changeScanScale() {
  * @param erase Törölje a korábbi adatokat?
  */
 void FreqScanDisplay::drawScanGraph(bool erase) {
-    DEBUG("Drawing scan graph (erase: %s)\n", erase ? "true" : "false");
     int d = 0;  // screenV itt nem releváns
 
     if (erase) {
@@ -839,8 +814,6 @@ void FreqScanDisplay::drawScanLine(int xPos) {
     if (scanMark[n] && !scanEmpty) {
         tft.fillRect(xPos - 1, spectrumY + 5, 3, 5, TFT_YELLOW);
     }
-
-    // <<<--- KURZOR RAJZOLÁS ELTÁVOLÍTVA --->>>
 }
 
 /**
@@ -856,7 +829,7 @@ void FreqScanDisplay::drawScanText(bool all) {
     uint16_t textY = spectrumY - 2;                // Szöveg aljának pozíciója
     uint16_t clearY = spectrumY - fontHeight - 3;  // Törlés teteje
 
-    // --- MÓDOSÍTÁS KEZDETE: Robusztusabb törlés ---
+    // Robusztusabb törlés
     if (all) {
         // Mindig töröljük a lehetséges területeket, ha 'all' igaz
         // BEGIN terület (bal)
@@ -864,7 +837,6 @@ void FreqScanDisplay::drawScanText(bool all) {
         // END terület (jobb)
         tft.fillRect(spectrumEndScanX - 60, clearY, 60, fontHeight + 2, TFT_BLACK);  // Szélesebb törlés
     }
-    // --- MÓDOSÍTÁS VÉGE ---
 
     // END felirat rajzolása, ha kell
     if (all || (scanEndBand < (spectrumWidth - 5))) {
@@ -889,7 +861,6 @@ void FreqScanDisplay::drawScanText(bool all) {
 
     // Skála kezdő és vég frekvenciájának kiírása...
     if (all) {
-        // --- JAVÍTOTT SZÁMÍTÁS ---
         // 1. Számítsd ki a képernyő közepén lévő frekvenciát (freqAtCenter)
         //    A frekvencia képlete: F(center) = startFrequency + deltaScanLine * scanStep
         double centerFreqDouble = static_cast<double>(startFrequency) + deltaScanLine * static_cast<double>(scanStep);
@@ -898,7 +869,6 @@ void FreqScanDisplay::drawScanText(bool all) {
         double halfWidthFreqSpan = (static_cast<double>(spectrumWidth) / 2.0) * static_cast<double>(scanStep);
         double startFreqDouble = centerFreqDouble - halfWidthFreqSpan;
         double endFreqDouble = centerFreqDouble + halfWidthFreqSpan;
-        // --- JAVÍTÁS VÉGE ---
 
         uint16_t freqStartVisible = static_cast<uint16_t>(round(startFreqDouble));
         uint16_t freqEndVisible = static_cast<uint16_t>(round(endFreqDouble));
@@ -906,11 +876,6 @@ void FreqScanDisplay::drawScanText(bool all) {
         // Korlátozás a teljes sávhatárokra
         freqStartVisible = constrain(freqStartVisible, startFrequency, endFrequency);
         freqEndVisible = constrain(freqEndVisible, startFrequency, endFrequency);
-
-        // <<<--- DEBUG KIÍRÁS --->>>
-        DEBUG("drawScanText(all=true): scanStep=%.3f, deltaScanLine=%.2f, centerFreq=%.2f, startVisible=%d, endVisible=%d\n", scanStep, deltaScanLine, centerFreqDouble,
-              freqStartVisible, freqEndVisible);
-        // <<<--- DEBUG KIÍRÁS VÉGE --->>>
 
         // --- Kisebb betűméret beállítása ---
         tft.setTextFont(1);  // Győződjünk meg róla, hogy a kisebb font van beállítva
@@ -985,7 +950,7 @@ void FreqScanDisplay::displayScanSignal() {
     uint8_t fontHeight = tft.fontHeight();  // Tényleges font magasság lekérdezése
     tft.setTextDatum(BC_DATUM);             // Bottom-Center igazítás
 
-    // --- MÓDOSÍTÁS KEZDETE: Y pozíciók módosítása ---
+    // Y pozíciók módosítása ---
     // Törlési és rajzolási Y koordináták feljebb tolása
     uint16_t clearY = spectrumY - fontHeight - 3;  // Törlési téglalap teteje (biztonsági ráhagyással)
     uint16_t textY = spectrumY - 2;                // Szöveg aljának pozíciója (biztonsággal a spektrum felett)
@@ -1011,7 +976,6 @@ void FreqScanDisplay::displayScanSignal() {
         tft.setTextColor(TFT_ORANGE, TFT_BLACK);
         tft.drawString("SNR:" + String(scanValueSNR[n]), spectrumX + spectrumWidth / 2 + 30, textY);  // textY használata
     }
-    // --- MÓDOSÍTÁS VÉGE ---
 }
 
 /**
@@ -1028,7 +992,6 @@ int FreqScanDisplay::getSignal(bool rssi) {
         else
             res += si4735.getCurrentSNR();
         // Rövid várakozás lehet szükséges a mérések között?
-        // delayMicroseconds(100); // Opcionális
     }
     res /= countScanSignal;  // Átlagolás
 
@@ -1066,7 +1029,6 @@ void FreqScanDisplay::setFreq(uint16_t f) {
  * Frekvencia léptetése felfelé (a scanStep alapján)
  */
 void FreqScanDisplay::freqUp() {
-    // Itt nem a si4735.frequencyUp()-ot használjuk, mert a lépésköz a scanStep
     // A scanStep lehet float is!
     double nextFreqDouble = static_cast<double>(posScanFreq) + static_cast<double>(scanStep);
 
@@ -1077,8 +1039,6 @@ void FreqScanDisplay::freqUp() {
     }
     setFreq(posScanFreq);  // Beállítjuk az új frekvenciát
 }
-
-// --- ÚJ KURZOR KEZELŐ FÜGGVÉNYEK ---
 
 /**
  * Visszarajzolja az alap grafikát (skála, jel) az adott X pozícióban,
@@ -1151,5 +1111,3 @@ void FreqScanDisplay::redrawCursors() {
         drawRedCursor(currentX);
     }
 }
-
-// --- ÚJ VÉGE ---
