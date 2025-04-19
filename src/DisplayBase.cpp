@@ -1,5 +1,6 @@
 #include "DisplayBase.h"
 
+#include "FrequencyInputDialog.h"
 #include "ValueChangeDialog.h"
 
 namespace DisplayConstants {
@@ -390,6 +391,7 @@ void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[
         {"Volum", TftButton::ButtonType::Pushable},                                                  //
         {"AGC", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(si4735.isAgcEnabled())},  //
         {"Att", TftButton::ButtonType::Pushable},                                                    //
+        {"Freq", TftButton::ButtonType::Pushable},                                                   //
         {"Setup", TftButton::ButtonType::Pushable},                                                  //
     };
     uint8_t mandatoryVButtonsLength = ARRAY_ITEM_COUNT(mandatoryVButtons);
@@ -548,7 +550,13 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                                                      });
         processed = true;
 
-    } else if (STREQ("Setup", event.label)) {            // Beállítások
+    } else if (STREQ("Freq", event.label)) {
+        // Open the FrequencyInputDialog
+        BandTable &currentBand = band.getCurrentBand();
+        DisplayBase::pDialog = new FrequencyInputDialog(this, DisplayBase::tft, band, currentBand.varData.currFreq);
+    }
+
+    else if (STREQ("Setup", event.label)) {              // Beállítások
         ::newDisplay = DisplayBase::DisplayType::setup;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
         processed = true;
     }

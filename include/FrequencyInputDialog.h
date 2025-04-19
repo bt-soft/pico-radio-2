@@ -134,7 +134,7 @@ class FrequencyInputDialog : public DialogBase {
 
         // Frekvencia kijelző
         uint16_t sevenSegmentFreqX = x + (w - tft.width() / 2) / 2;  // Dinamikusan számított X pozíció
-        pSevenSegmentFreq = new SevenSegmentFreq(tft, sevenSegmentFreqX, y + 20, band);
+        pSevenSegmentFreq = new SevenSegmentFreq(tft, sevenSegmentFreqX, y + 20, band, false, true);
 
         // Gombok létrehozása
         okButton = new TftButton(DLG_OK_BUTTON_ID, tft, x + 10, y + h - DLG_BTN_H - DLG_BUTTON_Y_GAP, 80, DLG_BTN_H, "OK", TftButton::ButtonType::Pushable);

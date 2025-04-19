@@ -2,8 +2,6 @@
 
 #include <Arduino.h>
 
-#include "FrequencyInputDialog.h"
-
 /**
  * Konstruktor
  */
@@ -30,7 +28,6 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Horizontális Képernyőgombok definiálása
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"RDS", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(config.data.rdsEnabled)},  //
-        {"Freq", TftButton::ButtonType::Pushable},
     };
 
     // Horizontális képernyőgombok legyártása
@@ -110,10 +107,6 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
         } else {
             pRds->clearRds();
         }
-    } else if (STREQ("Freq", event.label)) {
-        // Open the FrequencyInputDialog
-        BandTable &currentBand = band.getCurrentBand();
-        DisplayBase::pDialog = new FrequencyInputDialog(this, DisplayBase::tft, band, currentBand.varData.currFreq);
     }
 }
 

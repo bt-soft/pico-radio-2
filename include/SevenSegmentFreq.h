@@ -28,6 +28,7 @@ class SevenSegmentFreq {
 
     uint16_t freqDispX, freqDispY;
     bool screenSaverActive;
+    bool simpleMode = false;  // Egyszerű mód, csak a frekvenciát mutatja
 
     /**
      * @brief Kirajzolja a frekvenciát a megadott formátumban.
@@ -61,8 +62,8 @@ class SevenSegmentFreq {
     /**
      *
      */
-    SevenSegmentFreq(TFT_eSPI& tft, uint16_t freqDispX, uint16_t freqDispY, Band& band, bool screenSaverActive = false)
-        : tft(tft), freqDispX(freqDispX), freqDispY(freqDispY), band(band), screenSaverActive(screenSaverActive), spr(&tft) {}
+    SevenSegmentFreq(TFT_eSPI& tft, uint16_t freqDispX, uint16_t freqDispY, Band& band, bool screenSaverActive = false, bool simpleMode = false)
+        : tft(tft), freqDispX(freqDispX), freqDispY(freqDispY), band(band), screenSaverActive(screenSaverActive), simpleMode(simpleMode), spr(&tft) {}
 
     /**
      *

@@ -115,6 +115,11 @@ void SevenSegmentFreq::drawBfo(int bfoValue, int d, const SegmentColors& colors)
  */
 void SevenSegmentFreq::drawStepUnderline(int d, const SegmentColors& colors) {
 
+    // Képernyővédő vagy egyszerű üzemmódban nincs aláhúzás a touch-hoz
+    if (screenSaverActive or simpleMode) {
+        return;
+    }
+
     using namespace SevenSegmentConstants;
 
     // Töröljük a korábbi aláhúzást
@@ -132,6 +137,11 @@ void SevenSegmentFreq::drawStepUnderline(int d, const SegmentColors& colors) {
  * @return true, ha az eseményt kezeltük, false, ha nem.
  */
 bool SevenSegmentFreq::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
+
+    // Képernyővédő vagy egyszerű üzemmódban nincs touch a digiteken
+    if (screenSaverActive or simpleMode) {
+        return false;
+    }
 
     using namespace SevenSegmentConstants;
 
@@ -209,7 +219,8 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
     if (!screenSaverActive && (currDemod == LSB || currDemod == USB || currDemod == CW)) {
 
         // Kiszámítjuk a pontos frekvenciát Hz-ben a BFO eltolással
-        displayFreqHz = (uint32_t)currentFrequency * 1000 - currentBand.varData.lastBFO;
+        uint32_t bfoOffset = simpleMode ? 0 : currentBand.varData.lastBFO;  // BFO eltolás
+        displayFreqHz = (uint32_t)currentFrequency * 1000 - bfoOffset;
 
         // // CW módban további 700Hz eltolás (ha aktív a CW shift)
         // if (rtv::CWShift) {
@@ -220,10 +231,9 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
         long khz_part = displayFreqHz / 1000;            // Egész kHz rész
         int hz_tens_part = (displayFreqHz % 1000) / 10;  // A 100Hz és 10Hz-es rész (00-99)
 
-        char s[12] = {'\0'};  // String buffer a formázott frekvenciának
-
         // Formázás: kHz.százHz tízHz
         // A sprintf %ld formátumot használunk a long int (khz_part) és %02d-t a hz_tens_part-hoz (két számjegy, vezető nullával)
+        char s[12] = {'\0'};  // String buffer a formázott frekvenciának
         sprintf(s, "%ld.%02d", khz_part, hz_tens_part);
 
         // BFO kijelzés kezelése (animáció, stb.)
@@ -265,10 +275,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
                 tft.drawString(F("kHz"), freqDispX + xOffset + d, freqDispY + 85);  // Y pozíció
             }
 
-            // Képernyővédő üzemmódban nincs aláhúzás a touch-hoz
-            if (!screenSaverActive) {
-                drawStepUnderline(d, colors);  // Aláhúzás kirajzolása a lépésköz jelzésére
-            }
+            drawStepUnderline(d, colors);  // Aláhúzás kirajzolása a lépésköz jelzésére
         }
 
         // Ha a BFO be van kapcsolva, kirajzoljuk a BFO értéket is
