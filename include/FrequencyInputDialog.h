@@ -309,10 +309,12 @@ class FrequencyInputDialog : public DialogBase {
         uint16_t totalRow4Width = okCancelW + gapX + zeroW + gapX + okCancelW;
         uint16_t startX_R4 = x + (w - totalRow4Width) / 2;  // Kezdő X a 4. sorhoz (középre)
 
-        okButton = new TftButton(DLG_OK_BUTTON_ID, tft, startX_R4, row4Y, okCancelW, btnH, "OK", TftButton::ButtonType::Pushable);
+        // Először a Cancel gomb jön
+        cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, startX_R4, row4Y, okCancelW, btnH, "Canc", TftButton::ButtonType::Pushable);
+        // Utána a 0 gomb
         digitButtons[0] = new TftButton(id++, tft, startX_R4 + okCancelW + gapX, row4Y, zeroW, btnH, "0", TftButton::ButtonType::Pushable);
-        cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, startX_R4 + okCancelW + gapX + zeroW + gapX, row4Y, okCancelW, btnH, "Canc", TftButton::ButtonType::Pushable);
-        // --- ELRENDEZÉS VÉGE ---
+        // Végül az OK gomb
+        okButton = new TftButton(DLG_OK_BUTTON_ID, tft, startX_R4 + okCancelW + gapX + zeroW + gapX, row4Y, okCancelW, btnH, "OK", TftButton::ButtonType::Pushable);
 
         // Dialógus kirajzolása (ez hívja az updateFrequencyDisplay-t is)
         drawDialog();
