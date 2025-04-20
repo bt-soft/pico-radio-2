@@ -9,7 +9,7 @@
 #define KEY_HEIGHT 30
 #define KEY_GAP_X 3
 #define KEY_GAP_Y 3
-#define INPUT_DISPLAY_HEIGHT 30
+#define INPUT_DISPLAY_HEIGHT 40
 #define INPUT_DISPLAY_MARGIN_Y 5
 #define KEYBOARD_START_Y_OFFSET (INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y * 2)  // Billentyűzet kezdő Y pozíciója a dialógus tetejétől
 
@@ -144,8 +144,8 @@ void VirtualKeyboardDialog::updateInputDisplay(bool redrawCursorOnly) {
         tft.fillRect(inputDisplayX + 1, inputDisplayY + 1, inputDisplayW - 2, inputDisplayH - 2, TFT_BLACK);
 
         // Szöveg beállítások
-        tft.setFreeFont();  // Válassz egy megfelelő fontot
-        tft.setTextSize(1);
+        tft.setFreeFont();   // Válassz egy megfelelő fontot
+        tft.setTextSize(2);  // Nagyobb betűmret az editorban
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         tft.setTextDatum(ML_DATUM);  // Középre-balra igazítás
 
@@ -175,7 +175,7 @@ void VirtualKeyboardDialog::updateInputDisplay(bool redrawCursorOnly) {
 void VirtualKeyboardDialog::drawCursor() {
     // Kurzor pozíciójának kiszámítása
     tft.setFreeFont();  // Font beállítása a textWidth-hoz
-    tft.setTextSize(1);
+    tft.setTextSize(2);  // Ugyanaz a méret, mint a szövegnél
     String displayString = currentInput;
     if (displayString.length() > MAX_INPUT_LEN) {
         displayString = displayString.substring(0, MAX_INPUT_LEN);
@@ -184,7 +184,11 @@ void VirtualKeyboardDialog::drawCursor() {
 
     // Rajzolás vagy törlés (háttérszínnel rajzolás)
     uint16_t cursorColor = cursorVisible ? TFT_WHITE : TFT_BLACK;  // Fehér vagy háttérszín
-    tft.drawFastVLine(cursorX, inputDisplayY + 4, inputDisplayH - 8, cursorColor);
+
+    // Igazítsd ezeket az értékeket, ha kell
+    uint16_t cursorTopY = inputDisplayY + 6;     // Pl. kicsit lejjebb
+    uint16_t cursorHeight = inputDisplayH - 12;  // Pl. kicsit rövidebb/hosszabb
+    tft.drawFastVLine(cursorX, cursorTopY, cursorHeight, cursorColor);
 }
 
 /**
