@@ -182,7 +182,7 @@ void setup() {
     Utils::debugWaitForSerial(tft);
 #endif
 
-    // EEPROM inicializálása (A fordítónak muszáj megadni egy típust, itt most egy Config_t-t hsználunk, igaziból mindegy)
+    // EEPROM inicializálása (A fordítónak muszáj megadni egy típust, itt most egy Config_t-t használunk, igaziból mindegy)
     EepromManager<Config_t>::init();  // Meghívjuk a statikus init metódust
 
     // Ha a bekapcsolás alatt nyomva tartjuk a rotary gombját, akkor töröljük a konfigot
