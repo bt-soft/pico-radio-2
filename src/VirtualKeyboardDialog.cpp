@@ -14,6 +14,7 @@
 #define KEYBOARD_START_Y_OFFSET (INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y * 2)  // Billentyűzet kezdő Y pozíciója a dialógus tetejétől
 
 #define MAX_INPUT_LEN STATION_NAME_BUFFER_SIZE - 1  // Maximális bemeneti hossz (a StationData.h-ból)
+#define SPACE_BTN_WIDTH 120                         // Space gomb szélessége (ha szükséges)
 
 /**
  * Konstruktor
@@ -48,6 +49,7 @@ VirtualKeyboardDialog::~VirtualKeyboardDialog() {
     delete cancelButton;
     delete backspaceButton;
     delete clearButton;
+    delete spaceButton;
     // TODO: Töröld az esetleges további speciális gombokat (Space, Shift)
 
     // Karakter gombok törlése a vektorból
@@ -92,17 +94,26 @@ void VirtualKeyboardDialog::buildKeyboard() {
     // Ezeket a karakter gombok alá helyezzük el
     uint16_t specialBtnY = currentY + KEY_GAP_Y;  // Egy kis extra rés
     uint16_t btnWidthSpecial = 60;                // Speciális gombok szélessége
-    uint16_t totalSpecialWidth = (btnWidthSpecial * 4) + (KEY_GAP_X * 3);
+    // Teljes szélesség: Clear + Bksp + Space + Cancel + OK + 4 rés
+    uint16_t totalSpecialWidth = (btnWidthSpecial * 4) + SPACE_BTN_WIDTH + (KEY_GAP_X * 4);
     uint16_t startXSpecial = x + (w - totalSpecialWidth) / 2;
 
-    clearButton =
-        new TftButton(btnId++, tft, startXSpecial + 0 * (btnWidthSpecial + KEY_GAP_X), specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Clear", TftButton::ButtonType::Pushable);
-    backspaceButton =
-        new TftButton(btnId++, tft, startXSpecial + 1 * (btnWidthSpecial + KEY_GAP_X), specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Bksp", TftButton::ButtonType::Pushable);
-    cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, startXSpecial + 2 * (btnWidthSpecial + KEY_GAP_X), specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Cancel",
-                                 TftButton::ButtonType::Pushable);
-    okButton =
-        new TftButton(DLG_OK_BUTTON_ID, tft, startXSpecial + 3 * (btnWidthSpecial + KEY_GAP_X), specialBtnY, btnWidthSpecial, KEY_HEIGHT, "OK", TftButton::ButtonType::Pushable);
+    // Gombok létrehozása sorban
+    uint16_t currentXSpecial = startXSpecial;
+
+    clearButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Clear", TftButton::ButtonType::Pushable);
+    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
+
+    backspaceButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Bksp", TftButton::ButtonType::Pushable);
+    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
+
+    spaceButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, SPACE_BTN_WIDTH, KEY_HEIGHT, "Space", TftButton::ButtonType::Pushable);
+    currentXSpecial += SPACE_BTN_WIDTH + KEY_GAP_X;
+
+    cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Cancel", TftButton::ButtonType::Pushable);
+    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
+
+    okButton = new TftButton(DLG_OK_BUTTON_ID, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "OK", TftButton::ButtonType::Pushable);
 
     // OK gomb kezdetben tiltva, ha az input érvénytelen (pl. üres)
     okButton->setState(currentInput.length() > 0 ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled);
@@ -130,6 +141,7 @@ void VirtualKeyboardDialog::drawDialog() {
     // Speciális gombok kirajzolása
     clearButton->draw();
     backspaceButton->draw();
+    spaceButton->draw();
     cancelButton->draw();
     okButton->draw();  // Az állapotát a buildKeyboard/updateInputDisplay már beállította
 }
@@ -225,8 +237,15 @@ void VirtualKeyboardDialog::handleKeyPress(const char* key) {
             currentInput = "";
             inputChanged = true;
         }
+    } else if (strcmp(key, "Space") == 0) {
+        if (currentInput.length() < MAX_INPUT_LEN) {
+            currentInput += " ";  // Szóköz hozzáadása
+            inputChanged = true;
+        } else {
+            Utils::beepError();
+        }
     }
-    // TODO: Kezeld a Space, Shift stb. gombokat
+    // TODO: Kezeld a  Shift stb. gombokat
     // else if (strcmp(key, "Space") == 0) { ... }
     else if (strlen(key) == 1) {  // Feltételezzük, hogy a többi az karakter gomb
         if (currentInput.length() < MAX_INPUT_LEN) {
@@ -270,7 +289,11 @@ bool VirtualKeyboardDialog::handleTouch(bool touched, uint16_t tx, uint16_t ty) 
         handleKeyPress("Clear");
         return true;
     }
-    // TODO: Ellenőrizd a többi speciális gombot (Space, Shift)
+    if (spaceButton->handleTouch(touched, tx, ty)) {
+        handleKeyPress("Space");
+        return true;
+    }
+    // TODO: Ellenőrizd a többi speciális gombot ( Shift)
 
     // Karakter gombok ellenőrzése
     for (TftButton* btn : keyboardButtons) {

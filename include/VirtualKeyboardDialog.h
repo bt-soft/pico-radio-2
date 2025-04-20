@@ -18,6 +18,7 @@ class VirtualKeyboardDialog : public DialogBase {
     TftButton* cancelButton;
     TftButton* backspaceButton;
     TftButton* clearButton;
+    TftButton* spaceButton;
     // TODO: egyéb speciális gombok (Shift, Space, stb.)
 
     // Billentyűzet kiosztás
@@ -25,7 +26,7 @@ class VirtualKeyboardDialog : public DialogBase {
         "1234567890",  //
         "QWERTZUIOP",  //
         "ASDFGHJKL",   //
-        "YXCVBNM.,",   //
+        "YXCVBNM.-",   //
     };
     uint8_t keyRows = 4;
 
