@@ -177,12 +177,13 @@ void setup() {
     tft.setRotation(1);
     tft.fillScreen(TFT_COLOR_BACKGROUND);
 
-    // Várakozás a soros port megnyitására
+// Várakozás a soros port megnyitására DEBUG módban
+#ifdef DEBUG_WAIT_FOR_SERIAL
     Utils::debugWaitForSerial(tft);
+#endif
 
-    EEPROM.begin(EEPROM_SIZE);
-    DEBUG("EEPROM initialized with size: %d\n", EEPROM_SIZE);
-
+    // EEPROM inicializálása (A fordítónak muszáj megadni egy típust, itt most egy Config_t-t hsználunk, igaziból mindegy)
+    EepromManager<Config_t>::init();  // Meghívjuk a statikus init metódust
 
     // Ha a bekapcsolás alatt nyomva tartjuk a rotary gombját, akkor töröljük a konfigot
     if (digitalRead(PIN_ENCODER_SW) == LOW) {

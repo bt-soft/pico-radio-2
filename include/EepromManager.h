@@ -35,9 +35,15 @@ class EepromManager {
      */
     EepromManager(const T &dataRef)
         : data(dataRef), crc(calcCRC16((uint8_t *)&data, sizeof(T))) {  // EEPROM.begin hívás csak egyszer kellene, pl. a setup()-ban, nem minden példányosításkor.
-        // De ha csak statikus metódusokat használunk, akkor ez a konstruktor nem is fut le.
-        // Biztosítsuk, hogy EEPROM.begin() lefut a setup()-ban!
-        // EEPROM.begin(EEPROM_SIZE); // Ezt inkább vedd ki innen.
+    }
+
+    /**
+     * @brief Inicializálja az EEPROM-ot a megadott mérettel.
+     * Ezt a setup() elején kell meghívni egyszer.
+     */
+    inline static void init() {
+        EEPROM.begin(EEPROM_SIZE);
+        DEBUG("EEPROM initialized with size: %d\n", EEPROM_SIZE);
     }
 
     /**
