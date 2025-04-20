@@ -174,7 +174,7 @@ void VirtualKeyboardDialog::updateInputDisplay(bool redrawCursorOnly) {
  */
 void VirtualKeyboardDialog::drawCursor() {
     // Kurzor pozíciójának kiszámítása
-    tft.setFreeFont();  // Font beállítása a textWidth-hoz
+    tft.setFreeFont();   // Font beállítása a textWidth-hoz
     tft.setTextSize(2);  // Ugyanaz a méret, mint a szövegnél
     String displayString = currentInput;
     if (displayString.length() > MAX_INPUT_LEN) {
@@ -290,6 +290,5 @@ bool VirtualKeyboardDialog::handleTouch(bool touched, uint16_t tx, uint16_t ty) 
 void VirtualKeyboardDialog::displayLoop() {
     if (millis() - lastCursorToggleTime >= CURSOR_BLINK_INTERVAL) {
         toggleCursor();
-        DEBUG("Cursor toggled\n");
     }
 }

@@ -8,14 +8,14 @@
 class MemoryDisplay : public DisplayBase {
    private:
     // Enum a dialógus céljának jelzésére
-    enum class ActiveDialogPurpose {
+    enum class DialogMode {
         NONE,
         SAVE_NEW_STATION,   // Új állomás mentése (billentyűzet)
         EDIT_STATION_NAME,  // Meglévő állomás nevének szerkesztése (billentyűzet)
         DELETE_CONFIRM      // Törlés megerősítése (üzenet)
     };
 
-    ActiveDialogPurpose currentDialogPurpose = ActiveDialogPurpose::NONE;  // Aktuális dialógus célja
+    DialogMode currentDialogMode = DialogMode::NONE;  // Aktuális dialógus célja
 
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;  // Hova térjünk vissza
     bool isFmMode = true;                                                   // FM vagy AM memóriát mutatunk?

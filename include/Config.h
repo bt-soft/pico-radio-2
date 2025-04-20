@@ -66,10 +66,12 @@ class Config : public StoreBase<Config_t> {
     Config_t data;
 
    protected:
+    const char* getClassName() const override { return "Config"; }
+
     /**
      * Referencia az adattagra, csak az ős használja
      */
-    Config_t &r() override { return data; };
+    Config_t& r() override { return data; };
 
    public:
     /**

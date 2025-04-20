@@ -6,10 +6,6 @@
 const FmStationList_t DEFAULT_FM_STATIONS = {};
 const AmStationList_t DEFAULT_AM_STATIONS = {};
 
-// Globális példányok definíciója
-FmStationStore fmStationStore;
-AmStationStore amStationStore;
-
 // --- FmStationStore Helper Implementációk ---
 
 bool FmStationStore::addStation(const StationData& newStation) {

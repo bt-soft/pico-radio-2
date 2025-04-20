@@ -38,6 +38,11 @@ Band band(si4735);
 #include "PicoMemoryInfo.h"
 #endif
 
+//------------------- Állomás memória
+#include "StationStore.h"
+FmStationStore fmStationStore;
+AmStationStore amStationStore;
+
 //------------------- Képernyő
 #include "AmDisplay.h"
 #include "FmDisplay.h"
@@ -46,7 +51,6 @@ Band band(si4735);
 #include "ScreenSaverDisplay.h"
 #include "SetupDisplay.h"
 DisplayBase *pDisplay = nullptr;
-#include "StationStore.h"
 
 /**
  * Globális változó az aktuális kijelző váltásának előjegyzése
@@ -174,7 +178,11 @@ void setup() {
     tft.fillScreen(TFT_COLOR_BACKGROUND);
 
     // Várakozás a soros port megnyitására
-    //////////////////////////////////////////////////////Utils::debugWaitForSerial(tft);
+    Utils::debugWaitForSerial(tft);
+
+    EEPROM.begin(EEPROM_SIZE);
+    DEBUG("EEPROM initialized with size: %d\n", EEPROM_SIZE);
+
 
     // Ha a bekapcsolás alatt nyomva tartjuk a rotary gombját, akkor töröljük a konfigot
     if (digitalRead(PIN_ENCODER_SW) == LOW) {
@@ -263,7 +271,7 @@ void loop() {
     }
 #endif
 
-//------------------- EEprom mentés figyelése
+//------------------- EEPROM mentés figyelése
 #define EEPROM_SAVE_CHECK_INTERVAL 1000 * 60 * 5  // 5 perc
     static uint32_t lastEepromSaveCheck = 0;
     if (millis() - lastEepromSaveCheck >= EEPROM_SAVE_CHECK_INTERVAL) {

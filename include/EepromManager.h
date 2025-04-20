@@ -10,7 +10,7 @@
 #include "utils.h"
 
 #ifndef EEPROM_SIZE
-#define EEPROM_SIZE 2048  // Alapértelmezett 2K érték, de lehet 512-4096 között módosítani
+#define EEPROM_SIZE 4096  // Alapértelmezett 2K érték, de lehet 512-4096 között módosítani
 #endif
 
 /**
@@ -33,7 +33,12 @@ class EepromManager {
      * @note A konstruktorban kiszámoljuk a CRC-t is
      *
      */
-    EepromManager(const T &dataRef) : data(dataRef), crc(calcCRC16((uint8_t *)&data, sizeof(T))) { EEPROM.begin(EEPROM_SIZE); }
+    EepromManager(const T &dataRef)
+        : data(dataRef), crc(calcCRC16((uint8_t *)&data, sizeof(T))) {  // EEPROM.begin hívás csak egyszer kellene, pl. a setup()-ban, nem minden példányosításkor.
+        // De ha csak statikus metódusokat használunk, akkor ez a konstruktor nem is fut le.
+        // Biztosítsuk, hogy EEPROM.begin() lefut a setup()-ban!
+        // EEPROM.begin(EEPROM_SIZE); // Ezt inkább vedd ki innen.
+    }
 
     /**
      * Ha az adatok érvényesek, azokat beolvassa az EEPROM-ból
@@ -44,23 +49,31 @@ class EepromManager {
      * @param address az EEPROM címe
      * @return adatok CRC16 ellenőrző összege
      */
-    inline static uint16_t getIfValid(T &dataRef, bool &valid, const uint16_t address = 0) {
+    inline static uint16_t getIfValid(T &dataRef, bool &valid, const uint16_t address = 0, const char *className = "Unknown") {
+        EepromManager<T> storage(dataRef);  // Ez csak a CRC számításhoz kell itt
+        T tempData;                         // Ideiglenes hely a beolvasáshoz
+        uint16_t readCrc;
 
-        // Lokális példány létrehozása, közben a crc is számítódik
-        EepromManager<T> storage(dataRef);
+        // Adatok beolvasása
+        EEPROM.get(address, tempData);
+        // CRC beolvasása az adatok után
+        EEPROM.get(address + sizeof(T), readCrc);
 
-        // Kiolvassuk az EEPROM-ból a lokális példányba, közben crc is számítódik
-        EEPROM.get(address, storage);
+        // CRC ellenőrzés
+        uint16_t calculatedCrc = calcCRC16((uint8_t *)&tempData, sizeof(T));
+        valid = (readCrc == calculatedCrc);
 
-        // Azonos a crc?
-        valid = storage.crc == calcCRC16((uint8_t *)&storage.data, sizeof(T));
+        DEBUG("[%s] Checking EEPROM validity at address %d. Read CRC: %d, Calculated CRC: %d -> %s\n", className, address, readCrc, calculatedCrc, valid ? "Valid" : "INVALID");
 
-        // Ha valid, akkor beállítjuk a dataRef-et
         if (valid) {
-            dataRef = storage.data;
+            dataRef = tempData;  // Csak akkor másoljuk át, ha érvényes
+            return readCrc;      // Visszaadjuk a beolvasott/érvényes CRC-t
+        } else {
+            // Ha érvénytelen, nem adjuk vissza a rossz CRC-t, inkább 0-t,
+            // vagy hagyjuk, hogy a load kezelje a default mentést.
+            // A load() hívja a save()-et, ami visszaadja az új CRC-t.
+            return 0;  // Jelezzük, hogy a CRC érvénytelen volt.
         }
-
-        return storage.crc;
     }
 
     /**
@@ -72,25 +85,22 @@ class EepromManager {
      * @param address az EEPROM címe
      * @return adatok CRC16 ellenőrző összege
      */
-    inline static uint16_t load(T &dataRef, const uint16_t address = 0) {
-
-        // Kiolvassuk az adatokat az EEPROM-ból
+    inline static uint16_t load(T &dataRef, const uint16_t address = 0, const char *className = "Unknown") {
         bool valid = false;
-        uint16_t crc32 = getIfValid(dataRef, valid, address);
+        uint16_t loadedCrc = getIfValid(dataRef, valid, address, className);
 
-        // Ha NEM valid, akkor lementjük az EEPROM-ba a dataRef (mint default) értékeit
         if (!valid) {
-            Utils::beepError();
-            Utils::beepError();
-            DEBUG("EEPROM content is invalid, save defaults!\n");
-            Utils::beepError();
-            Utils::beepError();
-            save(dataRef, address);
+            // A hibaüzenetet már a getIfValid kiírta.
+            // Itt hívjuk a loadDefaults()-t, de azt a StoreBase-nek kellene, nem az EepromManagernek.
+            // A StoreBase::load() hívja ezt, és annak kell kezelnie a loadDefaults()-t.
+            // Viszont a default adatok mentését itt kell elindítani.
+            DEBUG("[%s] EEPROM content invalid at address %d, saving defaults!\n", className, address);
+            // A dataRef már tartalmazza a default értékeket (a StoreBase konstruktora vagy loadDefaults miatt)
+            return save(dataRef, address, className);  // Elmentjük a defaultot és visszaadjuk az új CRC-t
         } else {
-            DEBUG("EEPROM load OK\n");
+            DEBUG("[%s] EEPROM load OK from address %d\n", className, address);
+            return loadedCrc;  // Visszaadjuk az érvényes, beolvasott CRC-t
         }
-
-        return crc32;
     }
 
     /**
@@ -101,16 +111,23 @@ class EepromManager {
      * @param dataRef az adatok referenciája
      * @return adatok CRC16 ellenőrző összege
      */
-    inline static uint16_t save(const T &dataRef, const uint16_t address = 0) {
+    inline static uint16_t save(const T &dataRef, const uint16_t address = 0, const char *className = "Unknown") {
+        // Létrehozunk egy példányt a CRC számításhoz
+        EepromManager<T> storage(dataRef);  // Ez kiszámolja a storage.crc-t
 
-        // Létrehozunk egy saját példányt, közben a crc is számítódik
-        EepromManager<T> storage(dataRef);
+        DEBUG("[%s] Saving data to EEPROM at address %d (Size: %d B)...", className, address, sizeof(storage));
 
-        // Lementjük az adatokat + a crc-t az EEPROM-ba
-        EEPROM.put(address, storage);
-        EEPROM.commit();
+        // Lementjük az adatokat ÉS a crc-t az EEPROM-ba
+        EEPROM.put(address, storage.data);
+        EEPROM.put(address + sizeof(T), storage.crc);  // CRC mentése az adatok után
 
-        return storage.crc;
+        if (EEPROM.commit()) {
+            DEBUG(" OK (CRC: %d)\n", storage.crc);
+            return storage.crc;  // Visszaadjuk a CRC-t siker esetén
+        } else {
+            DEBUG(" FAILED!\n");
+            return 0;  // Hibát jelzünk 0-val
+        }
     }
 };
 

@@ -351,22 +351,20 @@ void MemoryDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent& e
  * Dialóg Button touch esemény feldolgozása
  */
 void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& event) {
-    DEBUG("MemoryDisplay::processDialogButtonResponse() -> Purpose: %d, Button ID: %d (%s)\n", static_cast<int>(currentDialogPurpose), event.id, event.label);
 
     bool redrawListNeeded = false;
     bool closeDialog = true;
 
     if (pDialog) {
         // Billentyűzet válasza
-        if (currentDialogPurpose == ActiveDialogPurpose::SAVE_NEW_STATION || currentDialogPurpose == ActiveDialogPurpose::EDIT_STATION_NAME) {
+        if (currentDialogMode == DialogMode::SAVE_NEW_STATION || currentDialogMode == DialogMode::EDIT_STATION_NAME) {
             if (event.id == DLG_OK_BUTTON_ID) {
                 // A stationNameBuffer tartalmazza az eredményt
 
-                if (currentDialogPurpose == ActiveDialogPurpose::SAVE_NEW_STATION) {
+                if (currentDialogMode == DialogMode::SAVE_NEW_STATION) {
                     // Új állomás mentése
                     Utils::safeStrCpy(pendingStationData.name, stationNameBuffer.c_str());
                     if (addStationInternal(pendingStationData)) {
-                        DEBUG("New station saved successfully: %s\n", pendingStationData.name);
                         redrawListNeeded = true;
                         // Opcionális: Ugrás az új elemre a listában
                         selectedListIndex = getCurrentStationCount() - 1;
@@ -377,10 +375,9 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                         listScrollOffset = constrain(listScrollOffset, 0, max(0, (int)getCurrentStationCount() - visibleLines));
 
                     } else {
-                        DEBUG("Failed to save new station.\n");
                         delete pDialog;  // Billentyűzet törlése
                         pDialog = new MessageDialog(this, tft, 250, 100, F("Error"), F("Memory full or station exists!"), "OK");
-                        currentDialogPurpose = ActiveDialogPurpose::NONE;
+                        currentDialogMode = DialogMode::NONE;
                         closeDialog = false;  // Ne zárja be a MessageDialog-ot
                     }
                 } else {  // EDIT_STATION_NAME
@@ -390,53 +387,45 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                         StationData updatedStation = *currentStation;
                         Utils::safeStrCpy(updatedStation.name, stationNameBuffer.c_str());
                         if (updateStationInternal(selectedListIndex, updatedStation)) {
-                            DEBUG("Station updated successfully at index %d: %s\n", selectedListIndex, updatedStation.name);
                             redrawListNeeded = true;
                         } else {
-                            DEBUG("Failed to update station.\n");
-                            // Hibaüzenet?
+                            delete pDialog;  // Billentyűzet törlése
+                            pDialog = new MessageDialog(this, tft, 250, 100, F("Error"), F("Error in modify!"), "OK");
+                            currentDialogMode = DialogMode::NONE;
+                            closeDialog = false;  // Ne zárja be a MessageDialog-ot
                         }
                     }
                 }
             } else {  // Cancel vagy X a billentyűzeten
-                DEBUG("Station save/edit cancelled.\n");
+                // DEBUG("Station name edit cancelled.\n");
             }
         }
         // Törlés megerősítésének válasza
-        else if (currentDialogPurpose == ActiveDialogPurpose::DELETE_CONFIRM) {
+        else if (currentDialogMode == DialogMode::DELETE_CONFIRM) {
             if (event.id == DLG_OK_BUTTON_ID) {  // "Delete" gomb
                 if (selectedListIndex != -1) {
                     int indexToDelete = selectedListIndex;  // Mentsük el az indexet
                     if (deleteStationInternal(indexToDelete)) {
-                        DEBUG("Station deleted successfully.\n");
                         selectedListIndex = -1;  // Törlés után nincs kiválasztás
-                        // Opcionális: Próbáljuk meg a törölt elem utáni elemet kiválasztani, ha van
-                        // if (indexToDelete < getCurrentStationCount()) {
-                        //     selectedListIndex = indexToDelete;
-                        // } else if (getCurrentStationCount() > 0) {
-                        //     selectedListIndex = getCurrentStationCount() - 1;
-                        // }
                         redrawListNeeded = true;
                     } else {
-                        DEBUG("Failed to delete station.\n");
-                        // Hibaüzenet?
+                        pDialog = new MessageDialog(this, tft, 250, 100, F("Error"), F("Failed to delete Station!"), "OK");
+                        currentDialogMode = DialogMode::NONE;
+                        closeDialog = false;  // Ne zárja be a MessageDialog-ot
                     }
                 }
             } else {  // Cancel vagy X a megerősítésen
-                DEBUG("Station delete cancelled.\n");
+                // DEBUG("Station delete cancelled.\n");
             }
         }
     }
 
     if (closeDialog) {
         DisplayBase::processDialogButtonResponse(event);  // Bezárja és törli a pDialog-ot, újrarajzolja a képernyőt
-        currentDialogPurpose = ActiveDialogPurpose::NONE;
+        currentDialogMode = DialogMode::NONE;
 
-        // A Base::processDialogButtonResponse már újrarajzolta a képernyőt,
-        // ami a listát is frissítette. A gombokat is frissíteni kell.
-        // if (redrawListNeeded) { // redrawListNeeded már nem kell, mert a base mindig rajzol
+        // A Base::processDialogButtonResponse már újrarajzolta a képernyőt, ami a listát is frissítette. A gombokat is frissíteni kell.
         updateActionButtonsState();
-        // }
     }
 }
 
@@ -445,7 +434,7 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
  */
 void MemoryDisplay::displayLoop() {
     // Csak akkor hívjuk a dialógus loopját, ha van dialógus ÉS az egy virtuális billentyűzet
-    if (pDialog != nullptr && (currentDialogPurpose == ActiveDialogPurpose::SAVE_NEW_STATION || currentDialogPurpose == ActiveDialogPurpose::EDIT_STATION_NAME)) {
+    if (pDialog != nullptr && (currentDialogMode == DialogMode::SAVE_NEW_STATION || currentDialogMode == DialogMode::EDIT_STATION_NAME)) {
         // Mivel tudjuk, hogy ilyenkor a pDialog egy VirtualKeyboardDialog-ra mutat,
         // biztonságosan hívhatjuk a displayLoop()-ját (ami a DialogBase-ból öröklődik).
         pDialog->displayLoop();
@@ -464,7 +453,7 @@ void MemoryDisplay::saveCurrentStation() {
     if (count >= maxCount) {
         DEBUG("Memory full. Cannot save.\n");
         pDialog = new MessageDialog(this, tft, 200, 100, F("Error"), F("Memory Full!"), "OK");
-        currentDialogPurpose = ActiveDialogPurpose::NONE;  // Nincs aktív cél
+        currentDialogMode = DialogMode::NONE;  // Nincs aktív cél
         return;
     }
 
@@ -475,7 +464,7 @@ void MemoryDisplay::saveCurrentStation() {
     if (existingIndex != -1) {
         DEBUG("Station already exists.\n");
         pDialog = new MessageDialog(this, tft, 250, 100, F("Info"), F("Station already saved!"), "OK");
-        currentDialogPurpose = ActiveDialogPurpose::NONE;
+        currentDialogMode = DialogMode::NONE;
         return;
     }
 
@@ -487,10 +476,9 @@ void MemoryDisplay::saveCurrentStation() {
 
     stationNameBuffer = "";  // Ürítjük a buffert
 
-    currentDialogPurpose = ActiveDialogPurpose::SAVE_NEW_STATION;
+    currentDialogMode = DialogMode::SAVE_NEW_STATION;
     selectedListIndex = -1;
 
-    DEBUG("Opening virtual keyboard for new station name...\n");
     pDialog = new VirtualKeyboardDialog(this, tft, F("Enter Station Name"), stationNameBuffer);
 }
 
@@ -509,7 +497,7 @@ void MemoryDisplay::editSelectedStation() {
     }
 
     stationNameBuffer = station->name;  // Kezdeti érték beállítása
-    currentDialogPurpose = ActiveDialogPurpose::EDIT_STATION_NAME;
+    currentDialogMode = DialogMode::EDIT_STATION_NAME;
 
     DEBUG("Opening virtual keyboard for editing station: %s\n", station->name);
     pDialog = new VirtualKeyboardDialog(this, tft, F("Edit Station Name"), stationNameBuffer);
@@ -529,7 +517,7 @@ void MemoryDisplay::deleteSelectedStation() {
         return;
     }
 
-    currentDialogPurpose = ActiveDialogPurpose::DELETE_CONFIRM;
+    currentDialogMode = DialogMode::DELETE_CONFIRM;
     String msg = "Delete '" + String(station->name) + "'?";
     DEBUG("Showing delete confirmation dialog for index %d\n", selectedListIndex);
     pDialog = new MessageDialog(this, tft, 250, 120, F("Confirm Delete"), F(msg.c_str()), "Delete", "Cancel");
