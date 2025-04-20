@@ -42,9 +42,11 @@ Band band(si4735);
 #include "AmDisplay.h"
 #include "FmDisplay.h"
 #include "FreqScanDisplay.h"
+#include "MemoryDisplay.h"
 #include "ScreenSaverDisplay.h"
 #include "SetupDisplay.h"
 DisplayBase *pDisplay = nullptr;
+#include "StationStore.h"
 
 /**
  * Globális változó az aktuális kijelző váltásának előjegyzése
@@ -105,6 +107,12 @@ void changeDisplay() {
             case DisplayBase::DisplayType::setup:
                 ::pDisplay = new SetupDisplay(tft, si4735, band);
                 // Elmentjük a beállítások képernyőnek, hogy hova térjen vissza
+                ::pDisplay->setPrevDisplayType(::currentDisplay);
+                break;
+
+            case DisplayBase::DisplayType::memory:
+                ::pDisplay = new MemoryDisplay(tft, si4735, band);
+                // Beállítjuk a képernyőnek, hogy hova térjen vissza
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
         }
@@ -189,6 +197,10 @@ void setup() {
     // Beállítjuk a touch scren-t
     tft.setTouch(config.data.tftCalibrateData);
 
+    // Állomáslisták betöltése az EEPROM-ból (a config után!) // <-- ÚJ
+    fmStationStore.load();
+    amStationStore.load();
+
     // Az si473x (Nem a default I2C lábakon [4,5] van!!!)
     Wire.setSDA(PIN_SI4735_I2C_SDA);  // I2C for SI4735 SDA
     Wire.setSCL(PIN_SI4735_I2C_SCL);  // I2C for SI4735 SCL
@@ -256,6 +268,8 @@ void loop() {
     static uint32_t lastEepromSaveCheck = 0;
     if (millis() - lastEepromSaveCheck >= EEPROM_SAVE_CHECK_INTERVAL) {
         config.checkSave();
+        fmStationStore.checkSave();
+        amStationStore.checkSave();
         lastEepromSaveCheck = millis();
     }
 //------------------- Memória információk megjelenítése

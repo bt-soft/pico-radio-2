@@ -14,11 +14,10 @@
 template <typename T>
 class StoreBase {
 
-   private:
+   protected:
     // A tárolt adatok CRC32 ellenőrző összege
     uint16_t lastCRC = 0;
 
-   protected:
     /**
      * Referencia az adattagra, ez az ős használja
      */

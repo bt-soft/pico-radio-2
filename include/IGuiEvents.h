@@ -13,12 +13,17 @@ class IGuiEvents {
     virtual ~IGuiEvents() = default;
 
     /**
-     * Rotary encoder esemény lekezelése
+     * Esemény nélküli képernyőfrissítés ciklus, a leszármazott felülírhatja
+     */
+    virtual void displayLoop() {};
+
+    /**
+     * Rotary encoder esemény lekezelése, a leszármazott felülírhatja
      */
     virtual bool handleRotary(RotaryEncoder::EncoderState encoderState) { return false; };
 
     /**
-     * Touch esemény lekezelése
+     * Touch esemény lekezelése, a leszármazott felülírhatja
      * true, ha valaki rámozdult az eseményre
      */
     virtual bool handleTouch(bool touched, uint16_t tx, uint16_t ty) { return false; };

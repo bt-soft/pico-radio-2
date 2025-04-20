@@ -28,6 +28,14 @@
 #define SCRN_HBTNS_ID_START 25  // A horizontális képernyő menübuttonok kezdő ID-je
 #define SCRN_VBTNS_ID_START 50  // A vertikális képernyő menübuttonok kezdő ID-je
 
+// Vízszintes gombok definíciói
+#define SCREEN_HBTNS_X_START 5    // Horizontális gombok kezdő X koordinátája
+#define SCREEN_HBTNS_Y_MARGIN 5   // Horizontális gombok alsó margója
+#define SCREEN_BTN_ROW_SPACING 5  // Gombok sorai közötti távolság
+
+// Vertical gombok definíciói
+#define SCREEN_VBTNS_X_MARGIN 0  // A vertikális gombok jobb oldali margója
+
 /**
  * DisplayBase base osztály
  */
@@ -35,7 +43,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 
    public:
     // Lehetséges képernyő típusok
-    enum DisplayType { none, fm, am, freqScan, screenSaver, setup };
+    enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory };
 
    private:
     // Gombok orientációja
@@ -234,7 +242,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 
     /**
      * Az előző képernyőtípus beállítása
-     * A SetupDisplay esetén használjuk, itt adjuk át, hogy hova kell visszatérnie a képrnyő bezárása után
+     * A SetupDisplay/MemoryDisplay esetén használjuk, itt adjuk át, hogy hova kell visszatérnie a képrnyő bezárása után
      */
     virtual void setPrevDisplayType(DisplayBase::DisplayType prevDisplay) {};
 };

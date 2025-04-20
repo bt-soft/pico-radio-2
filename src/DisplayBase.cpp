@@ -35,14 +35,6 @@ constexpr int VolumeMin = 0;
 constexpr int VolumeMax = 63;
 }  // namespace DisplayConstants
 
-// Vízszintes gombok definíciói
-#define SCREEN_HBTNS_X_START 5    // Horizontális gombok kezdő X koordinátája
-#define SCREEN_HBTNS_Y_MARGIN 5   // Horizontális gombok alsó margója
-#define SCREEN_BTN_ROW_SPACING 5  // Gombok sorai közötti távolság
-
-// Vertical gombok definíciói
-#define SCREEN_VBTNS_X_MARGIN 0  // A vertikális gombok jobb oldali margója
-
 /**
  *  BFO Status kirajzolása
  * @param initFont Ha true, akkor a betűtípus inicializálása történik
@@ -393,6 +385,7 @@ void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[
         {"Att", TftButton::ButtonType::Pushable},                                                    //
         {"Freq", TftButton::ButtonType::Pushable},                                                   //
         {"Setup", TftButton::ButtonType::Pushable},                                                  //
+        {"Memo", TftButton::ButtonType::Pushable},                                                   //
     };
     uint8_t mandatoryVButtonsLength = ARRAY_ITEM_COUNT(mandatoryVButtons);
 
@@ -592,6 +585,9 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
 
     else if (STREQ("Setup", event.label)) {              // Beállítások
         ::newDisplay = DisplayBase::DisplayType::setup;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
+        processed = true;
+    } else if (STREQ("Memo", event.label)) {              // Beállítások
+        ::newDisplay = DisplayBase::DisplayType::memory;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
         processed = true;
     }
     //

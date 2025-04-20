@@ -1,6 +1,7 @@
 #ifndef __TFTBUTTON_H
 #define __TFTBUTTON_H
 
+#include "defines.h"
 #include "utils.h"
 
 // Egy toggleable button állapotának megállapítása egy logikai kifejezés alapján
