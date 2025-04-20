@@ -36,7 +36,8 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
 
     listX = LIST_X_MARGIN;
     listY = statusLineHeight + LIST_Y_MARGIN;
-    listW = tft.width() - (SCRN_BTN_W + SCREEN_VBTNS_X_MARGIN * 2) - (LIST_X_MARGIN * 2);
+    // A lista szélessége most már a teljes képernyő szélességét használhatja (mínusz margók), mert nincs függőleges gombsor
+    listW = tft.width() - (LIST_X_MARGIN * 2);
     listH = tft.height() - listY - bottomButtonsHeight - LIST_Y_MARGIN;
 
     // Sor magasság és látható sorok számának számítása 2-es mérethez ---
@@ -50,18 +51,26 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
     }
 
     // Képernyő gombok definiálása
-    DisplayBase::BuildButtonData verticalButtonsData[] = {
-        {"Back", TftButton::ButtonType::Pushable},
-    };
-    buildVerticalScreenButtons(verticalButtonsData, ARRAY_ITEM_COUNT(verticalButtonsData), false);
-
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"SaveC", TftButton::ButtonType::Pushable},
         {"Edit", TftButton::ButtonType::Pushable, TftButton::ButtonState::Disabled},    // Kezdetben tiltva
         {"Delete", TftButton::ButtonType::Pushable, TftButton::ButtonState::Disabled},  // Kezdetben tiltva
         {"Tune", TftButton::ButtonType::Pushable, TftButton::ButtonState::Disabled},    // Kezdetben tiltva
+        {"Back", TftButton::ButtonType::Pushable},
     };
     buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), false);
+
+    // "Back" gomb megkeresése
+    TftButton* backButton = findButtonByLabel("Back");
+    if (backButton != nullptr) {
+        // Új X pozíció kiszámítása (jobbra igazítva)
+        uint16_t backButtonX = tft.width() - SCREEN_HBTNS_X_START - SCRN_BTN_W;  // Jobb szélhez igazítva
+        // Y pozíció lekérdezése (az automatikus elrendezés már beállította)
+        uint16_t backButtonY = getAutoButtonPosition(ButtonOrientation::Horizontal, ARRAY_ITEM_COUNT(horizontalButtonsData) - 1, false);  // Y pozíció lekérése az utolsó elemhez
+
+        // Gomb átpozícionálása. A setPosition nem rajzolja újra a gombot, de a drawScreen() majd igen.
+        backButton->setPosition(backButtonX, backButtonY);
+    }
 
     // Kezdeti kiválasztás törlése
     selectedListIndex = -1;

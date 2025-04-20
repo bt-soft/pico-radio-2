@@ -44,10 +44,10 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
    public:
     // Lehetséges képernyő típusok
     enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory };
-
-   private:
     // Gombok orientációja
     enum ButtonOrientation { Horizontal, Vertical };
+
+   private:
 
     // Vízszintes gombsor
     TftButton **horizontalScreenButtons = nullptr;  // A dinamikusan létrehozott gombok tömbjére mutató pointer
