@@ -8,7 +8,7 @@
 // --- Konstansok ---
 #define LIST_X_MARGIN 5
 #define LIST_Y_MARGIN 5
-#define LIST_ITEM_PADDING_Y 2
+#define LIST_ITEM_PADDING_Y 3  // Kicsit növeljük a paddinget a nagyobb font miatt
 #define LIST_ITEM_TEXT_COLOR TFT_WHITE
 #define LIST_ITEM_SELECTED_BG_COLOR TFT_BLUE
 #define LIST_ITEM_SELECTED_TEXT_COLOR TFT_WHITE
@@ -41,15 +41,16 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
     listW = tft.width() - (SCRN_BTN_W + SCREEN_VBTNS_X_MARGIN * 2) - (LIST_X_MARGIN * 2);
     listH = tft.height() - listY - bottomButtonsHeight - LIST_Y_MARGIN;
 
-    // Sor magasság és látható sorok számának becslése (Font 2-t használva)
-    tft.setTextFont(2);  // Használt font beállítása a méréshez
-    tft.setTextSize(1);
+    // --- MÓDOSÍTÁS KEZDETE: Sor magasság és látható sorok számának számítása 2-es mérethez ---
+    tft.setFreeFont();                                        // Alap font használata
+    tft.setTextSize(2);                                       // Méret beállítása a méréshez
     lineHeight = tft.fontHeight() + LIST_ITEM_PADDING_Y * 2;  // Font magasság + padding
     if (lineHeight > 0) {
         visibleLines = listH / lineHeight;
     } else {
         visibleLines = 0;  // Hiba elkerülése
     }
+    // --- MÓDOSÍTÁS VÉGE ---
     DEBUG("MemoryDisplay: List Area: x=%d, y=%d, w=%d, h=%d, lineHeight=%d, visibleLines=%d\n", listX, listY, listW, listH, lineHeight, visibleLines);
 
     // Képernyő gombok definiálása
@@ -83,14 +84,15 @@ void MemoryDisplay::drawScreen() {
     tft.setFreeFont();
     tft.fillScreen(TFT_COLOR_BACKGROUND);
 
-    // dawStatusLine();
+    // Státuszsor kirajzolása (örökölt)
+    dawStatusLine();  // Visszakapcsolva a státuszsor
 
-    tft.setTextFont(2);
+    tft.setTextFont(2);  // Visszaállítjuk a fontot a címhez (ha szükséges)
     tft.setTextSize(1);
     tft.setTextColor(TITLE_TEXT_COLOR, TFT_COLOR_BACKGROUND);
     tft.setTextDatum(TC_DATUM);
     const char* title = isFmMode ? "FM Memory" : "AM/LW/SW Memory";
-    tft.drawString(title, tft.width() / 2, 2);
+    tft.drawString(title, tft.width() / 2, 2);  // Státuszsor alá
 
     tft.drawRect(listX, listY, listW, listH, LIST_BORDER_COLOR);
     drawStationList();
@@ -106,8 +108,9 @@ void MemoryDisplay::drawStationList() {
 
     uint8_t count = getCurrentStationCount();
     if (count == 0) {
-        tft.setTextFont(2);
-        tft.setTextSize(1);
+        // Nagyobb font az üres listához is ---
+        tft.setFreeFont();
+        tft.setTextSize(2);
         tft.setTextColor(TFT_WHITE, LIST_ITEM_BG_COLOR);
         tft.setTextDatum(MC_DATUM);
         tft.drawString("Memory Empty", listX + listW / 2, listY + listH / 2);
@@ -115,14 +118,16 @@ void MemoryDisplay::drawStationList() {
     }
 
     if (listScrollOffset < 0) listScrollOffset = 0;
-    if (listScrollOffset >= count) listScrollOffset = max(0, count - 1);
+    // Javítás: A scroll offset ne mehessen túl az utolsó megjeleníthető elemen
+    if (listScrollOffset > max(0, count - visibleLines)) listScrollOffset = max(0, count - visibleLines);
     if (selectedListIndex >= count) selectedListIndex = -1;
 
-    tft.setTextFont(2);
-    tft.setTextSize(1);
+    // Font beállítása 2-es méretre ---
+    tft.setFreeFont();  // Alap font
+    tft.setTextSize(2);
     tft.setTextPadding(0);
 
-    int yPos = listY + 1 + LIST_ITEM_PADDING_Y;
+    int yPos = listY + 1;  // A sor teteje a kereten belül
 
     for (int i = listScrollOffset; i < count && (i - listScrollOffset) < visibleLines; ++i) {
         const StationData* station = getStationData(i);
@@ -132,16 +137,25 @@ void MemoryDisplay::drawStationList() {
         uint16_t bgColor = isSelected ? LIST_ITEM_SELECTED_BG_COLOR : LIST_ITEM_BG_COLOR;
         uint16_t textColor = isSelected ? LIST_ITEM_SELECTED_TEXT_COLOR : LIST_ITEM_TEXT_COLOR;
 
-        tft.fillRect(listX + 1, yPos - LIST_ITEM_PADDING_Y, listW - 2, lineHeight, bgColor);
+        // Háttér rajzolása (yPos a sor teteje, lineHeight a magasság)
+        tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
         tft.setTextColor(textColor, bgColor);
 
+        // Kiszámítjuk a szöveg függőleges középpontját a soron belül
+        int textCenterY = yPos + lineHeight / 2;
+
         // Állomásnév
-        tft.setTextDatum(TL_DATUM);
+        tft.setTextDatum(ML_DATUM);  // Middle-Left igazítás
         char displayName[STATION_NAME_BUFFER_SIZE];
         strncpy(displayName, station->name, STATION_NAME_BUFFER_SIZE - 1);
         displayName[STATION_NAME_BUFFER_SIZE - 1] = '\0';
-        // TODO: Szélesség alapján levágni
-        tft.drawString(displayName, listX + 5, yPos);
+
+        // Szélesség alapján levágás (egyszerűsített)
+        int availableWidth = listW - 10 - 100;  // Kb. hely a névnek
+        while (tft.textWidth(displayName) > availableWidth && strlen(displayName) > 0) {
+            displayName[strlen(displayName) - 1] = '\0';
+        }
+        tft.drawString(displayName, listX + 5, textCenterY);  // Rajzolás a függőleges középhez
 
         // Frekvencia
         String freqStr;
@@ -155,8 +169,8 @@ void MemoryDisplay::drawStationList() {
         } else {
             freqStr = String(station->frequency) + " ?";
         }
-        tft.setTextDatum(TR_DATUM);
-        tft.drawString(freqStr, listX + listW - 5, yPos);
+        tft.setTextDatum(MR_DATUM);                               // Middle-Right igazítás
+        tft.drawString(freqStr, listX + listW - 5, textCenterY);  // Rajzolás a függőleges középhez
 
         yPos += lineHeight;
     }
@@ -183,6 +197,7 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
     if (count == 0) return false;
 
     bool changed = false;
+    int oldSelectedIndex = selectedListIndex;  // Előző index mentése
 
     if (encoderState.direction == RotaryEncoder::Direction::Up) {
         selectedListIndex = (selectedListIndex == -1) ? 0 : min(selectedListIndex + 1, count - 1);
@@ -197,18 +212,22 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
         }
     }
 
-    if (changed) {
+    if (changed && selectedListIndex != oldSelectedIndex) {  // Csak akkor rajzolunk, ha tényleg változott az index
         // Scroll offset beállítása
         if (selectedListIndex < listScrollOffset) {
             listScrollOffset = selectedListIndex;
         } else if (selectedListIndex >= listScrollOffset + visibleLines) {
             listScrollOffset = selectedListIndex - visibleLines + 1;
         }
+        // Biztosítjuk, hogy a scroll offset érvényes maradjon
         listScrollOffset = constrain(listScrollOffset, 0, max(0, count - visibleLines));
 
         drawStationList();
         updateActionButtonsState();  // Gombok frissítése
         return true;
+    } else if (changed) {
+        // Ha az index nem változott (pl. a lista tetején/alján volt), de volt tekerés
+        return true;  // Kezeltük az eseményt, de nem kell újrarajzolni
     }
 
     return false;
@@ -222,7 +241,9 @@ bool MemoryDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
     if (count == 0) return false;
 
     if (touched && tx >= listX && tx < (listX + listW) && ty >= listY && ty < (listY + listH)) {
-        int touchedRow = (ty - listY) / lineHeight;
+        // --- MÓDOSÍTÁS: Pontosabb sor index számítás ---
+        int touchedRow = (ty - (listY + 1)) / lineHeight;  // A kereten belüli relatív Y / sor magasság
+        // --- MÓDOSÍTÁS VÉGE ---
         int touchedIndex = listScrollOffset + touchedRow;
 
         if (touchedIndex >= 0 && touchedIndex < count) {
@@ -231,8 +252,23 @@ bool MemoryDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
                 drawStationList();
                 updateActionButtonsState();  // Gombok frissítése
             }
+            // Dupla kattintás hangoláshoz (opcionális, egyszerűsített)
+            static unsigned long lastTouchTime = 0;
+            static int lastTouchedIndex = -1;
+            if (touchedIndex == lastTouchedIndex && millis() - lastTouchTime < 500) {  // 500ms-on belül ugyanoda
+                tuneToSelectedStation();
+                lastTouchTime = 0;  // Reset dupla kattintás után
+                lastTouchedIndex = -1;
+            } else {
+                lastTouchTime = millis();
+                lastTouchedIndex = touchedIndex;
+            }
             return true;
         }
+    } else if (!touched) {
+        // Ha az érintés véget ér a listán kívül, reseteljük a dupla kattintás figyelőt
+        // lastTouchTime = 0; // Ezt lehet, hogy nem itt kellene
+        // lastTouchedIndex = -1;
     }
     return false;
 }
@@ -259,6 +295,7 @@ void MemoryDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent& e
  * Dialóg Button touch esemény feldolgozása
  */
 void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& event) {
+    DEBUG("MemoryDisplay::processDialogButtonResponse() -> Purpose: %d, Button ID: %d (%s)\n", static_cast<int>(currentDialogPurpose), event.id, event.label);
 
     bool redrawListNeeded = false;
     bool closeDialog = true;
@@ -275,6 +312,14 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                     if (addStationInternal(pendingStationData)) {
                         DEBUG("New station saved successfully: %s\n", pendingStationData.name);
                         redrawListNeeded = true;
+                        // Opcionális: Ugrás az új elemre a listában
+                        selectedListIndex = getCurrentStationCount() - 1;
+                        // Scroll offset beállítása, hogy látható legyen
+                        if (selectedListIndex >= listScrollOffset + visibleLines) {
+                            listScrollOffset = selectedListIndex - visibleLines + 1;
+                        }
+                        listScrollOffset = constrain(listScrollOffset, 0, max(0, (int)getCurrentStationCount() - visibleLines));
+
                     } else {
                         DEBUG("Failed to save new station.\n");
                         delete pDialog;  // Billentyűzet törlése
@@ -305,9 +350,16 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
         else if (currentDialogPurpose == ActiveDialogPurpose::DELETE_CONFIRM) {
             if (event.id == DLG_OK_BUTTON_ID) {  // "Delete" gomb
                 if (selectedListIndex != -1) {
-                    if (deleteStationInternal(selectedListIndex)) {
+                    int indexToDelete = selectedListIndex;  // Mentsük el az indexet
+                    if (deleteStationInternal(indexToDelete)) {
                         DEBUG("Station deleted successfully.\n");
-                        selectedListIndex = -1;
+                        selectedListIndex = -1;  // Törlés után nincs kiválasztás
+                        // Opcionális: Próbáljuk meg a törölt elem utáni elemet kiválasztani, ha van
+                        // if (indexToDelete < getCurrentStationCount()) {
+                        //     selectedListIndex = indexToDelete;
+                        // } else if (getCurrentStationCount() > 0) {
+                        //     selectedListIndex = getCurrentStationCount() - 1;
+                        // }
                         redrawListNeeded = true;
                     } else {
                         DEBUG("Failed to delete station.\n");
@@ -324,11 +376,11 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
         DisplayBase::processDialogButtonResponse(event);  // Bezárja és törli a pDialog-ot, újrarajzolja a képernyőt
         currentDialogPurpose = ActiveDialogPurpose::NONE;
 
-        if (redrawListNeeded) {
-            // A Base::processDialogButtonResponse már újrarajzolta a képernyőt,
-            // ami a listát is frissítette. De a gombok állapotát lehet, hogy külön kell.
-            updateActionButtonsState();
-        }
+        // A Base::processDialogButtonResponse már újrarajzolta a képernyőt,
+        // ami a listát is frissítette. A gombokat is frissíteni kell.
+        // if (redrawListNeeded) { // redrawListNeeded már nem kell, mert a base mindig rajzol
+        updateActionButtonsState();
+        // }
     }
 }
 
@@ -356,7 +408,6 @@ void MemoryDisplay::saveCurrentStation() {
     if (count >= maxCount) {
         DEBUG("Memory full. Cannot save.\n");
         pDialog = new MessageDialog(this, tft, 200, 100, F("Error"), F("Memory Full!"), "OK");
-        // pDialog->drawDialog(); // Konstruktor rajzol
         currentDialogPurpose = ActiveDialogPurpose::NONE;  // Nincs aktív cél
         return;
     }
@@ -368,7 +419,6 @@ void MemoryDisplay::saveCurrentStation() {
     if (existingIndex != -1) {
         DEBUG("Station already exists.\n");
         pDialog = new MessageDialog(this, tft, 250, 100, F("Info"), F("Station already saved!"), "OK");
-        // pDialog->drawDialog(); // Konstruktor rajzol
         currentDialogPurpose = ActiveDialogPurpose::NONE;
         return;
     }
@@ -407,7 +457,6 @@ void MemoryDisplay::editSelectedStation() {
 
     DEBUG("Opening virtual keyboard for editing station: %s\n", station->name);
     pDialog = new VirtualKeyboardDialog(this, tft, F("Edit Station Name"), stationNameBuffer);
-    // pDialog->drawDialog(); // Konstruktor rajzol
 }
 
 /**
@@ -428,7 +477,6 @@ void MemoryDisplay::deleteSelectedStation() {
     String msg = "Delete '" + String(station->name) + "'?";
     DEBUG("Showing delete confirmation dialog for index %d\n", selectedListIndex);
     pDialog = new MessageDialog(this, tft, 250, 120, F("Confirm Delete"), F(msg.c_str()), "Delete", "Cancel");
-    // pDialog->drawDialog(); // Konstruktor rajzol
 }
 
 /**
