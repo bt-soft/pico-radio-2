@@ -16,8 +16,6 @@
 #define LIST_BORDER_COLOR TFT_WHITE
 #define TITLE_TEXT_COLOR TFT_YELLOW
 
-// --- MemoryDisplay Implementáció ---
-
 /**
  * Konstruktor
  */
@@ -41,7 +39,7 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
     listW = tft.width() - (SCRN_BTN_W + SCREEN_VBTNS_X_MARGIN * 2) - (LIST_X_MARGIN * 2);
     listH = tft.height() - listY - bottomButtonsHeight - LIST_Y_MARGIN;
 
-    // --- MÓDOSÍTÁS KEZDETE: Sor magasság és látható sorok számának számítása 2-es mérethez ---
+    // Sor magasság és látható sorok számának számítása 2-es mérethez ---
     tft.setFreeFont();                                        // Alap font használata
     tft.setTextSize(2);                                       // Méret beállítása a méréshez
     lineHeight = tft.fontHeight() + LIST_ITEM_PADDING_Y * 2;  // Font magasság + padding
@@ -50,8 +48,6 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
     } else {
         visibleLines = 0;  // Hiba elkerülése
     }
-    // --- MÓDOSÍTÁS VÉGE ---
-    DEBUG("MemoryDisplay: List Area: x=%d, y=%d, w=%d, h=%d, lineHeight=%d, visibleLines=%d\n", listX, listY, listW, listH, lineHeight, visibleLines);
 
     // Képernyő gombok definiálása
     DisplayBase::BuildButtonData verticalButtonsData[] = {
@@ -60,7 +56,7 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
     buildVerticalScreenButtons(verticalButtonsData, ARRAY_ITEM_COUNT(verticalButtonsData), false);
 
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
-        {"Save Curr", TftButton::ButtonType::Pushable},
+        {"SaveC", TftButton::ButtonType::Pushable},
         {"Edit", TftButton::ButtonType::Pushable, TftButton::ButtonState::Disabled},    // Kezdetben tiltva
         {"Delete", TftButton::ButtonType::Pushable, TftButton::ButtonState::Disabled},  // Kezdetben tiltva
         {"Tune", TftButton::ButtonType::Pushable, TftButton::ButtonState::Disabled},    // Kezdetben tiltva
@@ -83,9 +79,6 @@ MemoryDisplay::~MemoryDisplay() {}
 void MemoryDisplay::drawScreen() {
     tft.setFreeFont();
     tft.fillScreen(TFT_COLOR_BACKGROUND);
-
-    // Státuszsor kirajzolása (örökölt)
-    dawStatusLine();  // Visszakapcsolva a státuszsor
 
     tft.setTextFont(2);  // Visszaállítjuk a fontot a címhez (ha szükséges)
     tft.setTextSize(1);
@@ -194,11 +187,13 @@ void MemoryDisplay::updateActionButtonsState() {
  */
 bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
     uint8_t count = getCurrentStationCount();
-    if (count == 0) return false;
+    // Ha nincs elem a listában, vagy dialógus van nyitva, nem kezeljük
+    if (count == 0 || pDialog != nullptr) return false;
 
     bool changed = false;
     int oldSelectedIndex = selectedListIndex;  // Előző index mentése
 
+    // --- Forgatás kezelése ---
     if (encoderState.direction == RotaryEncoder::Direction::Up) {
         selectedListIndex = (selectedListIndex == -1) ? 0 : min(selectedListIndex + 1, count - 1);
         changed = true;
@@ -210,10 +205,17 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
             tuneToSelectedStation();
             return true;
         }
+    } else if (encoderState.buttonState == RotaryEncoder::ButtonState::DoubleClicked) {
+        // Dupla gombnyomás: Szerkesztés
+        if (selectedListIndex != -1) {
+            editSelectedStation();
+            return true;  // Kezeltük, nem kell tovább menni
+        }
     }
 
+    // --- Ha a kiválasztás változott a forgatás miatt ---
     if (changed && selectedListIndex != oldSelectedIndex) {  // Csak akkor rajzolunk, ha tényleg változott az index
-        // Scroll offset beállítása
+        // Scroll offset beállítása, ha a kiválasztás kiment a képből
         if (selectedListIndex < listScrollOffset) {
             listScrollOffset = selectedListIndex;
         } else if (selectedListIndex >= listScrollOffset + visibleLines) {
@@ -222,6 +224,7 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
         // Biztosítjuk, hogy a scroll offset érvényes maradjon
         listScrollOffset = constrain(listScrollOffset, 0, max(0, count - visibleLines));
 
+        // Lista és gombok újrarajzolása
         drawStationList();
         updateActionButtonsState();  // Gombok frissítése
         return true;
@@ -278,7 +281,7 @@ bool MemoryDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
  */
 void MemoryDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent& event) {
 
-    if (STREQ("Save Curr", event.label)) {
+    if (STREQ("SaveC", event.label)) {
         saveCurrentStation();
     } else if (STREQ("Edit", event.label)) {
         editSelectedStation();
@@ -501,7 +504,8 @@ void MemoryDisplay::tuneToSelectedStation() {
     targetBand.varData.currMod = station->modulation;
     band.bandSet(false);
 
-    ::newDisplay = (band.getCurrentBandType() == FM_BAND_TYPE) ? DisplayBase::DisplayType::fm : DisplayBase::DisplayType::am;
+    // Nem zárjuk be a képernyőt
+    //::newDisplay = (band.getCurrentBandType() == FM_BAND_TYPE) ? DisplayBase::DisplayType::fm : DisplayBase::DisplayType::am;
 }
 
 /**
