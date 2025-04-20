@@ -34,6 +34,7 @@ class MemoryDisplay : public DisplayBase {
     StationData pendingStationData;
 
     // Helper metódusok
+    void drawListItem(int index);  // Kirajzol egyetlen listaelemet a megadott indexre
     void drawStationList();
     void saveCurrentStation();     // Aktuális állomás mentése dialógussal
     void editSelectedStation();    // Kiválasztott állomás szerkesztése

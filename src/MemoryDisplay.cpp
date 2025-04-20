@@ -94,9 +94,75 @@ void MemoryDisplay::drawScreen() {
 }
 
 /**
+ * Kirajzol egyetlen listaelemet a megadott indexre.
+ * Figyelembe veszi, hogy az elem ki van-e választva.
+ * @param index A kirajzolandó elem indexe a teljes listában.
+ */
+void MemoryDisplay::drawListItem(int index) {
+    // Ellenőrzés, hogy az index érvényes-e és látható-e
+    if (index < 0 || index >= getCurrentStationCount() || index < listScrollOffset || index >= listScrollOffset + visibleLines) {
+        // Ha az index érvénytelen vagy nem látható, nem csinálunk semmit
+        // (Vagy törölhetnénk a sort, ha érvénytelen indexet kap, de az bonyolultabb)
+        return;
+    }
+
+    const StationData* station = getStationData(index);
+    if (!station) return;  // Hiba esetén kilép
+
+    // Y pozíció kiszámítása a sor tetejéhez
+    int yPos = listY + 1 + (index - listScrollOffset) * lineHeight;
+
+    bool isSelected = (index == selectedListIndex);
+    uint16_t bgColor = isSelected ? LIST_ITEM_SELECTED_BG_COLOR : LIST_ITEM_BG_COLOR;
+    uint16_t textColor = isSelected ? LIST_ITEM_SELECTED_TEXT_COLOR : LIST_ITEM_TEXT_COLOR;
+
+    // --- Font beállítása (fontos, hogy itt is be legyen állítva!) ---
+    tft.setFreeFont();
+    tft.setTextSize(2);
+    tft.setTextPadding(0);
+    // --- Font beállítás vége ---
+
+    // Háttér rajzolása (csak az adott sor)
+    tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
+    tft.setTextColor(textColor, bgColor);
+
+    // Szöveg függőleges középpontja
+    int textCenterY = yPos + lineHeight / 2;
+
+    // Állomásnév
+    tft.setTextDatum(ML_DATUM);
+    char displayName[STATION_NAME_BUFFER_SIZE];
+    strncpy(displayName, station->name, STATION_NAME_BUFFER_SIZE - 1);
+    displayName[STATION_NAME_BUFFER_SIZE - 1] = '\0';
+
+    // Szélesség alapján levágás
+    int availableWidth = listW - 10 - 100;
+    while (tft.textWidth(displayName) > availableWidth && strlen(displayName) > 0) {
+        displayName[strlen(displayName) - 1] = '\0';
+    }
+    tft.drawString(displayName, listX + 5, textCenterY);
+
+    // Frekvencia
+    String freqStr;
+    const BandTable* pBandData = &band.getBandByIdx(station->bandIndex);
+    if (pBandData && pBandData->pConstData) {
+        if (pBandData->pConstData->bandType == FM_BAND_TYPE) {
+            freqStr = String(station->frequency / 100.0f, 2) + " MHz";
+        } else {
+            freqStr = String(station->frequency) + " kHz";
+        }
+    } else {
+        freqStr = String(station->frequency) + " ?";
+    }
+    tft.setTextDatum(MR_DATUM);
+    tft.drawString(freqStr, listX + listW - 5, textCenterY);
+}
+
+/**
  * Állomáslista kirajzolása
  */
 void MemoryDisplay::drawStationList() {
+    // Lista területének törlése
     tft.fillRect(listX + 1, listY + 1, listW - 2, listH - 2, LIST_ITEM_BG_COLOR);
 
     uint8_t count = getCurrentStationCount();
@@ -110,62 +176,14 @@ void MemoryDisplay::drawStationList() {
         return;
     }
 
+    // Scroll offset és selected index validálása
     if (listScrollOffset < 0) listScrollOffset = 0;
-    // Javítás: A scroll offset ne mehessen túl az utolsó megjeleníthető elemen
     if (listScrollOffset > max(0, count - visibleLines)) listScrollOffset = max(0, count - visibleLines);
     if (selectedListIndex >= count) selectedListIndex = -1;
 
-    // Font beállítása 2-es méretre ---
-    tft.setFreeFont();  // Alap font
-    tft.setTextSize(2);
-    tft.setTextPadding(0);
-
-    int yPos = listY + 1;  // A sor teteje a kereten belül
-
+    // --- Ciklus a látható elemek kirajzolásához a drawListItem segítségével ---
     for (int i = listScrollOffset; i < count && (i - listScrollOffset) < visibleLines; ++i) {
-        const StationData* station = getStationData(i);
-        if (!station) continue;
-
-        bool isSelected = (i == selectedListIndex);
-        uint16_t bgColor = isSelected ? LIST_ITEM_SELECTED_BG_COLOR : LIST_ITEM_BG_COLOR;
-        uint16_t textColor = isSelected ? LIST_ITEM_SELECTED_TEXT_COLOR : LIST_ITEM_TEXT_COLOR;
-
-        // Háttér rajzolása (yPos a sor teteje, lineHeight a magasság)
-        tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
-        tft.setTextColor(textColor, bgColor);
-
-        // Kiszámítjuk a szöveg függőleges középpontját a soron belül
-        int textCenterY = yPos + lineHeight / 2;
-
-        // Állomásnév
-        tft.setTextDatum(ML_DATUM);  // Middle-Left igazítás
-        char displayName[STATION_NAME_BUFFER_SIZE];
-        strncpy(displayName, station->name, STATION_NAME_BUFFER_SIZE - 1);
-        displayName[STATION_NAME_BUFFER_SIZE - 1] = '\0';
-
-        // Szélesség alapján levágás (egyszerűsített)
-        int availableWidth = listW - 10 - 100;  // Kb. hely a névnek
-        while (tft.textWidth(displayName) > availableWidth && strlen(displayName) > 0) {
-            displayName[strlen(displayName) - 1] = '\0';
-        }
-        tft.drawString(displayName, listX + 5, textCenterY);  // Rajzolás a függőleges középhez
-
-        // Frekvencia
-        String freqStr;
-        const BandTable* pBandData = &band.getBandByIdx(station->bandIndex);
-        if (pBandData && pBandData->pConstData) {
-            if (pBandData->pConstData->bandType == FM_BAND_TYPE) {
-                freqStr = String(station->frequency / 100.0f, 2) + " MHz";
-            } else {
-                freqStr = String(station->frequency) + " kHz";
-            }
-        } else {
-            freqStr = String(station->frequency) + " ?";
-        }
-        tft.setTextDatum(MR_DATUM);                               // Middle-Right igazítás
-        tft.drawString(freqStr, listX + listW - 5, textCenterY);  // Rajzolás a függőleges középhez
-
-        yPos += lineHeight;
+        drawListItem(i);  // Meghívjuk az új metódust minden látható sorra
     }
 }
 
@@ -190,22 +208,32 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
     // Ha nincs elem a listában, vagy dialógus van nyitva, nem kezeljük
     if (count == 0 || pDialog != nullptr) return false;
 
-    bool changed = false;
+    bool selectionChanged = false;             // Jelzi, ha a kiválasztás változott
     int oldSelectedIndex = selectedListIndex;  // Előző index mentése
 
     // --- Forgatás kezelése ---
     if (encoderState.direction == RotaryEncoder::Direction::Up) {
-        selectedListIndex = (selectedListIndex == -1) ? 0 : min(selectedListIndex + 1, count - 1);
-        changed = true;
+        int newIndex = (selectedListIndex == -1) ? 0 : min(selectedListIndex + 1, count - 1);
+        if (newIndex != selectedListIndex) {
+            selectedListIndex = newIndex;
+            selectionChanged = true;
+        }
     } else if (encoderState.direction == RotaryEncoder::Direction::Down) {
-        selectedListIndex = (selectedListIndex == -1) ? count - 1 : max(0, selectedListIndex - 1);
-        changed = true;
-    } else if (encoderState.buttonState == RotaryEncoder::ButtonState::Clicked) {
+        int newIndex = (selectedListIndex == -1) ? count - 1 : max(0, selectedListIndex - 1);
+        if (newIndex != selectedListIndex) {
+            selectedListIndex = newIndex;
+            selectionChanged = true;
+        }
+    }
+    // --- Gombnyomás kezelése
+    else if (encoderState.buttonState == RotaryEncoder::ButtonState::Clicked) {
         if (selectedListIndex != -1) {
             tuneToSelectedStation();
             return true;
         }
-    } else if (encoderState.buttonState == RotaryEncoder::ButtonState::DoubleClicked) {
+    }
+    // --- Dupla gombnyomás kezelése ---
+    else if (encoderState.buttonState == RotaryEncoder::ButtonState::DoubleClicked) {
         // Dupla gombnyomás: Szerkesztés
         if (selectedListIndex != -1) {
             editSelectedStation();
@@ -214,26 +242,36 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
     }
 
     // --- Ha a kiválasztás változott a forgatás miatt ---
-    if (changed && selectedListIndex != oldSelectedIndex) {  // Csak akkor rajzolunk, ha tényleg változott az index
-        // Scroll offset beállítása, ha a kiválasztás kiment a képből
+    if (selectionChanged) {           // Csak akkor rajzolunk, ha tényleg van változás
+        bool needsScrolling = false;  // Jelzi, hogy scrollozni kell-e
+        // Ellenőrizzük, kell-e görgetni
         if (selectedListIndex < listScrollOffset) {
             listScrollOffset = selectedListIndex;
+            needsScrolling = true;
         } else if (selectedListIndex >= listScrollOffset + visibleLines) {
             listScrollOffset = selectedListIndex - visibleLines + 1;
+            needsScrolling = true;
         }
-        // Biztosítjuk, hogy a scroll offset érvényes maradjon
-        listScrollOffset = constrain(listScrollOffset, 0, max(0, count - visibleLines));
 
-        // Lista és gombok újrarajzolása
-        drawStationList();
-        updateActionButtonsState();  // Gombok frissítése
-        return true;
-    } else if (changed) {
-        // Ha az index nem változott (pl. a lista tetején/alján volt), de volt tekerés
-        return true;  // Kezeltük az eseményt, de nem kell újrarajzolni
+        if (needsScrolling) {
+            // Ha görgetni kellett, a teljes listát újrarajzoljuk
+            drawStationList();
+        } else {
+            // Ha nem kellett görgetni, csak a két érintett sort rajzoljuk újra
+            drawListItem(oldSelectedIndex);   // Régi (ha volt és látható volt)
+            drawListItem(selectedListIndex);  // Új
+        }
+
+        updateActionButtonsState();  // Gombok frissítése mindenképp
+        return true;                 // Kezeltük az eseményt
     }
 
-    return false;
+    // Ha csak gombnyomás volt, vagy nem változott a kiválasztás, de volt tekerés
+    if (encoderState.direction != RotaryEncoder::Direction::None) {
+        return true;  // Kezeltük, de nem rajzolunk
+    }
+
+    return false;  // Nem kezeltük
 }
 
 /**
@@ -241,20 +279,26 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
  */
 bool MemoryDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
     uint8_t count = getCurrentStationCount();
-    if (count == 0) return false;
+    if (count == 0 || pDialog != nullptr) return false;  // Dialógus alatt sem kezeljük
 
     if (touched && tx >= listX && tx < (listX + listW) && ty >= listY && ty < (listY + listH)) {
-        // --- MÓDOSÍTÁS: Pontosabb sor index számítás ---
+        // Pontosabb sor index számítás
         int touchedRow = (ty - (listY + 1)) / lineHeight;  // A kereten belüli relatív Y / sor magasság
-        // --- MÓDOSÍTÁS VÉGE ---
         int touchedIndex = listScrollOffset + touchedRow;
 
         if (touchedIndex >= 0 && touchedIndex < count) {
+            int oldSelectedIndex = selectedListIndex;  // Régi index mentése
+
             if (touchedIndex != selectedListIndex) {
                 selectedListIndex = touchedIndex;
-                drawStationList();
+
+                // Csak a két érintett sort rajzoljuk újra (itt nem kell görgetni)
+                drawListItem(oldSelectedIndex);   // Régi (ha volt és látható volt)
+                drawListItem(selectedListIndex);  // Új
+
                 updateActionButtonsState();  // Gombok frissítése
             }
+
             // Dupla kattintás hangoláshoz (opcionális, egyszerűsített)
             static unsigned long lastTouchTime = 0;
             static int lastTouchedIndex = -1;
@@ -266,14 +310,14 @@ bool MemoryDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
                 lastTouchTime = millis();
                 lastTouchedIndex = touchedIndex;
             }
-            return true;
+            return true;  // Kezeltük az érintést
         }
     } else if (!touched) {
         // Ha az érintés véget ér a listán kívül, reseteljük a dupla kattintás figyelőt
         // lastTouchTime = 0; // Ezt lehet, hogy nem itt kellene
         // lastTouchedIndex = -1;
     }
-    return false;
+    return false;  // Nem kezeltük
 }
 
 /**
