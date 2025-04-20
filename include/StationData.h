@@ -11,9 +11,9 @@
 #define MAX_STATION_NAME_LEN 15
 #define STATION_NAME_BUFFER_SIZE (MAX_STATION_NAME_LEN + 1)
 
-// EEPROM címek (Ellenőrizd, hogy ne ütközzenek a Config címmel és férjenek el!)
-#define EEPROM_FM_STATIONS_ADDR 1024
-#define EEPROM_AM_STATIONS_ADDR 2048  // Feltételezve, hogy az FM lista elfér 1024 bájtban
+// EEPROM címek (Optimalizált elrendezés)
+#define EEPROM_FM_STATIONS_ADDR 64   // <-- FM a Config után (Vége kb. 64 + 403 - 1 = 466)
+#define EEPROM_AM_STATIONS_ADDR 480  // <-- AM az FM után (Vége kb. 480 + 1003 - 1 = 1482)
 
 // Egyetlen állomás adatai
 struct StationData {

@@ -10,7 +10,7 @@
 #include "utils.h"
 
 #ifndef EEPROM_SIZE
-#define EEPROM_SIZE 4096  // Alapértelmezett 2K érték, de lehet 512-4096 között módosítani
+#define EEPROM_SIZE 2048  // Alapértelmezett 2K érték, de lehet 512-4096 között módosítani
 #endif
 
 /**
