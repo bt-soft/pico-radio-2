@@ -15,6 +15,8 @@
 #define LIST_ITEM_BG_COLOR TFT_BLACK  // Vagy TFT_COLOR_BACKGROUND
 #define LIST_BORDER_COLOR TFT_WHITE
 #define TITLE_TEXT_COLOR TFT_YELLOW
+#define LIST_ITEM_TUNED_ICON_COLOR TFT_YELLOW
+#define ICON_PADDING_RIGHT 3
 
 /**
  * Konstruktor
@@ -104,54 +106,77 @@ void MemoryDisplay::drawScreen() {
 
 /**
  * Kirajzol egyetlen listaelemet a megadott indexre.
- * Figyelembe veszi, hogy az elem ki van-e választva.
+ * Figyelembe veszi, hogy az elem ki van-e választva ÉS hogy hangolva van-e.
+ * Helyet hagy az ikonnak akkor is, ha nincs kirajzolva.
  * @param index A kirajzolandó elem indexe a teljes listában.
  */
 void MemoryDisplay::drawListItem(int index) {
     // Ellenőrzés, hogy az index érvényes-e és látható-e
     if (index < 0 || index >= getCurrentStationCount() || index < listScrollOffset || index >= listScrollOffset + visibleLines) {
-        // Ha az index érvénytelen vagy nem látható, nem csinálunk semmit
-        // (Vagy törölhetnénk a sort, ha érvénytelen indexet kap, de az bonyolultabb)
         return;
     }
 
     const StationData* station = getStationData(index);
-    if (!station) return;  // Hiba esetén kilép
+    if (!station) return;
+
+    // --- Aktuális hangolási adatok lekérdezése ---
+    uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
+    uint8_t currentTunedBandIdx = config.data.bandIdx;
+
+    // --- Állapotok meghatározása ---
+    bool isSelected = (index == selectedListIndex);
+    bool isTuned = (station->frequency == currentTunedFreq && station->bandIndex == currentTunedBandIdx);
+
+    // --- Színek beállítása a kiválasztás alapján ---
+    uint16_t bgColor = isSelected ? LIST_ITEM_SELECTED_BG_COLOR : LIST_ITEM_BG_COLOR;
+    uint16_t textColor = isSelected ? LIST_ITEM_SELECTED_TEXT_COLOR : LIST_ITEM_TEXT_COLOR;
 
     // Y pozíció kiszámítása a sor tetejéhez
     int yPos = listY + 1 + (index - listScrollOffset) * lineHeight;
 
-    bool isSelected = (index == selectedListIndex);
-    uint16_t bgColor = isSelected ? LIST_ITEM_SELECTED_BG_COLOR : LIST_ITEM_BG_COLOR;
-    uint16_t textColor = isSelected ? LIST_ITEM_SELECTED_TEXT_COLOR : LIST_ITEM_TEXT_COLOR;
-
-    // --- Font beállítása (fontos, hogy itt is be legyen állítva!) ---
+    // --- Font beállítása ---
     tft.setFreeFont();
     tft.setTextSize(2);
     tft.setTextPadding(0);
-    // --- Font beállítás vége ---
 
     // Háttér rajzolása (csak az adott sor)
     tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
-    tft.setTextColor(textColor, bgColor);
 
     // Szöveg függőleges középpontja
     int textCenterY = yPos + lineHeight / 2;
 
-    // Állomásnév
+    // --- Kezdő X pozíció és ikon helyének kiszámítása ---
+    int iconStartX = listX + 5;
+    // Kiszámítjuk az ikon szélességét és a hozzá tartozó paddingot
+    int iconWidth = tft.textWidth(">");
+    int iconSpaceWidth = iconWidth + ICON_PADDING_RIGHT;  // Teljes hely, amit az ikon (vagy annak hiánya) elfoglal
+
+    // --- Hangolásjelző ikon kirajzolása (ha szükséges) ---
+    if (isTuned) {
+        tft.setTextColor(LIST_ITEM_TUNED_ICON_COLOR, bgColor);  // Ikon színe
+        tft.setTextDatum(ML_DATUM);
+        tft.drawString(">", iconStartX, textCenterY);  // Ikon rajzolása a dedikált helyre
+    }
+    // --- Ikon rajzolás vége ---
+
+    // --- Állomásnév X pozíciójának beállítása (mindig az ikon helye után) ---
+    int textStartX = iconStartX + iconSpaceWidth;  // A név mindig az ikonnak fenntartott hely után kezdődik
+
+    // --- Állomásnév ---
+    tft.setTextColor(textColor, bgColor);  // Visszaállítjuk a normál szövegszínt
     tft.setTextDatum(ML_DATUM);
     char displayName[STATION_NAME_BUFFER_SIZE];
     strncpy(displayName, station->name, STATION_NAME_BUFFER_SIZE - 1);
     displayName[STATION_NAME_BUFFER_SIZE - 1] = '\0';
 
-    // Szélesség alapján levágás
-    int availableWidth = listW - 10 - 100;
+    // Szélesség alapján levágás (figyelembe véve az ikon helyét és a frekvencia helyét)
+    int availableWidth = (listX + listW - 5) - textStartX - 100;  // Jobb margó - Kezdő X - Becsült frekvencia szélesség
     while (tft.textWidth(displayName) > availableWidth && strlen(displayName) > 0) {
         displayName[strlen(displayName) - 1] = '\0';
     }
-    tft.drawString(displayName, listX + 5, textCenterY);
+    tft.drawString(displayName, textStartX, textCenterY);  // Kirajzolás az eltolt X pozícióval
 
-    // Frekvencia
+    // --- Frekvencia ---
     String freqStr;
     const BandTable* pBandData = &band.getBandByIdx(station->bandIndex);
     if (pBandData && pBandData->pConstData) {
@@ -539,11 +564,36 @@ void MemoryDisplay::tuneToSelectedStation() {
 
     DEBUG("Tuning to station: %s (Freq: %d, BandIdx: %d, Mod: %d)\n", station->name, station->frequency, station->bandIndex, station->modulation);
 
+    // --- Régi hangolt elem indexének megkeresése (a hangolás *előtt*) ---
+    int oldTunedIndex = -1;
+    uint16_t oldFreq = band.getCurrentBand().varData.currFreq;
+    uint8_t oldBandIdx = config.data.bandIdx;
+    uint8_t count = getCurrentStationCount();
+    for (int i = 0; i < count; ++i) {
+        const StationData* s = getStationData(i);
+        if (s && s->frequency == oldFreq && s->bandIndex == oldBandIdx) {
+            oldTunedIndex = i;
+            break;
+        }
+    }
+    // --- Régi index keresés vége ---
+
+    // --- Új hangolás beállítása ---
     config.data.bandIdx = station->bandIndex;
     BandTable& targetBand = band.getBandByIdx(station->bandIndex);
     targetBand.varData.currFreq = station->frequency;
     targetBand.varData.currMod = station->modulation;
-    band.bandSet(false);
+    band.bandSet(false);  // Ez behangolja a rádiót
+    // --- Hangolás vége ---
+
+    // --- Lista frissítése ---
+    // Csak akkor rajzoljuk újra a régi elemet, ha az nem ugyanaz, mint az új
+    // és ha látható volt (a drawListItem ezt ellenőrzi)
+    if (oldTunedIndex != -1 && oldTunedIndex != selectedListIndex) {
+        drawListItem(oldTunedIndex);  // Régi elem újrarajzolása (ikon eltűnik)
+    }
+    drawListItem(selectedListIndex);  // Új elem újrarajzolása (ikon megjelenik)
+                                      // --- Lista frissítés vége ---
 
     // Nem zárjuk be a képernyőt
     //::newDisplay = (band.getCurrentBandType() == FM_BAND_TYPE) ? DisplayBase::DisplayType::fm : DisplayBase::DisplayType::am;
