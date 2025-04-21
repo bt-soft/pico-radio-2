@@ -11,11 +11,20 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
     // Horizontális képernyőgombok definiálása
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"Bright", TftButton::ButtonType::Pushable},                             //
+        {"Squelch", TftButton::ButtonType::Pushable},                            //
         {"Exit", TftButton::ButtonType::Pushable, TftButton::ButtonState::Off},  //
     };
 
     // Horizontális képernyőgombok legyártása
-    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData));
+    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), false);
+
+    // Az "Exit" gombot továbbra is jobbra igazíthatjuk
+    TftButton *exitButton = findButtonByLabel("Exit");
+    if (exitButton != nullptr) {
+        uint16_t exitButtonX = tft.width() - SCREEN_HBTNS_X_START - SCRN_BTN_W;
+        uint16_t exitButtonY = getAutoButtonPosition(ButtonOrientation::Horizontal, ARRAY_ITEM_COUNT(horizontalButtonsData) - 1, false);
+        exitButton->setPosition(exitButtonX, exitButtonY);
+    }
 }
 
 /**
@@ -55,6 +64,32 @@ void SetupDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &ev
             new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("TFT Brightness"), F("Value:"),                                                                         //
                                   &config.data.tftBackgroundBrightness, (uint8_t)TFT_BACKGROUND_LED_MIN_BRIGHTNESS, (uint8_t)TFT_BACKGROUND_LED_MAX_BRIGHTNESS, (uint8_t)10,  //
                                   [this](uint8_t newBrightness) { analogWrite(PIN_TFT_BACKGROUND_LED, newBrightness); });
+    }
+    // --- ÚJ RÉSZ KEZDETE ---
+    else if (STREQ("Squelch", event.label)) {
+        // Squelch alapjának kiválasztása (SNR vagy RSSI)
+        const char *options[] = {"SNR", "RSSI"};
+        uint8_t optionCount = ARRAY_ITEM_COUNT(options);
+        const char *currentValue = config.data.squelchUsesRSSI ? "RSSI" : "SNR";  // Aktuális érték meghatározása
+
+        DisplayBase::pDialog = new MultiButtonDialog(
+            this, DisplayBase::tft, 250, 120,  // Méretet igazítsd szükség szerint
+            F("Squelch Basis"), options, optionCount,
+            [this](TftButton::ButtonTouchEvent event) {
+                // A callback függvény, ami lefut, ha a dialógusban gombot nyomnak
+                if (STREQ(event.label, "RSSI")) {
+                    config.data.squelchUsesRSSI = true;
+                    DEBUG("Squelch basis set to RSSI\n");
+                } else if (STREQ(event.label, "SNR")) {
+                    config.data.squelchUsesRSSI = false;
+                    DEBUG("Squelch basis set to SNR\n");
+                }
+                // Nincs szükség a képernyő újrarajzolására itt,
+                // mert a DialogBase::processDialogButtonResponse megteszi.
+                // A config mentése automatikusan megtörténik később.
+            },
+            currentValue  // Az aktuálisan kiválasztott érték átadása a dialógusnak
+        );
     }
 }
 

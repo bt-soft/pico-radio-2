@@ -8,30 +8,47 @@ int8_t Si4735Utils::currentBandIdx = -1;  // Induláskor nincs kiválasztvba ban
 /**
  * Manage Squelch
  */
+// Si4735Utils.cpp
 void Si4735Utils::manageSquelch() {
-
-    // squelchIndicator(pCfg->vars.currentSquelch);
-    if (!rtv::muteStat) {
-
+    if (!rtv::muteStat) {  // Csak akkor fusson, ha a globális némítás ki van kapcsolva
         si4735.getCurrentReceivedSignalQuality();
         uint8_t rssi = si4735.getCurrentRSSI();
         uint8_t snr = si4735.getCurrentSNR();
 
         uint8_t signalQuality = config.data.squelchUsesRSSI ? rssi : snr;
+
         if (signalQuality >= config.data.currentSquelch) {
-
-            if (rtv::SCANpause == true) {
-
-                si4735.setAudioMute(false);
-                rtv::squelchDecay = millis();
-                DEBUG("Si4735Utils::manageSuelch ->  si4735.setAudioMute(false)\n");
+            // Jel a küszöb felett -> Némítás kikapcsolása (ha szükséges)
+            if (rtv::SCANpause == true) {  // Ez a feltétel még mindig furcsa itt, de meghagyjuk
+                if (isSquelchMuted) {      // Csak akkor kapcsoljuk ki, ha eddig némítva volt
+                    si4735.setAudioMute(false);
+                    isSquelchMuted = false;                                             // Állapot frissítése
+                    DEBUG("Si4735Utils::manageSquelch -> Audio UNMUTED by squelch\n");  // Informatívabb üzenet
+                }
+                rtv::squelchDecay = millis();  // Időzítőt mindig reseteljük, ha jó a jel
             }
         } else {
+            // Jel a küszöb alatt -> Némítás bekapcsolása késleltetés után (ha szükséges)
             if (millis() > (rtv::squelchDecay + SQUELCH_DECAY_TIME)) {
-                si4735.setAudioMute(true);
-                DEBUG("Si4735Utils::manageSuelch -> si4735.setAudioMute(true)\n");
+                if (!isSquelchMuted) {  // Csak akkor kapcsoljuk be, ha eddig nem volt némítva
+                    si4735.setAudioMute(true);
+                    isSquelchMuted = true;                                            // Állapot frissítése
+                    DEBUG("Si4735Utils::manageSquelch -> Audio MUTED by squelch\n");  // Informatívabb üzenet
+                }
             }
         }
+    } else {
+        // Ha a globális némítás be van kapcsolva (rtv::muteStat == true),
+        // akkor a squelch állapotát is némítottra állítjuk, hogy szinkronban legyen.
+        // Ez fontos, hogy amikor a globális némítást kikapcsolják, a squelch helyesen tudjon működni.
+        if (!isSquelchMuted) {
+            // Nem kell ténylegesen mute parancsot küldeni, mert már némítva van globálisan,
+            // csak a belső állapotot frissítjük.
+            isSquelchMuted = true;
+            DEBUG("Si4735Utils::manageSquelch -> Squelch state synced to MUTED (due to global mute)\n");
+        }
+        // A decay timert is resetelhetjük itt, hogy ne némítson azonnal, ha a global mute megszűnik
+        rtv::squelchDecay = millis();
     }
 }
 
@@ -90,10 +107,10 @@ void Si4735Utils::checkAGC() {
  */
 void Si4735Utils::loop() {
     //
-    // this.manageSquelch();
+    this->manageSquelch();
 
     // A némítás után a hangot vissza kell állítani
-    manageHardwareAudioMute();
+    this->manageHardwareAudioMute();
 }
 
 /**

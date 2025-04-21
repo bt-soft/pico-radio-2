@@ -4,7 +4,6 @@
 #include "DisplayBase.h"
 
 class SetupDisplay : public DisplayBase {
-
    private:
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;
 

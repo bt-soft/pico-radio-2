@@ -13,6 +13,7 @@ class Si4735Utils {
     static int8_t currentBandIdx;
     bool hardwareAudioMuteState;        // SI4735 hardware audio mute állapot
     uint32_t hardwareAudioMuteElapsed;  // SI4735 hardware audio mute állapot start ideje
+    bool isSquelchMuted = false;        // Kezdetben nincs némítva a squelch miatt
 
     /**
      * Manage Audio Mute
