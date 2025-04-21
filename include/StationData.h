@@ -19,6 +19,7 @@
 struct StationData {
     char name[STATION_NAME_BUFFER_SIZE];  // Állomás neve
     uint16_t frequency;                   // Frekvencia (kHz vagy 10kHz, a bandType alapján)
+    int16_t bfoOffset;                    // BFO eltolás Hz-ben SSB/CW esetén (0 AM/FM esetén)
     uint8_t bandIndex;                    // A BandTable indexe, hogy tudjuk a sáv részleteit
     uint8_t modulation;                   // Aktuális moduláció (FM, AM, LSB, USB, CW)
     uint8_t bandwidthIndex;               // Index a Band::bandWidthFM/AM/SSB tömbökben

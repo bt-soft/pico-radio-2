@@ -306,8 +306,7 @@ class Band {
      */
     const char **getBandNames(uint8_t &count, bool isHamFilter);
 
-
-    void tuneMemoryStation(uint16_t frequency, uint8_t bandIndex, uint8_t demodModIndex, uint8_t bandwidthIndex);
+    void tuneMemoryStation(uint16_t frequency, int16_t bfoOffset, uint8_t bandIndex, uint8_t demodModIndex, uint8_t bandwidthIndex);
 };
 
 #endif  // __BAND_H

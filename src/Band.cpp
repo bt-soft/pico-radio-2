@@ -485,7 +485,7 @@ void Band::bandSet(bool useDefaults) {
 /**
  *
  */
-void Band::tuneMemoryStation(uint16_t frequency, uint8_t bandIndex, uint8_t demodModIndex, uint8_t bandwidthIndex) {
+void Band::tuneMemoryStation(uint16_t frequency, int16_t bfoOffset, uint8_t bandIndex, uint8_t demodModIndex, uint8_t bandwidthIndex) {
 
     // 1. Elkérjük a Band táblát
     config.data.bandIdx = bandIndex;  // Band index beállítása
@@ -516,6 +516,26 @@ void Band::tuneMemoryStation(uint16_t frequency, uint8_t bandIndex, uint8_t demo
     // 5. Explicit módon állítsd be a frekvenciát és a módot a chipen
     currentBand.varData.currFreq = frequency;
     si4735.setFrequency(currentBand.varData.currFreq);
+
+    // BFO eltolás visszaállítása SSB/CW esetén ---
+    if (demodModIndex == LSB || demodModIndex == USB || demodModIndex == CW) {
+        currentBand.varData.lastBFO = bfoOffset;  // Mentett BFO visszaállítása a sáv változóba
+        config.data.currentBFO = bfoOffset;       // Mentett BFO visszaállítása az aktuális hangolási változóba
+        rtv::freqDec = bfoOffset;                 // Rotary változó szinkronizálása
+
+        const int16_t cwBaseOffset = (demodModIndex == CW) ? CW_SHIFT_FREQUENCY : 0;
+        // A visszaállított BFO (+ az esetleges manuális finomítás) használata
+        int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
+        si4735.setSSBBfo(bfoToSet);
+        rtv::CWShift = (demodModIndex == CW);  // CW shift állapot frissítése
+
+    } else {
+        // AM/FM esetén biztosítjuk, hogy a BFO nullázva legyen
+        currentBand.varData.lastBFO = 0;
+        config.data.currentBFO = 0;
+        rtv::freqDec = 0;
+        rtv::CWShift = false;
+    }
 
     // 6. Hangerő visszaállítása
     si4735.setVolume(config.data.currVolume);

@@ -13,15 +13,30 @@ bool FmStationStore::addStation(const StationData& newStation) {
         DEBUG("FM Memory full. Cannot add station.\n");
         return false;  // Memória megtelt
     }
-    // Ellenőrzés, hogy létezik-e már (opcionális, de hasznos)
-    if (findStation(newStation.frequency, newStation.bandIndex) != -1) {
-        DEBUG("FM Station already exists (Freq: %d, Band: %d).\n", newStation.frequency, newStation.bandIndex);
-        return false;  // Már létezik
+
+    // Ellenőrzés, hogy létezik-e már
+    for (uint8_t i = 0; i < data.count; ++i) {
+        // Alap frekvencia és sávindex ellenőrzése
+        if (data.stations[i].frequency == newStation.frequency && data.stations[i].bandIndex == newStation.bandIndex) {
+            // Ha SSB/CW, akkor a BFO eltolást is ellenőrizzük
+            if (newStation.modulation == LSB || newStation.modulation == USB || newStation.modulation == CW) {
+                if (data.stations[i].bfoOffset == newStation.bfoOffset) {
+                    DEBUG("Station already exists (Freq: %d, Band: %d, BFO: %d).\n", newStation.frequency, newStation.bandIndex, newStation.bfoOffset);
+                    return false;  // Pontos duplikátum
+                }
+                // Ha a BFO eltér, akkor nem duplikátum, mehet tovább a ciklus
+            } else {
+                // AM/FM esetén elég a frekvencia és sáv egyezés
+                DEBUG("Station already exists (Freq: %d, Band: %d).\n", newStation.frequency, newStation.bandIndex);
+                return false;  // Duplikátum
+            }
+        }
     }
 
     data.stations[data.count] = newStation;  // Hozzáadás a tömb végére
     data.count++;
-    DEBUG("FM Station added: %s\n", newStation.name);
+    // Frissített DEBUG üzenet a BFO-val
+    DEBUG("FM Station added: %s (Freq: %d, BFO: %d)\n", newStation.name, newStation.frequency, newStation.bfoOffset);
     checkSave();  // Változás volt, mentsünk ha kell
     return true;
 }
@@ -70,13 +85,31 @@ bool AmStationStore::addStation(const StationData& newStation) {
         DEBUG("AM Memory full. Cannot add station.\n");
         return false;
     }
-    if (findStation(newStation.frequency, newStation.bandIndex) != -1) {
-        DEBUG("AM Station already exists (Freq: %d, Band: %d).\n", newStation.frequency, newStation.bandIndex);
-        return false;
+
+    // Ellenőrzés, hogy létezik-e már
+    for (uint8_t i = 0; i < data.count; ++i) {
+        // Alap frekvencia és sávindex ellenőrzése
+        if (data.stations[i].frequency == newStation.frequency && data.stations[i].bandIndex == newStation.bandIndex) {
+            // Ha SSB/CW, akkor a BFO eltolást is ellenőrizzük
+            if (newStation.modulation == LSB || newStation.modulation == USB || newStation.modulation == CW) {
+                if (data.stations[i].bfoOffset == newStation.bfoOffset) {
+                    DEBUG("Station already exists (Freq: %d, Band: %d, BFO: %d).\n", newStation.frequency, newStation.bandIndex, newStation.bfoOffset);
+                    return false;  // Pontos duplikátum
+                }
+                // Ha a BFO eltér, akkor nem duplikátum, mehet tovább a ciklus
+            } else {
+                // AM/FM esetén elég a frekvencia és sáv egyezés
+                DEBUG("Station already exists (Freq: %d, Band: %d).\n", newStation.frequency, newStation.bandIndex);
+                return false;  // Duplikátum
+            }
+        }
     }
-    data.stations[data.count] = newStation;
+
+    data.stations[data.count] = newStation;  // Hozzáadás a tömb végére
     data.count++;
-    DEBUG("AM Station added: %s\n", newStation.name);
+    // Frissített DEBUG üzenet a BFO-val
+    DEBUG("AM Station added: %s (Freq: %d, BFO: %d)\n", newStation.name, newStation.frequency, newStation.bfoOffset);
+
     checkSave();
     return true;
 }

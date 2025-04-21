@@ -112,6 +112,7 @@ void MemoryDisplay::drawScreen() {
  * @param index A kirajzolandó elem indexe a teljes listában.
  */
 void MemoryDisplay::drawListItem(int index) {
+
     // Ellenőrzés, hogy az index érvényes-e és látható-e
     if (index < 0 || index >= getCurrentStationCount() || index < listScrollOffset || index >= listScrollOffset + visibleLines) {
         return;
@@ -175,17 +176,22 @@ void MemoryDisplay::drawListItem(int index) {
 
     // --- Frekvencia string előkészítése (szélesség számításhoz kell) ---
     String freqStr;
-    const BandTable* pBandData = &band.getBandByIdx(station->bandIndex);
-    if (pBandData && pBandData->pConstData) {
-        if (pBandData->pConstData->bandType == FM_BAND_TYPE) {
-            freqStr = String(station->frequency / 100.0f, 2) + " MHz";
-        } else {
-            freqStr = String(station->frequency) + " kHz";
-        }
-    } else {
-        freqStr = String(station->frequency) + " ?";
+    if (station->modulation == FM) {  // Mentett moduláció ellenőrzése
+        freqStr = String(station->frequency / 100.0f, 2) + " MHz";
+    } else if (station->modulation == LSB || station->modulation == USB || station->modulation == CW) {
+        // Pontos frekvencia számítása a mentett adatokból
+        uint32_t displayFreqHz = (uint32_t)station->frequency * 1000 - station->bfoOffset;
+        long khz_part = displayFreqHz / 1000;
+        // Előjel nélküli száz/tíz Hz rész kell a formázáshoz
+        int hz_tens_part = abs((int)(displayFreqHz % 1000)) / 10;
+        char s[12];
+        sprintf(s, "%ld.%02d", khz_part, hz_tens_part);  // Formázás: kHz.százHz tízHz
+        freqStr = String(s) + " kHz";
+    } else {  // AM, LW, MW
+        freqStr = String(station->frequency) + " kHz";
     }
-    int freqWidth = tft.textWidth(freqStr);
+
+    int freqWidth = tft.textWidth(freqStr);  // Szélesség lekérése a formázott stringből
 
     // --- Moduláció string előkészítése ---
     const char* modStr = band.getBandModeDescByIndex(station->modulation);
@@ -529,6 +535,13 @@ void MemoryDisplay::saveCurrentStation() {
 
     // Ideiglenes adatok mentése
     pendingStationData.frequency = currentBandData.varData.currFreq;
+    //  BFO eltolás mentése SSB/CW esetén ---
+    if (currentBandData.varData.currMod == LSB || currentBandData.varData.currMod == USB || currentBandData.varData.currMod == CW) {
+        // A lastBFO tűnik relevánsnak a sávhoz mentett állapothoz
+        pendingStationData.bfoOffset = currentBandData.varData.lastBFO;
+    } else {
+        pendingStationData.bfoOffset = 0;  // AM/FM esetén 0
+    }
     pendingStationData.bandIndex = config.data.bandIdx;
     pendingStationData.modulation = currentBandData.varData.currMod;
 
@@ -543,11 +556,9 @@ void MemoryDisplay::saveCurrentStation() {
     }
 
     // A nevet a billentyűzet után kapjuk meg
-
     stationNameBuffer = "";  // Ürítjük a buffert
-
     currentDialogMode = DialogMode::SAVE_NEW_STATION;
-    selectedListIndex = -1;
+    selectedListIndex = -1;  // Kiválasztás törlése mentés előtt/alatt
 
     pDialog = new VirtualKeyboardDialog(this, tft, F("Enter Station Name"), stationNameBuffer);
 }
@@ -597,17 +608,19 @@ void MemoryDisplay::deleteSelectedStation() {
  * Behúzza a kiválasztott állomást
  */
 void MemoryDisplay::tuneToSelectedStation() {
+
     if (selectedListIndex < 0 || selectedListIndex >= getCurrentStationCount()) {
         DEBUG("No station selected for tuning.\n");
         return;
     }
+
     const StationData* station = getStationData(selectedListIndex);
     if (!station) {
         DEBUG("Error getting station data for tuning.\n");
         return;
     }
 
-    DEBUG("Tuning to station: %s (Freq: %d, BandIdx: %d, Mod: %d)\n", station->name, station->frequency, station->bandIndex, station->modulation);
+    DEBUG("Tuning to station: %s (Freq: %d, BFO: %d, BandIdx: %d, Mod: %d)\n", station->name, station->frequency, station->bfoOffset, station->bandIndex, station->modulation);
 
     // --- Régi hangolt elem indexének megkeresése (a hangolás *előtt*) ---
     int oldTunedIndex = -1;
@@ -624,7 +637,8 @@ void MemoryDisplay::tuneToSelectedStation() {
     // --- Régi index keresés vége ---
 
     // --- Hangolás beállítása a Band osztályban---
-    band.tuneMemoryStation(station->frequency, station->bandIndex, station->modulation, station->bandwidthIndex);
+    band.tuneMemoryStation(station->frequency, station->bfoOffset, station->bandIndex, station->modulation, station->bandwidthIndex);
+    Si4735Utils::checkAGC();  // AGC ellenőrzése a hangolás és módváltás után
 
     // --- Lista frissítése ---
     if (oldTunedIndex != -1 && oldTunedIndex != selectedListIndex) {
