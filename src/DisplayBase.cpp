@@ -436,12 +436,13 @@ void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[
 
     // Kötelező vertikális Képernyőgombok definiálása
     DisplayBase::BuildButtonData mandatoryVButtons[] = {
-        {"Mute", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(rtv::muteStat)},  //
-        {"Volum", TftButton::ButtonType::Pushable},                                           //
-        {"AGC", TftButton::ButtonType::Toggleable, initialAgcButtonState},                    //
-        {"Freq", TftButton::ButtonType::Pushable},                                            //
-        {"Setup", TftButton::ButtonType::Pushable},                                           //
-        {"Memo", TftButton::ButtonType::Pushable},                                            //
+        {"Mute", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(rtv::muteStat)},
+        {"Volum", TftButton::ButtonType::Pushable},
+        {"AGC", TftButton::ButtonType::Toggleable, initialAgcButtonState},
+        {"Squel", TftButton::ButtonType::Pushable},
+        {"Freq", TftButton::ButtonType::Pushable},
+        {"Setup", TftButton::ButtonType::Pushable},
+        {"Memo", TftButton::ButtonType::Pushable},
     };
     uint8_t mandatoryVButtonsLength = ARRAY_ITEM_COUNT(mandatoryVButtons);
 
@@ -503,9 +504,9 @@ void DisplayBase::buildHorizontalScreenButtons(BuildButtonData screenHButtonsDat
         {"Ham", TftButton::ButtonType::Pushable},    //
         {"Band", TftButton::ButtonType::Pushable},   //
         {"DeMod", TftButton::ButtonType::Pushable},  //
-        {"BndW", TftButton::ButtonType::Pushable, band.getCurrentBand().varData.currMod == FM ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off},
-        {"Step", TftButton::ButtonType::Pushable},  //
-        {"Scan", TftButton::ButtonType::Pushable},  //
+        {"BndW", TftButton::ButtonType::Pushable},   //
+        {"Step", TftButton::ButtonType::Pushable},   //
+        {"Scan", TftButton::ButtonType::Pushable},   //
     };
     uint8_t mandatoryHButtonsLength = ARRAY_ITEM_COUNT(mandatoryHButtons);
 
@@ -551,6 +552,22 @@ void DisplayBase::updateButtonStatus() {
     if (btnStep != nullptr) {
         bool stepDisabled = (currMod == LSB or currMod == USB or currMod == CW);
         btnStep->setState(stepDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
+    }
+
+    TftButton *btnSquelch = findButtonByLabel("Squel");
+    if (btnSquelch != nullptr) {
+        // Ellenőrizzük a squelch értékét
+        bool squelchActive = (config.data.currentSquelch > 0);
+        // Beállítjuk a gomb állapotát (On, ha aktív, Off, ha nem)
+        // A setState() újrarajzolja a gombot a megfelelő LED-del
+        btnSquelch->setState(squelchActive ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
+    }
+
+    TftButton *btnBndW = findButtonByLabel("BndW");
+    if (btnBndW != nullptr) {
+        // FM módban a BandWidth gomb tiltva van
+        bool bndwDisabled = (currMod == FM);
+        btnBndW->setState(bndwDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
     }
 }
 
@@ -653,7 +670,27 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         }
 
         processed = true;
+    } else if (STREQ("Squel", event.label)) {
+        // Squelch értékének állítása
+        const __FlashStringHelper *squelchPrompt;
+        if (config.data.squelchUsesRSSI) {
+            squelchPrompt = F("RSSI Value[dBuV]:");  // Flash string használata
+        } else {
+            squelchPrompt = F("SNR Value[dB]:");  // Flash string használata
+        }
 
+        // A MIN_SQUELCH és MAX_SQUELCH konstansok az rtVars.h-ban vannak definiálva
+        this->pDialog = new ValueChangeDialog(this, this->tft, 250, 150, F("Squelch Level"), squelchPrompt,
+                                              &config.data.currentSquelch,  // Pointer a config értékre
+                                              (uint8_t)MIN_SQUELCH,         // Minimum érték (rtVars.h-ból)
+                                              (uint8_t)MAX_SQUELCH,         // Maximum érték (rtVars.h-ból)
+                                              (uint8_t)1,                   // Lépésköz 1
+                                              [this](double newValue) {
+                                                  // A ValueChangeDialog már beállította a config.data.currentSquelch értékét az OK gomb megnyomásakor vagy a rotary click-re.
+                                                  // A Si4735Utils::manageSquelch() a következő ciklusban már az új értéket fogja használni.
+                                                  // Itt nincs szükség további explicit műveletre a chip felé, mert a manageSquelch periodikusan fut és olvassa a configot.
+                                              });
+        processed = true;
     } else if (STREQ("Freq", event.label)) {
         // Open the FrequencyInputDialog
         BandTable &currentBand = band.getCurrentBand();
