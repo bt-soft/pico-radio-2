@@ -76,7 +76,6 @@ void DisplayBase::drawAgcAttStatus(bool initFont /*= false*/) {  // initFont má
     tft.setTextDatum(BC_DATUM);  // Bottom-Center igazítás
 
     Si4735Utils::AgcGainMode currentMode = static_cast<Si4735Utils::AgcGainMode>(config.data.agcGain);
-    DEBUG("drawAgcAttStatus: Reading config.data.agcGain = %d, currentMode = %d\n", config.data.agcGain, (int)currentMode);
 
     uint16_t agcColor;
     String labelText;
@@ -182,7 +181,6 @@ void DisplayBase::dawStatusLine() {
     drawBfoStatus();
 
     // AGC Status
-    DEBUG("dawStatusLine: Before drawAgcAttStatus, config.data.agcGain = %d\n", config.data.agcGain);
     drawAgcAttStatus();
 
     // Demodulációs mód
@@ -388,6 +386,32 @@ TftButton *DisplayBase::findButtonByLabel(const char *label) {
 }
 
 /**
+ * Megkeresi a gombot az ID alapján
+ *
+ * @param id A keresett gomb ID-je
+ * @return A TftButton pointere, vagy nullptr, ha nincs ilyen gomb
+ */
+TftButton *DisplayBase::findButtonById(uint8_t id) {
+    // Keresés a horizontális gombok között
+    if (horizontalScreenButtons != nullptr) {
+        for (uint8_t i = 0; i < horizontalScreenButtonsCount; ++i) {
+            if (horizontalScreenButtons[i] != nullptr && horizontalScreenButtons[i]->getId() == id) {
+                return horizontalScreenButtons[i];
+            }
+        }
+    }
+    // Keresés a vertikális gombok között
+    if (verticalScreenButtons != nullptr) {
+        for (uint8_t i = 0; i < verticalScreenButtonsCount; ++i) {
+            if (verticalScreenButtons[i] != nullptr && verticalScreenButtons[i]->getId() == id) {
+                return verticalScreenButtons[i];
+            }
+        }
+    }
+    return nullptr;  // Nem található
+}
+
+/**
  * Vertikális képernyő menügombok legyártása
  *
  * @param buttonsData A gombok adatai
@@ -396,14 +420,28 @@ TftButton *DisplayBase::findButtonByLabel(const char *label) {
  */
 void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[], uint8_t screenVButtonsDataLength, bool isMandatoryNeed) {
 
+    // Határozzuk meg az AGC gomb kezdeti állapotát és feliratát a config alapján
+    Si4735Utils::AgcGainMode initialAgcMode = static_cast<Si4735Utils::AgcGainMode>(config.data.agcGain);
+
+    // Ha Automatikus AGC mód van, akkor a gomb állapota On
+    //  Ha Manual módban vagyunk, akkor a gomb állapota On, ha a gain > 1
+    TftButton::ButtonState initialAgcButtonState = TftButton::ButtonState::Off;
+    if (initialAgcMode == Si4735Utils::AgcGainMode::Automatic) {
+        initialAgcButtonState = TftButton::ButtonState::On;
+    } else if (initialAgcMode == Si4735Utils::AgcGainMode::Manual) {
+        if (config.data.currentAGCgain > 1) {
+            initialAgcButtonState = TftButton::ButtonState::On;
+        }
+    }
+
     // Kötelező vertikális Képernyőgombok definiálása
     DisplayBase::BuildButtonData mandatoryVButtons[] = {
-        {"Mute", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(rtv::muteStat)},         //
-        {"Volum", TftButton::ButtonType::Pushable},                                                  //
-        {"AGC", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(si4735.isAgcEnabled())},  //
-        {"Freq", TftButton::ButtonType::Pushable},                                                   //
-        {"Setup", TftButton::ButtonType::Pushable},                                                  //
-        {"Memo", TftButton::ButtonType::Pushable},                                                   //
+        {"Mute", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(rtv::muteStat)},  //
+        {"Volum", TftButton::ButtonType::Pushable},                                           //
+        {"AGC", TftButton::ButtonType::Toggleable, initialAgcButtonState},                    //
+        {"Freq", TftButton::ButtonType::Pushable},                                            //
+        {"Setup", TftButton::ButtonType::Pushable},                                           //
+        {"Memo", TftButton::ButtonType::Pushable},                                            //
     };
     uint8_t mandatoryVButtonsLength = ARRAY_ITEM_COUNT(mandatoryVButtons);
 
@@ -430,6 +468,20 @@ void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[
     // Gombok legyártása a (potenciálisan összefűzött) tömb alapján
     // Fontos: A buildScreenButtons most már beállítja a verticalScreenButtonsCount értékét
     verticalScreenButtons = buildScreenButtons(ButtonOrientation::Vertical, mergedButtons, mergedLength, SCRN_VBTNS_ID_START, verticalScreenButtonsCount);
+
+    // AGC gomb megkeresése és ID mentése
+    agcButtonId = TFT_BUTTON_INVALID_ID;  // Reset
+    TftButton *agcButton = findButtonInArray(verticalScreenButtons, verticalScreenButtonsCount, "AGC");
+    if (agcButton != nullptr) {
+        agcButtonId = agcButton->getId();
+
+        // Átállítjuk "Att"-ra, ha Manual módban vagyunk
+        if (initialAgcMode == Si4735Utils::AgcGainMode::Manual) {
+            agcButton->setLabel("Att");
+        }
+    } else {
+        DEBUG("Error: AGC button not found after creation!\n");
+    }
 
     // Felszabadítjuk a dinamikusan allokált memóriát, ha volt allokálva
     if (mergedButtons != nullptr) {
@@ -524,47 +576,84 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                                               &config.data.currVolume, (uint8_t)DisplayConstants::VolumeMin, (uint8_t)DisplayConstants::VolumeMax, (uint8_t)1,  //
                                               [this](uint8_t newValue) { si4735.setVolume(newValue); });
         processed = true;
-    } else if (STREQ("AGC", event.label)) {  // Automatikus AGC
+
+    }
+    // AGC/Att gomb kezelése
+    else if (event.id == agcButtonId && agcButtonId != TFT_BUTTON_INVALID_ID) {
+
+        // Gomb pointer lekérése
+        TftButton *agcButton = findButtonById(agcButtonId);
+        if (agcButton == nullptr) {
+            DEBUG("Error: AGC button not found by ID %d\n", agcButtonId);
+            return false;  // Gomb nem található, nem tudjuk kezelni az eseményt
+        }
+
+        // // Határozzuk meg az AGC gomb kezdeti állapotát és feliratát a config alapján
+        Si4735Utils::AgcGainMode currAgcMode = static_cast<Si4735Utils::AgcGainMode>(config.data.agcGain);
+
+        // Ha "AGC" a felirat, akkor AGC módban vagyunk
+        bool isButtonAgcMode = STREQ("AGC", agcButton->getLabel());
 
         // --- ÚJ: Hosszú és rövid nyomás megkülönböztetése ---
         if (event.state == TftButton::ButtonState::LongPressed) {
-            // --- HOSSZÚ NYOMÁS: Manuális AGC (Att) ---
-            DEBUG("AGC Long Press -> Manual Attenuator\n");
+            // --- HOSSZÚ NYOMÁS -> Felirat átállítása AGC <-> Att-ra
 
-            // 1. Állapot beállítása Manual-ra
-            config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Manual);
-            DEBUG("processMandatoryButtonTouchEvent (LongPress): config.data.agcGain set to %d\n", config.data.agcGain);
+            if (isButtonAgcMode) {  // AGC-ben vagyunk -> a gomb feliratának átállítása "Att"-ra
+                agcButton->setLabel("Att");
 
-#define MX_FM_AGC_GAIN 26
-#define MX_AM_AGC_GAIN 37
-            // 2. ValueChangeDialog megnyitása az Att értékhez
-            uint8_t maxValue = si4735.isCurrentTuneFM() ? MX_FM_AGC_GAIN : MX_AM_AGC_GAIN;
-            DisplayBase::pDialog =
-                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("RF Attenuator"), F("Value:"), &config.data.currentAGCgain, (uint8_t)1, (uint8_t)maxValue, (uint8_t)1,
-                                      [this](double currentAGCgain_double) {  // Callback double-t vár
-                                          uint8_t currentAGCgain = static_cast<uint8_t>(currentAGCgain_double);
-                                          // Itt már Manual módban vagyunk, csak a szintet kell állítani
-                                          si4735.setAutomaticGainControl(1, currentAGCgain);  // AGC disabled, manual index set
-                                          DisplayBase::drawAgcAttStatus(true);                // Státuszsor frissítése
-                                      });
-            processed = true;
+            } else {  // Att-ban vagyunkjk -> átállunk AGC-ra
+
+                // Gomb feliratának átállítása "AGC"-re
+                agcButton->setLabel("AGC");
+
+                // Gomb állapotának beállítása
+                agcButton->setState(currAgcMode == Si4735Utils::AgcGainMode::Automatic ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
+            }
 
         } else if (event.state == TftButton::ButtonState::On || event.state == TftButton::ButtonState::Off) {
-            // --- RÖVID NYOMÁS (Toggle On/Off): Automatikus AGC ki/be ---
-            // A TftButton::released() már beállította az új On/Off állapotot
-            DEBUG("AGC Short Press -> Toggle Auto AGC %s\n", (event.state == TftButton::ButtonState::On) ? "On" : "Off");
+            // --- RÖVID NYOMÁS (Toggle On/Off)
 
-            bool stateOn = (event.state == TftButton::ButtonState::On);
-            config.data.agcGain = stateOn ? static_cast<uint8_t>(Si4735Utils::AgcGainMode::Automatic) : static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);
+            if (isButtonAgcMode) {
+                if (currAgcMode == Si4735Utils::AgcGainMode::Automatic) {
+                    config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);  // AGC OFF
+                } else {
+                    config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Automatic);  // AGC ON
+                }
+                // Gomb állapotának beállítása
+                agcButton->setState(config.data.agcGain == static_cast<uint8_t>(Si4735Utils::AgcGainMode::Automatic) ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
+
+            } else {
+
+                if (currAgcMode == Si4735Utils::AgcGainMode::Off) {
+                    config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Manual);  // Att
+
+                    // 3. ValueChangeDialog megnyitása az Att értékhez
+                    constexpr uint8_t MX_FM_AGC_GAIN = 26;
+                    constexpr uint8_t MX_AM_AGC_GAIN = 37;
+
+                    uint8_t maxValue = si4735.isCurrentTuneFM() ? MX_FM_AGC_GAIN : MX_AM_AGC_GAIN;
+                    DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("RF Attenuator"), F("Value:"), &config.data.currentAGCgain, (uint8_t)1,
+                                                                 (uint8_t)maxValue, (uint8_t)1,
+                                                                 [this](double currentAGCgain_double) {  // Callback double-t vár
+                                                                     uint8_t currentAGCgain = static_cast<uint8_t>(currentAGCgain_double);
+
+                                                                     // Itt már Manual módban vagyunk, csak a szintet kell állítani
+                                                                     si4735.setAutomaticGainControl(1, currentAGCgain);  // AGC disabled, manual index set
+                                                                     DisplayBase::drawAgcAttStatus(true);                // Státuszsor frissítése
+                                                                 });
+                    processed = true;
+                } else {
+                    config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);  // AGC OFF
+                }
+
+                // Gomb állapotának beállítása
+                agcButton->setState(config.data.agcGain != static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off) ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
+            }
 
             Si4735Utils::checkAGC();  // Chip beállítása
-
-            // Kijelzés frissítése (a gombot a setState már újrarajzolta)
-            drawAgcAttStatus(true);
-
+            drawAgcAttStatus(true);   // Státuszsor frissítése
             processed = true;
         }
-        // A Pushed eseményt itt nem kezeljük külön az AGC-nél
 
     } else if (STREQ("Freq", event.label)) {
         // Open the FrequencyInputDialog
@@ -634,7 +723,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBand().pConstData->bandName);
         processed = true;
-
     } else if (STREQ("Band", event.label)) {
         // Kigyűjtjük az összes NEM HAM sáv nevét
         uint8_t bandCount;
@@ -652,7 +740,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBand().pConstData->bandName);
         processed = true;
-
     } else if (STREQ("DeMod", event.label)) {
 
         // Kigyűjtjük az összes NEM HAM sáv nevét
@@ -685,7 +772,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBandModeDesc());
         processed = true;
-
     } else if (STREQ("BndW", event.label)) {
 
         uint8_t currMod = band.getCurrentBand().varData.currMod;  // Demodulációs mód
@@ -736,7 +822,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             currentBandWidthLabel);  // Az aktuális sávszélesség felirata
         processed = true;
-
     } else if (STREQ("Step", event.label)) {
 
         uint8_t currentBandType = band.getCurrentBandType();      // Kikeressük az aktuális Band típust
@@ -786,7 +871,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             currentStepStr);  // Az aktuális lépés felirata
         processed = true;
-
     } else if (STREQ("Scan", event.label)) {
         // Képernyő váltás !!!
         ::newDisplay = DisplayBase::DisplayType::freqScan;

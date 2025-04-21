@@ -293,38 +293,26 @@ class TftButton {
             // --- Gomb felengedése ---
             ButtonState stateBeforeRelease = state;  // Mentsük el az állapotot a felengedés előtt
 
-            DEBUG("TftButton Release: Label='%s', StateBeforeRelease=%d, CurrentState=%d\n", label, stateBeforeRelease, state);
+            // --- MÓDOSÍTÁS KEZDETE ---
+            if (stateBeforeRelease == ButtonState::LongPressed) {
+                // Hosszú nyomás utáni felengedés:
+                // Az állapotot 'On'-ra állítjuk (mivel a Manual mód aktív állapot)
+                // és NEM generálunk újabb eseményt.
+                state = ButtonState::On;  // Végleges állapot: On
+                oldState = state;         // oldState frissítése
+                buttonPressed = false;    // Nyomás vége
+                pressStartTime = 0;       // Időzítő nullázása
+                draw();                   // Gomb újrarajzolása 'On' állapotban
+                // eventGenerated marad false
 
-            // Visszaállítjuk az állapotot (Toggle vagy Off) és a buttonPressed flag-et
-            // A released() a régi logika szerint működik:
-            // Toggleable: Off -> On, On -> Off
-            // Pushable: Mindig Off lesz
-            released();  // Ez beállítja: buttonPressed = false, state = (On/Off)
-
-            DEBUG("TftButton Release: StateAfterReleased=%d\n", state);
-
-            // Csak akkor generálunk "normál" eseményt (Clicked/Pushed),
-            // ha NEM LongPressed állapotból engedtük fel.
-            if (stateBeforeRelease != ButtonState::LongPressed) {
-
-                DEBUG("TftButton Release: Generating short press event because StateBeforeRelease was NOT LongPressed.\n");
-
-                if (type == ButtonType::Pushable) {
-                    // Pushable felengedése -> Pushed esemény
-                    // A state most Off, de Pushed eseményt akarunk küldeni
-                    // Ezt a buildButtonTouchEvent kezeli majd
-                    eventGenerated = true;
-                } else {  // Toggleable
-                    // Toggleable felengedése -> Az új állapot (On/Off) lesz az esemény
-                    // Vagy küldhetnénk egy 'Clicked' eseményt is, de az On/Off informatívabb
-                    eventGenerated = true;
-                }
             } else {
-                DEBUG("TftButton Release: SKIPPING short press event because StateBeforeRelease WAS LongPressed.\n");  // <<<--- ÚJ DEBUG
+                // Rövid nyomás utáni felengedés:
+                // Meghívjuk a normál released() logikát (ami váltogat) és generálunk eseményt.
+                released();  // Ez beállítja: buttonPressed = false, state = (On/Off), oldState = state, és rajzol
+                // Az eseményt a buildButtonTouchEvent fogja helyesen összeállítani (Pushed vagy On/Off)
+                eventGenerated = true;
             }
-
-            // Ha LongPressed volt, a felengedéskor már nem generálunk újabb eseményt.
-            pressStartTime = 0;  // Időzítő nullázása
+            // --- MÓDOSÍTÁS VÉGE ---
 
         } else if (touched && !isInside && buttonPressed) {
             // --- Ujj lehúzása a gombról lenyomás közben ---
@@ -389,6 +377,19 @@ class TftButton {
      *
      */
     inline const char *getLabel() const { return label; }
+
+    /**
+     * Gomb feliratának beállítása futás közben.
+     * @param newLabel Az új felirat.
+     */
+    void setLabel(const char *newLabel) {
+        if (label != nullptr) {
+            delete[] label;  // Régi label memória felszabadítása
+        }
+        label = new char[strlen(newLabel) + 1];  // Új memória foglalása
+        strcpy(label, newLabel);                 // Új label másolása
+        draw();                                  // Gomb újrarajzolása az új felirattal
+    }
 
     /**
      * Button állapot

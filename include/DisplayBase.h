@@ -44,11 +44,11 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
    public:
     // Lehetséges képernyő típusok
     enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory };
+
     // Gombok orientációja
     enum ButtonOrientation { Horizontal, Vertical };
 
    private:
-
     // Vízszintes gombsor
     TftButton **horizontalScreenButtons = nullptr;  // A dinamikusan létrehozott gombok tömbjére mutató pointer
     uint8_t horizontalScreenButtonsCount = 0;       // A dinamikusan létrehozott gombok száma
@@ -56,6 +56,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
     // Függőleges gombsor
     TftButton **verticalScreenButtons = nullptr;  // Új: Vertikális gombok tömbje
     uint8_t verticalScreenButtonsCount = 0;       // Új: Vertikális gombok száma
+    uint8_t agcButtonId = TFT_BUTTON_INVALID_ID;  // AGC/Att gomb ID-jának tárolása
 
     // A lenyomott képernyő menügomb adatai
     TftButton::ButtonTouchEvent screenButtonTouchEvent = TftButton::noTouchEvent;
@@ -161,6 +162,14 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
     TftButton *findButtonByLabel(const char *label);
 
     /**
+     * Megkeresi a gombot az ID alapján
+     *
+     * @param id A keresett gomb ID-je
+     * @return A TftButton pointere, vagy nullptr, ha nincs ilyen gomb
+     */
+    TftButton *findButtonById(uint8_t id);
+
+    /**
      * Közös gombok touch handlere
      */
     bool processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &event);
@@ -220,8 +229,6 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
      * (Ha kell a leszármazottnak akkor majd felülírja)
      */
     virtual void processDialogButtonResponse(TftButton::ButtonTouchEvent &event) {
-
-        DEBUG("processDialogButtonResponse: Before closing dialog, config.data.agcGain = %d\n", config.data.agcGain); 
 
         // Töröljük a dialógot
         delete this->pDialog;
