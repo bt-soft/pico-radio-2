@@ -579,24 +579,39 @@ void MemoryDisplay::tuneToSelectedStation() {
     // --- Régi index keresés vége ---
 
     // --- Új hangolás beállítása ---
+    // 1. Állítsd be a cél sáv indexét a configban
     config.data.bandIdx = station->bandIndex;
-    BandTable& targetBand = band.getBandByIdx(station->bandIndex);
+
+    // 2. Hívd meg a band.bandInit(false)-t. Ez gondoskodik a chip helyes
+    //    inicializálásáról az új sávhoz a config alapján (meghívja a bandSet(true)-t).
+    //    Ez beállítja a preferált módot, lépésközt, sávszélességet stb.
+    band.bandInit(false);  // false: nem rendszerindítás
+
+    // 3. Most, hogy a sáv inicializálva van, állítsd be a pontos frekvenciát és módot
+    //    a memóriából a varData-ban ÉS a chipen is.
+    BandTable& targetBand = band.getCurrentBand();  // Most már a helyes sávot adja vissza
     targetBand.varData.currFreq = station->frequency;
     targetBand.varData.currMod = station->modulation;
-    band.bandSet(false);  // Ez behangolja a rádiót
+
+    // 4. Explicit módon állítsd be a frekvenciát és a módot a chipen
+    //    (Lehet, hogy a bandInit/bandSet már megtette, de ez biztosabb)
+    si4735.setFrequency(targetBand.varData.currFreq);
+
+    // 5. Visszaállítjuk a hangerőt a konfigból
+    si4735.setVolume(config.data.currVolume);
+
     // --- Hangolás vége ---
 
     // --- Lista frissítése ---
-    // Csak akkor rajzoljuk újra a régi elemet, ha az nem ugyanaz, mint az új
-    // és ha látható volt (a drawListItem ezt ellenőrzi)
     if (oldTunedIndex != -1 && oldTunedIndex != selectedListIndex) {
-        drawListItem(oldTunedIndex);  // Régi elem újrarajzolása (ikon eltűnik)
+        drawListItem(oldTunedIndex);
     }
-    drawListItem(selectedListIndex);  // Új elem újrarajzolása (ikon megjelenik)
-                                      // --- Lista frissítés vége ---
+    drawListItem(selectedListIndex);
+    // --- Lista frissítés vége ---
 
-    // Nem zárjuk be a képernyőt
-    //::newDisplay = (band.getCurrentBandType() == FM_BAND_TYPE) ? DisplayBase::DisplayType::fm : DisplayBase::DisplayType::am;
+    // Jelezzük a fő loopnak, hogy a frekvencia (és mód) változott,
+    // hogy a többi kijelző (pl. státuszsor) is frissüljön, ha visszalépünk.
+    DisplayBase::frequencyChanged = true;
 }
 
 /**
