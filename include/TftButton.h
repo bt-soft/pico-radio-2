@@ -15,6 +15,8 @@
 #define TFT_BUTTON_LED_PUSHED TFT_ORANGE
 #define TFT_BUTTON_LED_OFF TFT_COLOR(10, 128, 30)
 
+#define TFT_BUTTON_LONG_PRESS_THRESHOLD 1000  // Hosszú nyomás küszöbértéke (ms)
+
 class TftButton {
    public:
     // A gomb típusa
@@ -27,7 +29,9 @@ class TftButton {
         Disabled,
         CurrentActive,  // Épp aktív módot jelző gomb, de nem választható (hiszen épp ez van kiválasztva)
         //---- technikai állapotok
-        Pushed,  // Csak az esemény jelzésére a calbback függvénynek, nincs színhez kötve az állapota
+        Pushed,       // Csak Pushable gomb felengedésekor küldött esemény
+        Clicked,      // Csak Toggleable gomb rövid felengedésekor küldött esemény (opcionális, lehetne csak On/Off)
+        LongPressed,  // Hosszú nyomás esemény
         //---
         HOLD,    // Nyomva tartják
         UNKNOWN  // ismeretlen
@@ -36,7 +40,7 @@ class TftButton {
     struct ButtonTouchEvent {
         uint8_t id;
         const char *label;
-        ButtonState state;
+        ButtonState state;  // Az esemény típusa (Pushed, Clicked, LongPressed, On, Off...)
     };
 
     // Érvénytelen gomb esemény kezdeti értéke
@@ -55,14 +59,15 @@ class TftButton {
         TFT_COLOR(243, 179, 105)  // current active
     };
 
-    TFT_eSPI *pTft;        // Itt pointert használunk a dinamikus tömbök miatt (nem lehet null referenciát használni)
-    uint16_t x, y, w, h;   // A gomb pozíciója
-    uint8_t id;            // A gomb ID-je
-    char *label;           // A gomb felirata
-    ButtonState state;     // Állapota
-    ButtonState oldState;  // Előző állapota
-    ButtonType type;       // Típusa
-    bool buttonPressed;    // Flag a gomb nyomva tartásának követésére
+    TFT_eSPI *pTft;                    // Itt pointert használunk a dinamikus tömbök miatt (nem lehet null referenciát használni)
+    uint16_t x, y, w, h;               // A gomb pozíciója
+    uint8_t id;                        // A gomb ID-je
+    char *label;                       // A gomb felirata
+    ButtonState state;                 // Állapota
+    ButtonState oldState;              // Előző állapota
+    ButtonType type;                   // Típusa
+    bool buttonPressed;                // Flag a gomb nyomva tartásának követésére
+    unsigned long pressStartTime = 0;  // Mikor nyomták le a gombot
 
     /**
      * Ezt nyomták meg?
@@ -253,29 +258,111 @@ class TftButton {
      * @param ty Az érintési esemény y-koordinátája.
      */
     bool handleTouch(bool touched, uint16_t tx, uint16_t ty) {
+        bool eventGenerated = false;  // Jelzi, ha eseményt kell küldeni
 
-        // Ha tiltott vagy épp aktív a gomb, akkor nem megyünk tovább, nem reagál a touch-ra
-        if (state == ButtonState::Disabled or state == ButtonState::CurrentActive) {
+        // Tiltott vagy Aktív gomb nem reagál
+        if (state == ButtonState::Disabled || state == ButtonState::CurrentActive) {
+            buttonPressed = false;  // Biztos, ami biztos
+            pressStartTime = 0;
             return false;
         }
 
-        // Ha van touch, de még nincs lenyomva a gomb, és erre a gombra jött a touch
-        if (touched and !buttonPressed and contains(tx, ty)) {
-            pressed();
+        bool isInside = contains(tx, ty);
 
-        } else if (!touched and buttonPressed) {
-            // Ha nincs ugyan touch, de ezt a gombot nyomva tartották eddig, akkor esemény van!!
-            released();
-            return true;
+        if (touched && isInside && !buttonPressed) {
+            // --- Gomb lenyomásának kezdete ---
+            pressed();                  // Beállítja: buttonPressed = true, state = HOLD, oldState = (ami volt)
+            pressStartTime = millis();  // Lenyomás idejének rögzítése
+            // Még nem generálunk eseményt
+
+        } else if (touched && buttonPressed) {
+            // --- Gomb nyomva tartva ---
+            if (state == ButtonState::HOLD) {  // Csak akkor vizsgáljuk, ha még HOLD állapotban van
+                if (millis() - pressStartTime >= TFT_BUTTON_LONG_PRESS_THRESHOLD) {
+                    // --- Hosszú nyomás érzékelve ---
+                    state = ButtonState::LongPressed;  // Állapot váltása LongPressed-re
+                    eventGenerated = true;             // Eseményt generálunk MOST
+                    // A buildButtonTouchEvent majd LongPressed állapotot ad vissza
+                    // Fontos: A gomb még le van nyomva (buttonPressed = true)
+                    draw();  // Opcionális: Vizuális visszajelzés a hosszú nyomásról
+                }
+            }
+            // Ha már LongPressed állapotban van, nem csinálunk semmit, amíg nyomva tartják
+
+        } else if (!touched && buttonPressed) {
+            // --- Gomb felengedése ---
+            ButtonState stateBeforeRelease = state;  // Mentsük el az állapotot a felengedés előtt
+
+            DEBUG("TftButton Release: Label='%s', StateBeforeRelease=%d, CurrentState=%d\n", label, stateBeforeRelease, state);
+
+            // Visszaállítjuk az állapotot (Toggle vagy Off) és a buttonPressed flag-et
+            // A released() a régi logika szerint működik:
+            // Toggleable: Off -> On, On -> Off
+            // Pushable: Mindig Off lesz
+            released();  // Ez beállítja: buttonPressed = false, state = (On/Off)
+
+            DEBUG("TftButton Release: StateAfterReleased=%d\n", state);
+
+            // Csak akkor generálunk "normál" eseményt (Clicked/Pushed),
+            // ha NEM LongPressed állapotból engedtük fel.
+            if (stateBeforeRelease != ButtonState::LongPressed) {
+
+                DEBUG("TftButton Release: Generating short press event because StateBeforeRelease was NOT LongPressed.\n");
+
+                if (type == ButtonType::Pushable) {
+                    // Pushable felengedése -> Pushed esemény
+                    // A state most Off, de Pushed eseményt akarunk küldeni
+                    // Ezt a buildButtonTouchEvent kezeli majd
+                    eventGenerated = true;
+                } else {  // Toggleable
+                    // Toggleable felengedése -> Az új állapot (On/Off) lesz az esemény
+                    // Vagy küldhetnénk egy 'Clicked' eseményt is, de az On/Off informatívabb
+                    eventGenerated = true;
+                }
+            } else {
+                DEBUG("TftButton Release: SKIPPING short press event because StateBeforeRelease WAS LongPressed.\n");  // <<<--- ÚJ DEBUG
+            }
+
+            // Ha LongPressed volt, a felengedéskor már nem generálunk újabb eseményt.
+            pressStartTime = 0;  // Időzítő nullázása
+
+        } else if (touched && !isInside && buttonPressed) {
+            // --- Ujj lehúzása a gombról lenyomás közben ---
+            buttonPressed = false;  // Megszakítjuk a nyomást
+            state = oldState;       // Visszaállítjuk az eredeti állapotot
+            pressStartTime = 0;
+            draw();  // Újrarajzolás az eredeti állapotban
+                     // Nincs esemény generálva (Cancel)
+
+        } else if (!touched && !buttonPressed) {
+            // Nincs érintés, nincs lenyomás -> nincs teendő
+            pressStartTime = 0;  // Biztonsági nullázás
         }
 
-        return false;
+        return eventGenerated;  // Visszaadjuk, hogy kell-e eseményt küldeni
     }
 
     /**
      * ButtonTouchEvent legyártása
      */
-    inline ButtonTouchEvent buildButtonTouchEvent() { return {id, label, type == ButtonType::Pushable ? ButtonState::Pushed : state}; }
+    ButtonTouchEvent buildButtonTouchEvent() {
+
+        // Ha Pushable gombot engedtek fel (és nem volt LongPress)
+        if (type == ButtonType::Pushable && state == ButtonState::Off && !buttonPressed) {
+            // A state most Off, de mi Pushed eseményt küldünk
+            return {id, label, ButtonState::Pushed};
+        }
+        // Ha LongPressed állapotban vagyunk (ezt a handleTouch állította be)
+        if (state == ButtonState::LongPressed) {
+            // Közvetlenül a LongPressed állapotot küldjük eseményként
+            // Fontos: Lehet, hogy a process...TouchEvent-ben vissza kell állítani az állapotot HOLD-ról,
+            // miután feldolgoztuk a LongPressed eseményt, hogy ne ragadjon be.
+            return {id, label, ButtonState::LongPressed};
+        }
+        // Minden más esetben (pl. Toggleable felengedésekor On/Off)
+        // a gomb aktuális állapotát küldjük.
+        return {id, label, state};
+    }
 
     /**
      * Button állapotának beállítása

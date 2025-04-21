@@ -65,26 +65,44 @@ void DisplayBase::drawBfoStatus(bool initFont) {
 
 /**
  * AGC / ATT Status kirajzolása
- * @param initFont Ha true, akkor a betűtípus inicializálása történik
+ * @param initFont Ha true, akkor a betűtípus inicializálása történik (itt már nem használjuk)
  */
-void DisplayBase::drawAgcAttStatus(bool initFont) {
+void DisplayBase::drawAgcAttStatus(bool initFont /*= false*/) {  // initFont már nem szükséges itt
+    using namespace DisplayConstants;                            // Használjuk a névtér konstansait
 
-    // Fontot kell váltani?
-    if (initFont) {
-        tft.setFreeFont();
-        tft.setTextSize(1);
-        tft.setTextDatum(BC_DATUM);
-    }
+    // Font beállítása (mindig beállítjuk a biztonság kedvéért)
+    tft.setFreeFont();
+    tft.setTextSize(1);
+    tft.setTextDatum(BC_DATUM);  // Bottom-Center igazítás
 
-    // AGC / ATT
-    uint16_t agcColor = config.data.agcGain == 0 ? TFT_SILVER : DisplayConstants::AgcColor;
-    tft.setTextColor(agcColor, TFT_BLACK);
-    if (config.data.agcGain > 1) {
-        tft.drawString("ATT" + String(config.data.currentAGCgain < 9 ? " " : "") + String(config.data.currentAGCgain), DisplayConstants::StatusLineAgcX, 15);
+    Si4735Utils::AgcGainMode currentMode = static_cast<Si4735Utils::AgcGainMode>(config.data.agcGain);
+    DEBUG("drawAgcAttStatus: Reading config.data.agcGain = %d, currentMode = %d\n", config.data.agcGain, (int)currentMode);
+
+    uint16_t agcColor;
+    String labelText;
+
+    // Töröljük a korábbi tartalmat (szöveg + téglalap)
+    // A téglalap X pozícióját is figyelembe véve törlünk
+    int rectX = StatusLineAgcX - (ButtonWidth / 2);
+    tft.fillRect(rectX, 0, ButtonWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);  // Törlés háttérszínnel
+
+    if (currentMode == Si4735Utils::AgcGainMode::Manual) {
+        // Manual mode (ATT)
+        agcColor = AgcColor;  // Használjuk a definiált AgcColor-t ATT-hez is
+        // Biztosítunk helyet az egyjegyű számoknak is (pl. "ATT 5")
+        labelText = "ATT" + String(config.data.currentAGCgain < 10 ? " " : "") + String(config.data.currentAGCgain);
     } else {
-        tft.drawString(F(" AGC "), DisplayConstants::StatusLineAgcX, 15);
+        // Automatic vagy Off mode (AGC)
+        agcColor = (currentMode == Si4735Utils::AgcGainMode::Automatic) ? AgcColor : TFT_SILVER;  // AgcColor ha Auto, Silver ha Off
+        labelText = F(" AGC ");                                                                   // Flash string használata
     }
-    tft.drawRect(40, 2, DisplayConstants::ButtonWidth, DisplayConstants::ButtonHeight, agcColor);
+
+    // Szöveg kirajzolása
+    tft.setTextColor(agcColor, TFT_BLACK);          // Háttérszín itt már nem kell, mert töröltünk
+    tft.drawString(labelText, StatusLineAgcX, 15);  // Y=15 marad
+
+    // Téglalap keret kirajzolása (középre igazítva)
+    tft.drawRect(rectX, 2, ButtonWidth, ButtonHeight, agcColor);
 }
 
 /**
@@ -164,6 +182,7 @@ void DisplayBase::dawStatusLine() {
     drawBfoStatus();
 
     // AGC Status
+    DEBUG("dawStatusLine: Before drawAgcAttStatus, config.data.agcGain = %d\n", config.data.agcGain);
     drawAgcAttStatus();
 
     // Demodulációs mód
@@ -382,7 +401,6 @@ void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[
         {"Mute", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(rtv::muteStat)},         //
         {"Volum", TftButton::ButtonType::Pushable},                                                  //
         {"AGC", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(si4735.isAgcEnabled())},  //
-        {"Att", TftButton::ButtonType::Pushable},                                                    //
         {"Freq", TftButton::ButtonType::Pushable},                                                   //
         {"Setup", TftButton::ButtonType::Pushable},                                                  //
         {"Memo", TftButton::ButtonType::Pushable},                                                   //
@@ -508,40 +526,45 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         processed = true;
     } else if (STREQ("AGC", event.label)) {  // Automatikus AGC
 
-        bool stateOn = (event.state == TftButton::ButtonState::On);
-        config.data.agcGain = stateOn ? static_cast<uint8_t>(Si4735Utils::AgcGainMode::Automatic) : static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);
+        // --- ÚJ: Hosszú és rövid nyomás megkülönböztetése ---
+        if (event.state == TftButton::ButtonState::LongPressed) {
+            // --- HOSSZÚ NYOMÁS: Manuális AGC (Att) ---
+            DEBUG("AGC Long Press -> Manual Attenuator\n");
 
-        Si4735Utils::checkAGC();
-
-        // Kijelzés frissítése
-        drawAgcAttStatus(true);
-
-        processed = true;
-
-    } else if (STREQ("Att", event.label)) {  // Kézi AGC
-
-        // Kikapcsoljuk az automatikus AGC gombot
-        TftButton *agcButton = DisplayBase::findButtonByLabel("AGC");
-        if (agcButton != nullptr) {
-            agcButton->setState(TftButton::ButtonState::Off);
-        }
-
-        // AGCDIS This param selects whether the AGC is enabled or disabled (0 = AGC enabled; 1 = AGC disabled);
-        // AGCIDX AGC Index (0 = Minimum attenuation (max gain); 1 – 36 = Intermediate attenuation);
-        //  if >greater than 36 - Maximum attenuation (min gain) ).
+            // 1. Állapot beállítása Manual-ra
+            config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Manual);
+            DEBUG("processMandatoryButtonTouchEvent (LongPress): config.data.agcGain set to %d\n", config.data.agcGain);
 
 #define MX_FM_AGC_GAIN 26
 #define MX_AM_AGC_GAIN 37
-        uint8_t maxValue = si4735.isCurrentTuneFM() ? MX_FM_AGC_GAIN : MX_AM_AGC_GAIN;
-        config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Manual);  // 2
+            // 2. ValueChangeDialog megnyitása az Att értékhez
+            uint8_t maxValue = si4735.isCurrentTuneFM() ? MX_FM_AGC_GAIN : MX_AM_AGC_GAIN;
+            DisplayBase::pDialog =
+                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("RF Attenuator"), F("Value:"), &config.data.currentAGCgain, (uint8_t)1, (uint8_t)maxValue, (uint8_t)1,
+                                      [this](double currentAGCgain_double) {  // Callback double-t vár
+                                          uint8_t currentAGCgain = static_cast<uint8_t>(currentAGCgain_double);
+                                          // Itt már Manual módban vagyunk, csak a szintet kell állítani
+                                          si4735.setAutomaticGainControl(1, currentAGCgain);  // AGC disabled, manual index set
+                                          DisplayBase::drawAgcAttStatus(true);                // Státuszsor frissítése
+                                      });
+            processed = true;
 
-        DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("RF Attennuator"), F("Value:"),      //
-                                                     &config.data.currentAGCgain, (uint8_t)1, (uint8_t)maxValue, (uint8_t)1,  //
-                                                     [this](uint8_t currentAGCgain) {
-                                                         si4735.setAutomaticGainControl(1, currentAGCgain);
-                                                         DisplayBase::drawAgcAttStatus(true);
-                                                     });
-        processed = true;
+        } else if (event.state == TftButton::ButtonState::On || event.state == TftButton::ButtonState::Off) {
+            // --- RÖVID NYOMÁS (Toggle On/Off): Automatikus AGC ki/be ---
+            // A TftButton::released() már beállította az új On/Off állapotot
+            DEBUG("AGC Short Press -> Toggle Auto AGC %s\n", (event.state == TftButton::ButtonState::On) ? "On" : "Off");
+
+            bool stateOn = (event.state == TftButton::ButtonState::On);
+            config.data.agcGain = stateOn ? static_cast<uint8_t>(Si4735Utils::AgcGainMode::Automatic) : static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);
+
+            Si4735Utils::checkAGC();  // Chip beállítása
+
+            // Kijelzés frissítése (a gombot a setState már újrarajzolta)
+            drawAgcAttStatus(true);
+
+            processed = true;
+        }
+        // A Pushed eseményt itt nem kezeljük külön az AGC-nél
 
     } else if (STREQ("Freq", event.label)) {
         // Open the FrequencyInputDialog

@@ -221,6 +221,8 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
      */
     virtual void processDialogButtonResponse(TftButton::ButtonTouchEvent &event) {
 
+        DEBUG("processDialogButtonResponse: Before closing dialog, config.data.agcGain = %d\n", config.data.agcGain); 
+
         // Töröljük a dialógot
         delete this->pDialog;
         this->pDialog = nullptr;
