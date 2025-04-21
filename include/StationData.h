@@ -21,7 +21,9 @@ struct StationData {
     uint16_t frequency;                   // Frekvencia (kHz vagy 10kHz, a bandType alapján)
     uint8_t bandIndex;                    // A BandTable indexe, hogy tudjuk a sáv részleteit
     uint8_t modulation;                   // Aktuális moduláció (FM, AM, LSB, USB, CW)
-    // Opcionálisan további adatok menthetők: bandwidth index, step index stb.
+    uint8_t bandwidthIndex;               // Index a Band::bandWidthFM/AM/SSB tömbökben
+    // uint16_t antCap;     // Opcionális: Ha az antenna kapacitást is menteni akarod
+    // int16_t bfoOffset;   // Opcionális: Ha a BFO eltolást is menteni akarod
 };
 
 // FM állomások listája

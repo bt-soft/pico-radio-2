@@ -156,6 +156,12 @@ class Band {
     int8_t getBandIdxByBandName(const char *bandName);
 
     /**
+     * Demodulációs mód index szerinti elkérése (FM, AM, LSB, USB, CW)
+     * @param demodIndex A demodulációs mód indexe
+     */
+    inline const char *getBandModeDescByIndex(uint8_t demodIndex) { return bandModeDesc[demodIndex]; }
+
+    /**
      * Aktuális mód/modulációs típus (FM, AM, LSB, USB, CW)
      */
     inline const char *getCurrentBandModeDesc() { return bandModeDesc[getCurrentBand().varData.currMod]; }
@@ -280,6 +286,7 @@ class Band {
         return currentStepStr;
     }
 
+    // Current band utils metódusok
     inline const char *getCurrentBandName() { return (const char *)pgm_read_ptr(&getCurrentBand().pConstData->bandName); }
 
     inline uint8_t getCurrentBandType() { return getCurrentBand().pConstData->bandType; }
@@ -295,9 +302,12 @@ class Band {
     inline bool getCurrentBandIsHam() { return getCurrentBand().pConstData->isHam; }
 
     /**
-     *
+     * Band nevek lekérdezése
      */
     const char **getBandNames(uint8_t &count, bool isHamFilter);
+
+
+    void tuneMemoryStation(uint16_t frequency, uint8_t bandIndex, uint8_t demodModIndex, uint8_t bandwidthIndex);
 };
 
 #endif  // __BAND_H

@@ -481,3 +481,42 @@ void Band::bandSet(bool useDefaults) {
     // Antenna Tunning Capacitor beállítása
     si4735.setTuneFrequencyAntennaCapacitor(currentBand.varData.antCap);
 }
+
+/**
+ *
+ */
+void Band::tuneMemoryStation(uint16_t frequency, uint8_t bandIndex, uint8_t demodModIndex, uint8_t bandwidthIndex) {
+
+    // 1. Elkérjük a Band táblát
+    config.data.bandIdx = bandIndex;  // Band index beállítása
+    BandTable& currentBand = this->getCurrentBand();
+
+    // 2. Demodulátor beállítása a chipen.  Ha CW módra váltunk, akkor nullázzuk a finomhangolási BFO-t
+    uint8_t savedMod = demodModIndex;  // A demodulációs mód kiemelése
+    if (savedMod != CW and rtv::CWShift == true) {
+        currentBand.varData.lastBFO = 0;  // CW_SHIFT_FREQUENCY;
+        config.data.currentBFO = currentBand.varData.lastBFO;
+        rtv::CWShift = false;
+    }
+    currentBand.varData.currMod = demodModIndex;  // Átállítjuk a demodulációs módot
+
+    // 3. Sávszélesség index beállítása a configban a MENTETT érték alapján ---
+    uint8_t savedBwIndex = bandwidthIndex;
+    if (savedMod == FM) {
+        config.data.bwIdxFM = savedBwIndex;
+    } else if (savedMod == AM) {
+        config.data.bwIdxAM = savedBwIndex;
+    } else {  // LSB, USB, CW
+        config.data.bwIdxSSB = savedBwIndex;
+    }
+
+    // 4. Újra beállítjuk a sávot az új móddal (false -> ne a preferált adatokat töltse be)
+    this->bandSet(false);
+
+    // 5. Explicit módon állítsd be a frekvenciát és a módot a chipen
+    currentBand.varData.currFreq = frequency;
+    si4735.setFrequency(currentBand.varData.currFreq);
+
+    // 6. Hangerő visszaállítása
+    si4735.setVolume(config.data.currVolume);
+}

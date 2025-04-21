@@ -17,6 +17,8 @@
 #define TITLE_TEXT_COLOR TFT_YELLOW
 #define LIST_ITEM_TUNED_ICON_COLOR TFT_YELLOW
 #define ICON_PADDING_RIGHT 3
+#define MOD_FREQ_GAP 10  // Rés a moduláció és a frekvencia között
+#define NAME_MOD_GAP 10  // Rés a név és a moduláció között
 
 /**
  * Konstruktor
@@ -106,8 +108,7 @@ void MemoryDisplay::drawScreen() {
 
 /**
  * Kirajzol egyetlen listaelemet a megadott indexre.
- * Figyelembe veszi, hogy az elem ki van-e választva ÉS hogy hangolva van-e.
- * Helyet hagy az ikonnak akkor is, ha nincs kirajzolva.
+ * Formátum: [>] Név (max MAX_STATION_NAME_LEN )... Mod Freq
  * @param index A kirajzolandó elem indexe a teljes listában.
  */
 void MemoryDisplay::drawListItem(int index) {
@@ -119,64 +120,60 @@ void MemoryDisplay::drawListItem(int index) {
     const StationData* station = getStationData(index);
     if (!station) return;
 
-    // --- Aktuális hangolási adatok lekérdezése ---
+    // --- Aktuális hangolási adatok lekérdezése (változatlan) ---
     uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
     uint8_t currentTunedBandIdx = config.data.bandIdx;
 
-    // --- Állapotok meghatározása ---
+    // --- Állapotok meghatározása (változatlan) ---
     bool isSelected = (index == selectedListIndex);
     bool isTuned = (station->frequency == currentTunedFreq && station->bandIndex == currentTunedBandIdx);
 
-    // --- Színek beállítása a kiválasztás alapján ---
+    // --- Színek beállítása a kiválasztás alapján (változatlan) ---
     uint16_t bgColor = isSelected ? LIST_ITEM_SELECTED_BG_COLOR : LIST_ITEM_BG_COLOR;
     uint16_t textColor = isSelected ? LIST_ITEM_SELECTED_TEXT_COLOR : LIST_ITEM_TEXT_COLOR;
 
-    // Y pozíció kiszámítása a sor tetejéhez
+    // Y pozíció kiszámítása a sor tetejéhez (változatlan)
     int yPos = listY + 1 + (index - listScrollOffset) * lineHeight;
 
-    // --- Font beállítása ---
+    // --- Font beállítása (változatlan) ---
     tft.setFreeFont();
     tft.setTextSize(2);
     tft.setTextPadding(0);
 
-    // Háttér rajzolása (csak az adott sor)
+    // Háttér rajzolása (csak az adott sor) (változatlan)
     tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
 
-    // Szöveg függőleges középpontja
+    // Szöveg függőleges középpontja (változatlan)
     int textCenterY = yPos + lineHeight / 2;
 
-    // --- Kezdő X pozíció és ikon helyének kiszámítása ---
+    // --- Kezdő X pozíció és ikon helyének kiszámítása (változatlan) ---
     int iconStartX = listX + 5;
-    // Kiszámítjuk az ikon szélességét és a hozzá tartozó paddingot
     int iconWidth = tft.textWidth(">");
-    int iconSpaceWidth = iconWidth + ICON_PADDING_RIGHT;  // Teljes hely, amit az ikon (vagy annak hiánya) elfoglal
+    int iconSpaceWidth = iconWidth + ICON_PADDING_RIGHT;
 
-    // --- Hangolásjelző ikon kirajzolása (ha szükséges) ---
+    // --- Hangolásjelző ikon kirajzolása (ha szükséges) (változatlan) ---
     if (isTuned) {
-        tft.setTextColor(LIST_ITEM_TUNED_ICON_COLOR, bgColor);  // Ikon színe
+        tft.setTextColor(LIST_ITEM_TUNED_ICON_COLOR, bgColor);
         tft.setTextDatum(ML_DATUM);
-        tft.drawString(">", iconStartX, textCenterY);  // Ikon rajzolása a dedikált helyre
+        tft.drawString(">", iconStartX, textCenterY);
     }
-    // --- Ikon rajzolás vége ---
 
-    // --- Állomásnév X pozíciójának beállítása (mindig az ikon helye után) ---
-    int textStartX = iconStartX + iconSpaceWidth;  // A név mindig az ikonnak fenntartott hely után kezdődik
+    // --- Állomásnév X pozíciójának beállítása (mindig az ikon helye után) (változatlan) ---
+    int textStartX = iconStartX + iconSpaceWidth;
 
-    // --- Állomásnév ---
-    tft.setTextColor(textColor, bgColor);  // Visszaállítjuk a normál szövegszínt
-    tft.setTextDatum(ML_DATUM);
+    // --- Állomásnév Előkészítése és Levágása ---
+    tft.setTextColor(textColor, bgColor);  // Normál szövegszín
+    tft.setTextDatum(ML_DATUM);            // Balra igazítás a névhez
     char displayName[STATION_NAME_BUFFER_SIZE];
     strncpy(displayName, station->name, STATION_NAME_BUFFER_SIZE - 1);
     displayName[STATION_NAME_BUFFER_SIZE - 1] = '\0';
 
-    // Szélesség alapján levágás (figyelembe véve az ikon helyét és a frekvencia helyét)
-    int availableWidth = (listX + listW - 5) - textStartX - 100;  // Jobb margó - Kezdő X - Becsült frekvencia szélesség
-    while (tft.textWidth(displayName) > availableWidth && strlen(displayName) > 0) {
-        displayName[strlen(displayName) - 1] = '\0';
+    // Levágás MAX_STATION_NAME_LEN karakterre
+    if (strlen(displayName) > MAX_STATION_NAME_LEN) {
+        displayName[MAX_STATION_NAME_LEN] = '\0';
     }
-    tft.drawString(displayName, textStartX, textCenterY);  // Kirajzolás az eltolt X pozícióval
 
-    // --- Frekvencia ---
+    // --- Frekvencia string előkészítése (szélesség számításhoz kell) ---
     String freqStr;
     const BandTable* pBandData = &band.getBandByIdx(station->bandIndex);
     if (pBandData && pBandData->pConstData) {
@@ -188,8 +185,45 @@ void MemoryDisplay::drawListItem(int index) {
     } else {
         freqStr = String(station->frequency) + " ?";
     }
-    tft.setTextDatum(MR_DATUM);
-    tft.drawString(freqStr, listX + listW - 5, textCenterY);
+    int freqWidth = tft.textWidth(freqStr);
+
+    // --- Moduláció string előkészítése ---
+    const char* modStr = band.getBandModeDescByIndex(station->modulation);
+    int modWidth = tft.textWidth(modStr);
+
+    // --- Név további levágása az elérhető hely alapján ---
+    // Elérhető hely = Teljes szélesség - margók - ikon hely - név kezdete - mod szélesség - freq szélesség - rések
+    int availableNameWidth = (listX + listW - 5)  // Jobb margó
+                             - textStartX         // Név kezdete (ikon után)
+                             - modWidth           // Moduláció helye
+                             - freqWidth          // Frekvencia helye
+                             - NAME_MOD_GAP       // Rés a név és a mod között
+                             - MOD_FREQ_GAP;      // Rés a mod és a freq között
+
+    while (tft.textWidth(displayName) > availableNameWidth && strlen(displayName) > 0) {
+        displayName[strlen(displayName) - 1] = '\0';
+    }
+    int nameWidth = tft.textWidth(displayName);  // Végleges név szélesség
+
+    // --- Pozíciók kiszámítása ---
+    int nameX = textStartX;
+    int modX = nameX + nameWidth + NAME_MOD_GAP;
+    int freqX = listX + listW - 5;  // Jobb szélhez igazítva
+
+    // --- Rajzolás ---
+    // Név
+    tft.drawString(displayName, nameX, textCenterY);
+
+    // Moduláció
+    tft.setTextDatum(ML_DATUM);  // Balra igazítva a rés után
+    tft.drawString(modStr, modX, textCenterY);
+
+    // Frekvencia
+    tft.setTextDatum(MR_DATUM);  // Jobbra igazítás
+    tft.drawString(freqStr, freqX, textCenterY);
+
+    // Visszaállítás, ha szükséges
+    tft.setTextDatum(TL_DATUM);  // Vagy ami az alapértelmezett
 }
 
 /**
@@ -497,6 +531,17 @@ void MemoryDisplay::saveCurrentStation() {
     pendingStationData.frequency = currentBandData.varData.currFreq;
     pendingStationData.bandIndex = config.data.bandIdx;
     pendingStationData.modulation = currentBandData.varData.currMod;
+
+    // Releváns sávszélesség index mentése az aktuális mód alapján
+    uint8_t currentMod = currentBandData.varData.currMod;
+    if (currentMod == FM) {
+        pendingStationData.bandwidthIndex = config.data.bwIdxFM;
+    } else if (currentMod == AM) {
+        pendingStationData.bandwidthIndex = config.data.bwIdxAM;
+    } else {  // LSB, USB, CW
+        pendingStationData.bandwidthIndex = config.data.bwIdxSSB;
+    }
+
     // A nevet a billentyűzet után kapjuk meg
 
     stationNameBuffer = "";  // Ürítjük a buffert
@@ -578,29 +623,8 @@ void MemoryDisplay::tuneToSelectedStation() {
     }
     // --- Régi index keresés vége ---
 
-    // --- Új hangolás beállítása ---
-    // 1. Állítsd be a cél sáv indexét a configban
-    config.data.bandIdx = station->bandIndex;
-
-    // 2. Hívd meg a band.bandInit(false)-t. Ez gondoskodik a chip helyes
-    //    inicializálásáról az új sávhoz a config alapján (meghívja a bandSet(true)-t).
-    //    Ez beállítja a preferált módot, lépésközt, sávszélességet stb.
-    band.bandInit(false);  // false: nem rendszerindítás
-
-    // 3. Most, hogy a sáv inicializálva van, állítsd be a pontos frekvenciát és módot
-    //    a memóriából a varData-ban ÉS a chipen is.
-    BandTable& targetBand = band.getCurrentBand();  // Most már a helyes sávot adja vissza
-    targetBand.varData.currFreq = station->frequency;
-    targetBand.varData.currMod = station->modulation;
-
-    // 4. Explicit módon állítsd be a frekvenciát és a módot a chipen
-    //    (Lehet, hogy a bandInit/bandSet már megtette, de ez biztosabb)
-    si4735.setFrequency(targetBand.varData.currFreq);
-
-    // 5. Visszaállítjuk a hangerőt a konfigból
-    si4735.setVolume(config.data.currVolume);
-
-    // --- Hangolás vége ---
+    // --- Hangolás beállítása a Band osztályban---
+    band.tuneMemoryStation(station->frequency, station->bandIndex, station->modulation, station->bandwidthIndex);
 
     // --- Lista frissítése ---
     if (oldTunedIndex != -1 && oldTunedIndex != selectedListIndex) {

@@ -709,7 +709,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                 } else {
                     config.data.bwIdxSSB = band.getBandWidthIndexByLabel(Band::bandWidthSSB, event.label);
                 }
-                band.bandSet();
+                band.bandSet(false);  // false -> ne a preferált adatokat töltse be
             },
             currentBandWidthLabel);  // Az aktuális sávszélesség felirata
         processed = true;
