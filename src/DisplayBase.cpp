@@ -150,9 +150,7 @@ void DisplayBase::drawAntCapStatus(bool initFont) {
     } else {
         // Explicit String konverzió a számhoz, majd hozzáfűzés
         value = String(currentAntCap);
-        // if (currentAntCap < 1000) {
         value += F("pF");  // F() makró használata a "pF"-hez is memóriatakarékosabb lehet
-        //}
     }
 
     // Kiírjuk az értéket (középre igazítva a téglalaphoz)
@@ -670,6 +668,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         }
 
         processed = true;
+
     } else if (STREQ("Squel", event.label)) {
         // Squelch értékének állítása
         const __FlashStringHelper *squelchPrompt;
@@ -691,6 +690,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                                                   // Itt nincs szükség további explicit műveletre a chip felé, mert a manageSquelch periodikusan fut és olvassa a configot.
                                               });
         processed = true;
+
     } else if (STREQ("Freq", event.label)) {
         // Open the FrequencyInputDialog
         BandTable &currentBand = band.getCurrentBand();
