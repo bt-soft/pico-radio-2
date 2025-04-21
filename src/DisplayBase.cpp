@@ -619,8 +619,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                 } else {
                     config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Automatic);  // AGC ON
                 }
-                // Gomb állapotának beállítása
-                agcButton->setState(config.data.agcGain == static_cast<uint8_t>(Si4735Utils::AgcGainMode::Automatic) ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
 
             } else {
 
@@ -638,22 +636,23 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                                                                      uint8_t currentAGCgain = static_cast<uint8_t>(currentAGCgain_double);
 
                                                                      // Itt már Manual módban vagyunk, csak a szintet kell állítani
-                                                                     si4735.setAutomaticGainControl(1, currentAGCgain);  // AGC disabled, manual index set
-                                                                     DisplayBase::drawAgcAttStatus(true);                // Státuszsor frissítése
+                                                                     // si4735.setAutomaticGainControl(1, currentAGCgain);  // AGC disabled, manual index set
+                                                                     Si4735Utils::checkAGC();              // Chip beállítása
+                                                                     DisplayBase::drawAgcAttStatus(true);  // Státuszsor frissítése
                                                                  });
-                    processed = true;
                 } else {
                     config.data.agcGain = static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off);  // AGC OFF
                 }
-
-                // Gomb állapotának beállítása
-                agcButton->setState(config.data.agcGain != static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off) ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
             }
+
+            // Gomb állapotának beállítása
+            agcButton->setState(config.data.agcGain != static_cast<uint8_t>(Si4735Utils::AgcGainMode::Off) ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
 
             Si4735Utils::checkAGC();  // Chip beállítása
             drawAgcAttStatus(true);   // Státuszsor frissítése
-            processed = true;
         }
+
+        processed = true;
 
     } else if (STREQ("Freq", event.label)) {
         // Open the FrequencyInputDialog

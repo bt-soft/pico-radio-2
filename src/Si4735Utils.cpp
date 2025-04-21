@@ -61,28 +61,20 @@ void Si4735Utils::checkAGC() {
     //  Ez a hívás frissíti az SI4735 objektum belső állapotát az AGC-vel kapcsolatban (pl. hogy engedélyezve van-e vagy sem).
     si4735.getAutomaticGainControl();
 
-    bool chipAgcEnabled = si4735.isAgcEnabled();
+    // Mit szeretnénk beállítani?
     AgcGainMode desiredMode = static_cast<AgcGainMode>(config.data.agcGain);
+
+    // Most engedélyezve van az AGC?
+    bool chipAgcEnabled = si4735.isAgcEnabled();
     bool stateChanged = false;  // Jelző, hogy történt-e változás, küldtünk-e AGC parancsot?
 
-    // Ha az AGC engedélyezve van
-    if (si4735.isAgcEnabled()) {
-
-        if (desiredMode == AgcGainMode::Off) {
-
+    // Ha a felhasználó kikapcsolta az AGC-t, akkor állítsuk le a chip AGC-t is
+    if (desiredMode == AgcGainMode::Off) {
+        // A felhasználó az AGC kikapcsolását kérte.
+        if (chipAgcEnabled) {
             DEBUG("Si4735Utils::checkAGC() -> AGC Off\n");
-            // A felhasználó az AGC kikapcsolását kérte.
-            if (chipAgcEnabled) {
-                si4735.setAutomaticGainControl(1, 0);  // disabled
-                stateChanged = true;
-            }
-
-        } else if (desiredMode == AgcGainMode::Manual) {
-
-            DEBUG("Si4735Utils::checkAGC() -> AGC Manual\n");
-            // A felhasználó manuális AGC beállítást kért
-            si4735.setAutomaticGainControl(1, config.data.currentAGCgain);
-            stateChanged = true;  // Feltételezzük, hogy változott az állapot
+            si4735.setAutomaticGainControl(1, 0);  // disabled -> AGCDIS = 1, AGCIDX = 0
+            stateChanged = true;
         }
 
     } else if (desiredMode == AgcGainMode::Automatic) {
@@ -91,7 +83,16 @@ void Si4735Utils::checkAGC() {
         // Ez a teljesen automatikus AGC működést jelenti.
         if (!chipAgcEnabled) {
             DEBUG("Si4735Utils::checkAGC() -> AGC Automatic\n");
-            si4735.setAutomaticGainControl(0, 0);  // enabled
+            si4735.setAutomaticGainControl(0, 0);  // enabled -> AGCDIS = 0, AGCIDX = 0
+            stateChanged = true;
+        }
+    } else if (desiredMode == AgcGainMode::Manual) {
+
+        // Csak ha nem azonos az AGC-gain index, akkor állítsuk be a chip AGC-t
+        if (config.data.currentAGCgain != si4735.getAgcGainIndex()) {
+            DEBUG("Si4735Utils::checkAGC() -> AGC Manual, att: %d\n", config.data.currentAGCgain);
+            // A felhasználó manuális AGC beállítást kért
+            si4735.setAutomaticGainControl(1, config.data.currentAGCgain);  //-> AGCDIS = 1, AGCIDX = a konfig szerint
             stateChanged = true;
         }
     }
