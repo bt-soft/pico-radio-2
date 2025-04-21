@@ -321,7 +321,7 @@ void DisplayBase::drawScreenButtons() {
  */
 void DisplayBase::deleteButtons(TftButton **buttons, uint8_t buttonsCount) {
     if (buttons) {
-        for (int i = 0; i < buttonsCount; i++) {
+        for (uint8_t i = 0; i < buttonsCount; i++) {
             delete buttons[i];
         }
         delete[] buttons;
