@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
+#include "PicoSensorUtils.h"
 #include "defines.h"
-#include "picoSensorUtils.h"
 #include "rtVars.h"
 #include "utils.h"
 
@@ -253,8 +253,8 @@ void setup() {
     // Csippantunk egyet
     Utils::beepTick();
 
-    // AD 12 bites legyen
-    analogReadResolution(12);
+    // PICO AD inicializálása
+    PicoSensorUtils::init();
 }
 
 /** ----------------------------------------------------------------------------------------------------------------------------------------
@@ -343,7 +343,7 @@ void loop() {
         if (millis() - lastMeasure >= 1000 * 10) {  // 10 másodpercenként mérjük a feszültséget
 
             // Eredmények kiírása a soros monitorra
-            Serial.print("Vbux : ");
+            Serial.print("Vbus : ");
             Serial.print(PicoSensorUtils::readVBus(), 2);  // 2 tizedesjegy pontossággal
             Serial.println(" V");
 

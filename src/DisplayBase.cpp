@@ -1,6 +1,7 @@
 #include "DisplayBase.h"
 
 #include "FrequencyInputDialog.h"
+#include "PicoSensorUtils.h"
 #include "ValueChangeDialog.h"
 
 namespace DisplayConstants {
@@ -14,6 +15,8 @@ constexpr int StatusLineBandWidthX = 135;
 constexpr int StatusLineBandNameX = 180;
 constexpr int StatusLineStepX = 220;
 constexpr int StatusLineAntCapX = 260;
+constexpr int StatusLineTempX = 300;  // Új pozíció a hőmérsékletnek
+constexpr int StatusLineVbusX = 340;  // Új pozíció a Vbus-nak
 
 // Gombok méretei és margói
 constexpr int ButtonWidth = 39;
@@ -29,11 +32,18 @@ constexpr uint16_t StatusLineBandColor = TFT_CYAN;
 constexpr uint16_t StatusLineStepColor = TFT_SKYBLUE;
 constexpr uint16_t StatusLineAntCapDefaultColor = TFT_SILVER;  //  Alapértelmezett AntCap szín (szürke)
 constexpr uint16_t StatusLineAntCapChangedColor = TFT_GREEN;   // Megváltozott AntCap szín (világoszöld)
+constexpr uint16_t StatusLineTempColor = TFT_YELLOW;           // Hőmérséklet színe
+constexpr uint16_t StatusLineVbusColor = TFT_GREENYELLOW;      // Vbus színe
 
 // Egyéb
 constexpr int VolumeMin = 0;
 constexpr int VolumeMax = 63;
 }  // namespace DisplayConstants
+
+/**
+ * Szenzor olvasási intervallum (ms)
+ */
+constexpr uint32_t SENSOR_READ_INTERVAL_MS = 10000;  // 10 másodperc
 
 /**
  *  BFO Status kirajzolása
@@ -163,6 +173,56 @@ void DisplayBase::drawAntCapStatus(bool initFont) {
 }
 
 /**
+ * Hőmérséklet Status kirajzolása
+ * @param initFont Ha true, akkor a betűtípus inicializálása történik
+ */
+void DisplayBase::drawTemperatureStatus(bool initFont) {
+    using namespace DisplayConstants;
+
+    if (initFont) {
+        tft.setFreeFont();
+        tft.setTextSize(1);
+        tft.setTextDatum(BC_DATUM);
+    }
+
+    // Töröljük a területet
+    int rectX = StatusLineTempX - (ButtonWidth / 2);
+    tft.fillRect(rectX, 0, ButtonWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+
+    tft.setTextColor(StatusLineTempColor, TFT_BLACK);
+    String tempStr = isnan(lastTemperature) ? "---" : String(lastTemperature, 1);  // 1 tizedesjegy
+    tft.drawString(tempStr + "C", StatusLineTempX, 15);
+
+    // Keret
+    tft.drawRect(rectX, 2, ButtonWidth, ButtonHeight, StatusLineTempColor);
+}
+
+/**
+ * Vbus Status kirajzolása
+ * @param initFont Ha true, akkor a betűtípus inicializálása történik
+ */
+void DisplayBase::drawVbusStatus(bool initFont) {
+    using namespace DisplayConstants;
+
+    if (initFont) {
+        tft.setFreeFont();
+        tft.setTextSize(1);
+        tft.setTextDatum(BC_DATUM);
+    }
+
+    // Töröljük a területet
+    int rectX = StatusLineVbusX - (ButtonWidth / 2);
+    tft.fillRect(rectX, 0, ButtonWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+
+    tft.setTextColor(StatusLineVbusColor, TFT_BLACK);
+    String vbusStr = isnan(lastVbus) ? "---" : String(lastVbus, 2);  // 2 tizedesjegy
+    tft.drawString(vbusStr + "V", StatusLineVbusX, 15);
+
+    // Keret
+    tft.drawRect(rectX, 2, ButtonWidth, ButtonHeight, StatusLineVbusColor);
+}
+
+/**
  * Státusz sor a képernyő tetején
  * @param initFont Ha true, akkor a betűtípus inicializálása történik
  */
@@ -205,6 +265,12 @@ void DisplayBase::dawStatusLine() {
 
     // Antenna Tuning Capacitor
     drawAntCapStatus();
+
+    // Hőmérséklet
+    drawTemperatureStatus();
+
+    // Vbus
+    drawVbusStatus();
 }
 
 /**
@@ -942,6 +1008,23 @@ DisplayBase::~DisplayBase() {
 }
 
 /**
+ * Szenzor adatok frissítése és kijelzése
+ */
+void DisplayBase::updateSensorReadings() {
+    uint32_t now = millis();
+    if (now - lastSensorReadTime >= SENSOR_READ_INTERVAL_MS) {
+        lastSensorReadTime = now;
+
+        lastTemperature = PicoSensorUtils::readCoreTemperature();
+        lastVbus = PicoSensorUtils::readVBus();
+
+        // Kijelző frissítése (csak a releváns részek)
+        drawTemperatureStatus(true);  // true: állítsa be a fontot
+        drawVbusStatus(true);         // true: állítsa be a fontot
+    }
+}
+
+/**
  * Arduino loop hívás (a leszármazott nem írhatja felül)
  *
  * @param encoderState enkóder állapot
@@ -951,6 +1034,9 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
 
     // Az ős loop hívása a squelch kezelésére
     Si4735Utils::loop();
+
+    // Szenzor adatok frissítése (ha szükséges)
+    updateSensorReadings();
 
     // Touch adatok változói
     uint16_t tx, ty;

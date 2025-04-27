@@ -54,8 +54,8 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
     uint8_t horizontalScreenButtonsCount = 0;       // A dinamikusan létrehozott gombok száma
 
     // Függőleges gombsor
-    TftButton **verticalScreenButtons = nullptr;  // Új: Vertikális gombok tömbje
-    uint8_t verticalScreenButtonsCount = 0;       // Új: Vertikális gombok száma
+    TftButton **verticalScreenButtons = nullptr;  // Vertikális gombok tömbje
+    uint8_t verticalScreenButtonsCount = 0;       // Vertikális gombok száma
     uint8_t agcButtonId = TFT_BUTTON_INVALID_ID;  // AGC/Att gomb ID-jának tárolása
 
     // A lenyomott képernyő menügomb adatai
@@ -87,6 +87,11 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 
     // A képernyőn megjelenő dialog pointere
     DialogBase *pDialog = nullptr;
+
+    // Szenzor adatok és időzítés
+    float lastTemperature = NAN;  // Kezdetben érvénytelen
+    float lastVbus = NAN;         // Kezdetben érvénytelen
+    uint32_t lastSensorReadTime = 0;
 
     // Frekvencia változott-e az utolsó kijelzés frissítés óta?
     bool frequencyChanged = false;
@@ -141,7 +146,12 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
     void drawAgcAttStatus(bool initFont = false);
     void drawStepStatus(bool initFont = false);
     void drawAntCapStatus(bool initFont = false);
+    void drawTemperatureStatus(bool initFont = false);
+    void drawVbusStatus(bool initFont = false);
+
     void dawStatusLine();
+
+    void updateSensorReadings();  // Szenzor adatok frissítése és kijelzése
 
     /**
      * Gombok törlése
