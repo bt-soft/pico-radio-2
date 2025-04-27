@@ -169,8 +169,6 @@ void DisplayBase::drawAntCapStatus(bool initFont) {
 void DisplayBase::dawStatusLine() {
     using namespace DisplayConstants;
 
-    // tft.fillRect(0, 0, StatusLineWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
-
     tft.setFreeFont();
     tft.setTextSize(1);
     tft.setTextDatum(BC_DATUM);

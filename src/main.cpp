@@ -1,5 +1,14 @@
 #include <Arduino.h>
 
+// --- Konstansok ---
+const int ADC_GPIO_PIN = 29;  // GP26 -> ADC0
+const float VREF = 3.3;       // Pico referenciafeszültsége
+const float R1 = 20000.0;     // Felső ellenállás (Ohm)
+const float R2 = 5000.0;      // Alsó ellenállás (Ohm)
+// Feszültségosztó aránya (Vin / Vout)
+const float DIVIDER_RATIO = (R1 + R2) / R2;  // Ez itt (20k+5k)/5k = 5.0
+const int ADC_MAX_READING = 4095;            // 12 bites ADC maximális értéke
+
 #include "defines.h"
 #include "rtVars.h"
 #include "utils.h"
@@ -251,6 +260,9 @@ void setup() {
 
     // Csippantunk egyet
     Utils::beepTick();
+
+    // AD 12 bites legyen
+    analogReadResolution(12);
 }
 
 /** ----------------------------------------------------------------------------------------------------------------------------------------
@@ -333,6 +345,36 @@ void loop() {
                 // ha a screen saver már fut, akkor a timeout-ot frissítjük
                 lastScreenSaver = millis();
             }
+        }
+
+        static uint32_t lastMeasure = millis();
+        if (millis() - lastMeasure >= 1000 * 10) {  // 10 másodpercenként mérjük a feszültséget
+
+            // 1. Nyers ADC érték olvasása (0-4095)
+            int rawValue = analogRead(__FIRSTANALOGGPIO);
+
+            // 2. Nyers érték átalakítása az ADC lábán mért feszültségre (Vout)
+            //    Fontos a float típus használata a pontos osztáshoz!
+            float vout = (float)rawValue * (VREF / (float)ADC_MAX_READING);
+
+            // 3. Az eredeti feszültség (Vin) kiszámítása az osztó arányával
+            float vin = vout * DIVIDER_RATIO;
+
+            // Eredmények kiírása a soros monitorra
+            Serial.print("Nyers ADC: ");
+            Serial.print(rawValue);
+            Serial.print("\t| Vout (ADC láb): ");
+            Serial.print(vout, 3);  // 3 tizedesjegy pontossággal
+            Serial.print(" V\t| Vin (Eredeti): ");
+            Serial.print(vin, 3);  // 3 tizedesjegy pontossággal
+            Serial.println(" V");
+
+            float temp = analogReadTemp();  // Kiolvassuk a processzor hőmérsékletét (nem használjuk fel, csak kiírjuk a soros monitorra)
+            Serial.print("Pico core temp: ");
+            Serial.print(temp, 3);  // 3 tizedesjegy pontossággal
+            Serial.println(" C");
+
+            lastMeasure = millis();
         }
     }
 }
