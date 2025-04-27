@@ -41,11 +41,6 @@ constexpr int VolumeMax = 63;
 }  // namespace DisplayConstants
 
 /**
- * Szenzor olvasási intervallum (ms)
- */
-constexpr uint32_t SENSOR_READ_INTERVAL_MS = 10000;  // 10 másodperc
-
-/**
  *  BFO Status kirajzolása
  * @param initFont Ha true, akkor a betűtípus inicializálása történik
  */
@@ -1011,14 +1006,18 @@ DisplayBase::~DisplayBase() {
  * Szenzor adatok frissítése és kijelzése
  */
 void DisplayBase::updateSensorReadings() {
-    uint32_t now = millis();
-    if (now - lastSensorReadTime >= SENSOR_READ_INTERVAL_MS) {
-        lastSensorReadTime = now;
+
+    // Szenzor olvasási intervallum (ms)
+#define SENSOR_READ_INTERVAL_MS 1000 * 10  // 10 másodperc
+
+    if (lastSensorReadTime == 0 or millis() - lastSensorReadTime >= SENSOR_READ_INTERVAL_MS) {
+
+        lastSensorReadTime = millis();
 
         lastTemperature = PicoSensorUtils::readCoreTemperature();
         lastVbus = PicoSensorUtils::readVBus();
 
-        // Kijelző frissítése (csak a releváns részek)
+        // Kijelző frissítése
         drawTemperatureStatus(true);  // true: állítsa be a fontot
         drawVbusStatus(true);         // true: állítsa be a fontot
     }
@@ -1035,7 +1034,7 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
     // Az ős loop hívása a squelch kezelésére
     Si4735Utils::loop();
 
-    // Szenzor adatok frissítése (ha szükséges)
+    // Szenzor adatok frissítése
     updateSensorReadings();
 
     // Touch adatok változói

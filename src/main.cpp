@@ -338,20 +338,5 @@ void loop() {
                 lastScreenSaver = millis();
             }
         }
-
-        static uint32_t lastMeasure = millis();
-        if (millis() - lastMeasure >= 1000 * 10) {  // 10 másodpercenként mérjük a feszültséget
-
-            // Eredmények kiírása a soros monitorra
-            Serial.print("Vbus : ");
-            Serial.print(PicoSensorUtils::readVBus(), 2);  // 2 tizedesjegy pontossággal
-            Serial.println(" V");
-
-            Serial.print("Pico core temp: ");
-            Serial.print(PicoSensorUtils::readCoreTemperature(), 3);  // 3 tizedesjegy pontossággal
-            Serial.println(" C");
-
-            lastMeasure = millis();
-        }
     }
 }
