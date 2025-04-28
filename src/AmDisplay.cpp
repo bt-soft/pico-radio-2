@@ -80,9 +80,9 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
         // FM - the valid range is 0 to 191.
 
         // Antenna kapacitás állítása
-        int maxValue = band.getCurrentBand().varData.currMod == FM ? 191 : 6143;
+        int maxValue = band.getCurrentBand().varData.currMod == FM ? Si4735Utils::MAX_ANT_CAP_FM : Si4735Utils::MAX_ANT_CAP_AM;
 
-        int antCapValue = 0;
+        int antCapValue = band.getCurrentBand().varData.antCap;  // Az aktuális érték a Band táblából
 
         DisplayBase::pDialog =
             new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Antenna Tuning capacitor"), F("Capacitor value [pF]:"), &antCapValue, (int)0, (int)maxValue,

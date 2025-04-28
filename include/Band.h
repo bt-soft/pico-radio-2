@@ -108,25 +108,19 @@ class Band {
      * A Default Antenna Tuning Capacitor értékének lekérdezése
      * @return Az alapértelmezett antenna tuning capacitor értéke
      */
-    uint16_t getDefaultAntCapValue() {
+    inline uint16_t getDefaultAntCapValue() {
 
         // Kikeressük az aktuális Band rekordot
-        BandTable &currentBand = getCurrentBand();
-        uint8_t currentBandType = getCurrentBandType();
-        switch (currentBandType) {
-
-            case FM_BAND_TYPE:
-                return 0;  // FM band esetén nincs antenna tuning capacitor
-
-            case MW_BAND_TYPE:
-            case LW_BAND_TYPE:
-                return 0;  // Sima AM esetén sem kell antenna tuning capacitor
+        switch (getCurrentBandType()) {
 
             case SW_BAND_TYPE:
                 return 1;  // SW band esetén antenna tuning capacitor szükséges
 
+            case FM_BAND_TYPE:
+            case MW_BAND_TYPE:
+            case LW_BAND_TYPE:
             default:
-                return 0;  // Alapértelmezett érték
+                return 0;  // FM és sima AM esetén nem kell antenna tuning capacitor
         }
     }
 

@@ -9,6 +9,11 @@
  * si4735 utilities
  */
 class Si4735Utils {
+
+   public:
+    static constexpr int MAX_ANT_CAP_FM = 191;
+    static constexpr int MAX_ANT_CAP_AM = 6143;
+
    private:
     static int8_t currentBandIdx;
     bool hardwareAudioMuteState;        // SI4735 hardware audio mute állapot

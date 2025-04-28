@@ -41,36 +41,36 @@ const char bandNames[][5] PROGMEM = {
 
 // PROGMEM - ben tárolt állandó tábla
 const BandTableConst bandTableConst[] PROGMEM = {
-    {bandNames[0], 0, FM, 6400, 10800, 9390, 10, false},    //  FM          0   // 93.9MHz Petőfi
-    {bandNames[1], 1, AM, 100, 514, 198, 9, false},         //  LW          1
-    {bandNames[2], 1, AM, 514, 1800, 540, 9, false},        //  MW          2   // 540kHz Kossuth
-    {bandNames[3], 1, AM, 280, 470, 284, 1, true},          // Ham  800M    3
-    {bandNames[4], 1, LSB, 470, 480, 475, 1, true},         // Ham  630M    4
-    {bandNames[5], 1, LSB, 1800, 2000, 1850, 1, true},      // Ham  160M    5
-    {bandNames[6], 1, AM, 2000, 3200, 2400, 5, false},      //      120M    6
-    {bandNames[7], 1, AM, 3200, 3500, 3300, 5, false},      //       90M    7
-    {bandNames[8], 1, LSB, 3500, 3900, 3630, 1, true},      // Ham   80M    8
-    {bandNames[9], 1, AM, 3900, 5300, 3950, 5, false},      //       75M    9
-    {bandNames[10], 1, USB, 5300, 5900, 5375, 1, true},     // Ham   60M   10
-    {bandNames[11], 1, AM, 5900, 7000, 6000, 5, false},     //       49M   11
-    {bandNames[12], 1, LSB, 7000, 7500, 7074, 1, true},     // Ham   40M   12
-    {bandNames[13], 1, AM, 7200, 9000, 7210, 5, false},     //       41M   13
-    {bandNames[14], 1, AM, 9000, 10000, 9600, 5, false},    //       31M   14
-    {bandNames[15], 1, USB, 10000, 10200, 10099, 1, true},  // Ham   30M   15
-    {bandNames[16], 1, AM, 10200, 13500, 11700, 5, false},  //       25M   16
-    {bandNames[17], 1, AM, 13500, 14000, 13700, 5, false},  //       22M   17
-    {bandNames[18], 1, USB, 14000, 14500, 14074, 1, true},  // Ham   20M   18
-    {bandNames[19], 1, AM, 14500, 17500, 15700, 5, false},  //       19M   19
-    {bandNames[20], 1, AM, 17500, 18000, 17600, 5, false},  //       17M   20
-    {bandNames[21], 1, USB, 18000, 18500, 18100, 1, true},  // Ham   16M   21
-    {bandNames[22], 1, AM, 18500, 21000, 18950, 5, false},  //       15M   22
-    {bandNames[23], 1, USB, 21000, 21500, 21074, 1, true},  // Ham   14M   23
-    {bandNames[24], 1, AM, 21500, 24000, 21500, 5, false},  //       13M   24
-    {bandNames[25], 1, USB, 24000, 25500, 24940, 1, true},  // Ham   12M   25
-    {bandNames[26], 1, AM, 25500, 26100, 25800, 5, false},  //       11M   26
-    {bandNames[27], 1, AM, 26100, 28000, 27200, 1, false},  // CB band     27
-    {bandNames[28], 1, USB, 28000, 30000, 28500, 1, true},  // Ham   10M   28
-    {bandNames[29], 1, AM, 100, 30000, 15500, 5, false}     // Whole SW    29
+    {bandNames[0], FM_BAND_TYPE, FM, 6400, 10800, 9390, 10, false},    //  FM          0   // 93.9MHz Petőfi
+    {bandNames[1], LW_BAND_TYPE, AM, 100, 514, 198, 9, false},         //  LW          1
+    {bandNames[2], MW_BAND_TYPE, AM, 514, 1800, 540, 9, false},        //  MW          2   // 540kHz Kossuth
+    {bandNames[3], SW_BAND_TYPE, AM, 280, 470, 284, 1, true},          // Ham  800M    3
+    {bandNames[4], SW_BAND_TYPE, LSB, 470, 480, 475, 1, true},         // Ham  630M    4
+    {bandNames[5], SW_BAND_TYPE, LSB, 1800, 2000, 1850, 1, true},      // Ham  160M    5
+    {bandNames[6], SW_BAND_TYPE, AM, 2000, 3200, 2400, 5, false},      //      120M    6
+    {bandNames[7], SW_BAND_TYPE, AM, 3200, 3500, 3300, 5, false},      //       90M    7
+    {bandNames[8], SW_BAND_TYPE, LSB, 3500, 3900, 3630, 1, true},      // Ham   80M    8
+    {bandNames[9], SW_BAND_TYPE, AM, 3900, 5300, 3950, 5, false},      //       75M    9
+    {bandNames[10], SW_BAND_TYPE, USB, 5300, 5900, 5375, 1, true},     // Ham   60M   10
+    {bandNames[11], SW_BAND_TYPE, AM, 5900, 7000, 6000, 5, false},     //       49M   11
+    {bandNames[12], SW_BAND_TYPE, LSB, 7000, 7500, 7074, 1, true},     // Ham   40M   12
+    {bandNames[13], SW_BAND_TYPE, AM, 7200, 9000, 7210, 5, false},     //       41M   13
+    {bandNames[14], SW_BAND_TYPE, AM, 9000, 10000, 9600, 5, false},    //       31M   14
+    {bandNames[15], SW_BAND_TYPE, USB, 10000, 10100, 10099, 1, true},  // Ham   30M   15
+    {bandNames[16], SW_BAND_TYPE, AM, 10200, 13500, 11700, 5, false},  //       25M   16
+    {bandNames[17], SW_BAND_TYPE, AM, 13500, 14000, 13700, 5, false},  //       22M   17
+    {bandNames[18], SW_BAND_TYPE, USB, 14000, 14500, 14074, 1, true},  // Ham   20M   18
+    {bandNames[19], SW_BAND_TYPE, AM, 14500, 17500, 15700, 5, false},  //       19M   19
+    {bandNames[20], SW_BAND_TYPE, AM, 17500, 18000, 17600, 5, false},  //       17M   20
+    {bandNames[21], SW_BAND_TYPE, USB, 18000, 18500, 18100, 1, true},  // Ham   16M   21
+    {bandNames[22], SW_BAND_TYPE, AM, 18500, 21000, 18950, 5, false},  //       15M   22
+    {bandNames[23], SW_BAND_TYPE, USB, 21000, 21500, 21074, 1, true},  // Ham   14M   23
+    {bandNames[24], SW_BAND_TYPE, AM, 21500, 24000, 21500, 5, false},  //       13M   24
+    {bandNames[25], SW_BAND_TYPE, USB, 24000, 25500, 24940, 1, true},  // Ham   12M   25
+    {bandNames[26], SW_BAND_TYPE, AM, 25500, 26100, 25800, 5, false},  //       11M   26
+    {bandNames[27], SW_BAND_TYPE, AM, 26100, 28000, 27200, 1, false},  // CB band     27
+    {bandNames[28], SW_BAND_TYPE, USB, 28000, 30000, 28500, 1, true},  // Ham   10M   28
+    {bandNames[29], SW_BAND_TYPE, AM, 100, 30000, 15500, 5, false}     // Whole SW    29
 };
 
 /// Itt határozzuk meg a BAND_COUNT értékét!
@@ -272,6 +272,7 @@ void Band::useBand() {
     }
 
     if (currentBandType == FM_BAND_TYPE) {
+        ssbLoaded = false;
         rtv::bfoOn = false;
 
         // Antenna tuning capacitor beállítása (FM esetén antenna tuning capacitor nem kell)
@@ -280,15 +281,15 @@ void Band::useBand() {
         // delay(100);
 
         si4735.setFM(currentBand.pConstData->minimumFreq, currentBand.pConstData->maximumFreq, currentBand.varData.currFreq, currentBand.varData.currStep);
-        si4735.setFMDeEmphasis(1);
-        ssbLoaded = false;
+        si4735.setFMDeEmphasis(1);  // 1 = 50 μs. Usedin Europe, Australia, Japan;  2 = 75 μs. Used in USA (default)
         si4735.RdsInit();
-        si4735.setRdsConfig(1, 2, 2, 2, 2);
+#define RDS_ENABLE 1
+#define RDS_BLOCK_ERROR_TRESHOLD 2
+        si4735.setRdsConfig(RDS_ENABLE, RDS_BLOCK_ERROR_TRESHOLD, RDS_BLOCK_ERROR_TRESHOLD, RDS_BLOCK_ERROR_TRESHOLD, RDS_BLOCK_ERROR_TRESHOLD);
 
     } else {
 
         // AM-ben vagyunk
-        //  Antenna capacitor beállítása
         currentBand.varData.antCap = getDefaultAntCapValue();  // Sima AM esetén antenna tuning capacitor nem kell
         si4735.setTuneFrequencyAntennaCapacitor(currentBand.varData.antCap);
 
