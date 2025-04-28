@@ -22,8 +22,7 @@ void Si4735Utils::manageSquelch() {
             if (rtv::SCANpause == true) {  // Ez a feltétel még mindig furcsa itt, de meghagyjuk
                 if (isSquelchMuted) {      // Csak akkor kapcsoljuk ki, ha eddig némítva volt
                     si4735.setAudioMute(false);
-                    isSquelchMuted = false;                                             // Állapot frissítése
-                    DEBUG("Si4735Utils::manageSquelch -> Audio UNMUTED by squelch\n");  // Informatívabb üzenet
+                    isSquelchMuted = false;  // Állapot frissítése
                 }
                 rtv::squelchDecay = millis();  // Időzítőt mindig reseteljük, ha jó a jel
             }
@@ -32,8 +31,7 @@ void Si4735Utils::manageSquelch() {
             if (millis() > (rtv::squelchDecay + SQUELCH_DECAY_TIME)) {
                 if (!isSquelchMuted) {  // Csak akkor kapcsoljuk be, ha eddig nem volt némítva
                     si4735.setAudioMute(true);
-                    isSquelchMuted = true;                                            // Állapot frissítése
-                    DEBUG("Si4735Utils::manageSquelch -> Audio MUTED by squelch\n");  // Informatívabb üzenet
+                    isSquelchMuted = true;  // Állapot frissítése
                 }
             }
         }
@@ -45,7 +43,6 @@ void Si4735Utils::manageSquelch() {
             // Nem kell ténylegesen mute parancsot küldeni, mert már némítva van globálisan,
             // csak a belső állapotot frissítjük.
             isSquelchMuted = true;
-            DEBUG("Si4735Utils::manageSquelch -> Squelch state synced to MUTED (due to global mute)\n");
         }
         // A decay timert is resetelhetjük itt, hogy ne némítson azonnal, ha a global mute megszűnik
         rtv::squelchDecay = millis();
