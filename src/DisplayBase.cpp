@@ -121,8 +121,14 @@ void DisplayBase::drawStepStatus(bool initFont) {
         tft.setFreeFont();
         tft.setTextSize(1);
     }
+
+    // Ha SSB vagy CW, akkor a lépésköz ki van kapcsolva
+    BandTable &currentBand = band.getCurrentBand();
+    uint8_t currMod = currentBand.varData.currMod;
+    bool stepDisabled = (currMod == LSB or currMod == USB or currMod == CW);
+
     tft.setTextColor(StatusLineStepColor, TFT_BLACK);
-    tft.drawString(band.currentStepSizeStr(), StatusLineStepX, 15);
+    tft.drawString(stepDisabled ? "-" : band.currentStepSizeStr(), StatusLineStepX, 15);
     tft.drawRect(200, 2, ButtonWidth, ButtonHeight, StatusLineStepColor);
 }
 
