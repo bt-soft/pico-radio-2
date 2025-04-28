@@ -34,7 +34,7 @@ SetupDisplay::~SetupDisplay() {}
 
 /**
  * Képernyő kirajzolása
- * A ScreenSaver rögtön a képernyő törlésével kezd
+ * Rögtön a képernyő törlésével kezdünk
  */
 void SetupDisplay::drawScreen() {
     tft.setFreeFont();

@@ -269,12 +269,34 @@ class Band {
 
         static const char *currentStepStr = nullptr;
 
-        uint8_t currentBandType = getCurrentBandType();
+        BandTable &currentBand = getCurrentBand();
+
+        uint8_t currentBandType = currentBand.pConstData->bandType;  // Kikeressük az aktuális Band típust
         if (currentBandType == FM_BAND_TYPE) {
             currentStepStr = getStepSizeLabelByIndex(Band::stepSizeFM, config.data.ssIdxFM);
+
         } else {
-            uint8_t index = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? config.data.ssIdxMW : config.data.ssIdxAM;
-            currentStepStr = getStepSizeLabelByIndex(Band::stepSizeAM, index);
+
+            // Ha SSB vagy CW, akkor a lépésköz a BFO-val van megoldva
+            if (currentBand.varData.currMod == LSB or currentBand.varData.currMod == USB or currentBand.varData.currMod == CW) {
+                switch (rtv::freqstepnr) {
+                    default:
+                    case 0:
+                        currentStepStr = "1kHz";
+                        break;
+                    case 1:
+                        currentStepStr = "100Hz";
+                        break;
+                    case 2:
+                        currentStepStr = "10Hz";
+                        break;
+                }
+
+            } else {
+
+                uint8_t index = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? config.data.ssIdxMW : config.data.ssIdxAM;
+                currentStepStr = getStepSizeLabelByIndex(Band::stepSizeAM, index);
+            }
         }
 
         return currentStepStr;

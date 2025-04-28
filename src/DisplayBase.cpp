@@ -6,8 +6,10 @@
 
 namespace DisplayConstants {
 // Status line méretek és pozíciók
+constexpr int StatusLineRectWidth = 39;
 constexpr int StatusLineHeight = 16;
 constexpr int StatusLineWidth = 240;
+
 constexpr int StatusLineBfoX = 20;
 constexpr int StatusLineAgcX = 60;
 constexpr int StatusLineModX = 95;
@@ -65,7 +67,7 @@ void DisplayBase::drawBfoStatus(bool initFont) {
     if (!rtv::bfoOn) {
         tft.drawString(F(" BFO "), StatusLineBfoX, 15);
     }
-    tft.drawRect(0, 2, ButtonWidth, ButtonHeight, bfoStepColor);
+    tft.drawRect(0, 2, StatusLineRectWidth, StatusLineHeight, bfoStepColor);
 }
 
 /**
@@ -87,8 +89,8 @@ void DisplayBase::drawAgcAttStatus(bool initFont /*= false*/) {  // initFont má
 
     // Töröljük a korábbi tartalmat (szöveg + téglalap)
     // A téglalap X pozícióját is figyelembe véve törlünk
-    int rectX = StatusLineAgcX - (ButtonWidth / 2);
-    tft.fillRect(rectX, 0, ButtonWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);  // Törlés háttérszínnel
+    int rectX = StatusLineAgcX - (StatusLineRectWidth / 2);
+    tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);  // Törlés háttérszínnel
 
     if (currentMode == Si4735Utils::AgcGainMode::Manual) {
         // Manual mode (ATT)
@@ -106,7 +108,7 @@ void DisplayBase::drawAgcAttStatus(bool initFont /*= false*/) {  // initFont má
     tft.drawString(labelText, StatusLineAgcX, 15);  // Y=15 marad
 
     // Téglalap keret kirajzolása (középre igazítva)
-    tft.drawRect(rectX, 2, ButtonWidth, ButtonHeight, agcColor);
+    tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, agcColor);
 }
 
 /**
@@ -121,15 +123,13 @@ void DisplayBase::drawStepStatus(bool initFont) {
         tft.setFreeFont();
         tft.setTextSize(1);
     }
-
-    // Ha SSB vagy CW, akkor a lépésköz ki van kapcsolva
-    BandTable &currentBand = band.getCurrentBand();
-    uint8_t currMod = currentBand.varData.currMod;
-    bool stepDisabled = (currMod == LSB or currMod == USB or currMod == CW);
+    constexpr uint32_t rectX = 200;  // A téglalap kezdő X koordinátája
+    tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+    tft.setTextDatum(BC_DATUM);  // Bottom-Center igazítás
 
     tft.setTextColor(StatusLineStepColor, TFT_BLACK);
-    tft.drawString(stepDisabled ? "-" : band.currentStepSizeStr(), StatusLineStepX, 15);
-    tft.drawRect(200, 2, ButtonWidth, ButtonHeight, StatusLineStepColor);
+    tft.drawString(band.currentStepSizeStr(), StatusLineStepX, 15);
+    tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, StatusLineStepColor);
 }
 
 /**
@@ -170,7 +170,7 @@ void DisplayBase::drawAntCapStatus(bool initFont) {
     tft.setTextDatum(BC_DATUM);                                          // Visszaállítás az alapértelmezettre
 
     // Kirajzoljuk a keretet
-    tft.drawRect(StatusLineAntCapX - (ButtonWidth / 2), 2, ButtonWidth, ButtonHeight, antCapColor);
+    tft.drawRect(StatusLineAntCapX - (StatusLineRectWidth / 2), 2, StatusLineRectWidth, StatusLineHeight, antCapColor);
 }
 
 /**
@@ -187,15 +187,15 @@ void DisplayBase::drawTemperatureStatus(bool initFont) {
     }
 
     // Töröljük a területet
-    int rectX = StatusLineTempX - (ButtonWidth / 2);
-    tft.fillRect(rectX, 0, ButtonWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+    int rectX = StatusLineTempX - (StatusLineRectWidth / 2);
+    tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
 
     tft.setTextColor(StatusLineTempColor, TFT_BLACK);
     String tempStr = isnan(lastTemperature) ? "---" : String(lastTemperature, 1);  // 1 tizedesjegy
     tft.drawString(tempStr + "C", StatusLineTempX, 15);
 
     // Keret
-    tft.drawRect(rectX, 2, ButtonWidth, ButtonHeight, StatusLineTempColor);
+    tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, StatusLineTempColor);
 }
 
 /**
@@ -212,15 +212,15 @@ void DisplayBase::drawVbusStatus(bool initFont) {
     }
 
     // Töröljük a területet
-    int rectX = StatusLineVbusX - (ButtonWidth / 2);
-    tft.fillRect(rectX, 0, ButtonWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+    int rectX = StatusLineVbusX - (StatusLineRectWidth / 2);
+    tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
 
     tft.setTextColor(StatusLineVbusColor, TFT_BLACK);
     String vbusStr = isnan(lastVbus) ? "---" : String(lastVbus, 2);  // 2 tizedesjegy
     tft.drawString(vbusStr + "V", StatusLineVbusX, 15);
 
     // Keret
-    tft.drawRect(rectX, 2, ButtonWidth, ButtonHeight, StatusLineVbusColor);
+    tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, StatusLineVbusColor);
 }
 
 /**
@@ -244,7 +244,7 @@ void DisplayBase::dawStatusLine() {
     tft.setTextColor(StatusLineModeColor, TFT_BLACK);
     const char *modtext = (rtv::CWShift ? "CW" : band.getCurrentBandModeDesc());
     tft.drawString(modtext, StatusLineModX, 15);
-    tft.drawRect(80, 2, 29, ButtonHeight, StatusLineModeColor);
+    tft.drawRect(80, 2, 29, StatusLineHeight, StatusLineModeColor);
 
     // BandWidth
     tft.setTextColor(StatusLineBandWidthColor, TFT_BLACK);
@@ -254,12 +254,12 @@ void DisplayBase::dawStatusLine() {
     } else {
         tft.drawString("F" + bwText + "KHz", StatusLineBandWidthX, 15);
     }
-    tft.drawRect(110, 2, 49, ButtonHeight, StatusLineBandWidthColor);
+    tft.drawRect(110, 2, 49, StatusLineHeight, StatusLineBandWidthColor);
 
     // Band name
     tft.setTextColor(StatusLineBandColor, TFT_BLACK);
     tft.drawString(band.getCurrentBandName(), StatusLineBandNameX, 15);
-    tft.drawRect(160, 2, ButtonWidth, ButtonHeight, StatusLineBandColor);
+    tft.drawRect(160, 2, StatusLineRectWidth, StatusLineHeight, StatusLineBandColor);
 
     // Frequency step
     drawStepStatus();
@@ -1040,8 +1040,12 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
     // Az ős loop hívása a squelch kezelésére
     Si4735Utils::loop();
 
-    // Szenzor adatok frissítése
-    updateSensorReadings();
+    // Csak rádió módban (AM/FM) mérjük a szenzorokat
+    DisplayType displayType = this->getDisplayType();
+    if (displayType == DisplayBase::DisplayType::fm || displayType == DisplayBase::DisplayType::am) {
+        // Szenzor adatok frissítése
+        updateSensorReadings();
+    }
 
     // Touch adatok változói
     uint16_t tx, ty;

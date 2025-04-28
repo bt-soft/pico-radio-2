@@ -110,7 +110,12 @@ bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
     // A frekvencia kijelző kezeli a touch eseményeket SSB/CW módban
     if (currMod == LSB or currMod == USB or currMod == CW) {
-        return pSevenSegmentFreq->handleTouch(touched, tx, ty);
+        bool handled = pSevenSegmentFreq->handleTouch(touched, tx, ty);
+        if (handled) {
+            DisplayBase::drawStepStatus();  // Frissítjük a státusvonalban a kiírást
+        }
+
+        return handled;
     }
 
     return false;
