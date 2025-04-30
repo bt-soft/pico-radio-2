@@ -96,7 +96,9 @@ void ScreenSaverDisplay::displayLoop() {
         saverY = random(tft.height() / 2) + 5;
 
         // Frekvencia kijelzése
-        pSevenSegmentFreq->setPositions(saverX - 30, saverY);
+        uint8_t currentDemod = band.getCurrentBand().varData.currMod;
+        uint8_t xOffset = (currentDemod == FM or currentDemod == AM) ? 30 : 50;  // FM/AM esetén 30 pixel eltolás, SSB/CW esetén 50 pixel eltolás
+        pSevenSegmentFreq->setPositions(saverX - xOffset, saverY);
         pSevenSegmentFreq->freqDispl(currentFrequency);
 
         // Az animált keretet hozzá igazítjuk a frekvenciához
@@ -108,12 +110,7 @@ void ScreenSaverDisplay::displayLoop() {
             float vSupply = PicoSensorUtils::readVBus();
 
             uint8_t bat = map(int(vSupply * 100), MIN_BATTERRY_VOLTAGE, MAX_BATTERRY_VOLTAGE, 0, 100);
-            // csak 0-100% között lehet
-            if (bat < 0) {
-                bat = 0;
-            } else if (bat > 100) {
-                bat = 100;
-            }
+            bat = constrain(bat, 0, 100);  // Érték korlátozása 0% és 100% közé
 
             // Szín beállítása az alacsony feszültségekhez
             uint32_t colorBatt = TFT_DARKCYAN;
