@@ -57,4 +57,7 @@
 #define DEBUG(fmt, ...)  // Üres makró, ha __DEBUG nincs definiálva
 #endif
 
+#define MIN_BATTERRY_VOLTAGE 270  // Minimum akkumulátor feszültség (V*100)
+#define MAX_BATTERRY_VOLTAGE 405  // Maximum akkumulátor feszültség (V*100)
+
 #endif  // __DEFINES_H

@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include "PicoSensorUtils.h"
+
 #define SAVER_ANIMATION_STEPS 500          // Az animáció ciklusának hossza
 #define SAVER_ANIMATION_LINE_LENGTH 63     // A vonal hossza
 #define SAVER_LINE_CENTER 31               // A vonal közepe
@@ -94,30 +96,39 @@ void ScreenSaverDisplay::displayLoop() {
         saverY = random(tft.height() / 2) + 5;
 
         // Frekvencia kijelzése
-        pSevenSegmentFreq->setPositions(saverX, saverY);
+        pSevenSegmentFreq->setPositions(saverX - 30, saverY);
         pSevenSegmentFreq->freqDispl(currentFrequency);
 
         // Az animált keretet hozzá igazítjuk a frekvenciához
-        saverX += 35;
-        saverY += 20;
+        saverX += 35;  // A keret X pozíciója
+        saverY += 20;  // A keret Y pozíciója
 
-        // if (batShow) {
-        //     // float vsupply = 3.724 * analogRead(PIN_BAT_INFO) / 2047; // 3.3v
-        //     float vSupply = readBatterry();
-        //     int bat = map(int(vSupply * 100), 270, 405, 0, 100);
-        //     if (bat < 0) bat = 0;
-        //     if (bat > 100) bat = 100;
-        //     int colorBatt = TFT_DARKCYAN;
-        //     if (bat < 15) colorBatt = TFT_ORANGE;
-        //     if (bat < 5) colorBatt = 64528;
-        //     tft.drawRect(saverX + 145, saverY, 38, 18, colorBatt);
-        //     tft.drawRect(saverX + 184, saverY + 4, 2, 10, colorBatt);
-        //     tftRusSetFont(T1012_T);
-        //     tftRusSetSize(1);
-        //     tftRusSetColor(TFT_CYAN, TFT_TRANS);
-        //     tftRusSetDatum(BC_T);
-        //     tftRusSetStyle(NRG_T);
-        //     tftRusPrint(String(bat) + "%", saverX + 164, saverY + 15);
-        // }
+        if (true) {  // konfigból beállíthatóvá tenni, hogy mutassa-e a feszültséget
+
+            float vSupply = PicoSensorUtils::readVBus();
+
+            uint8_t bat = map(int(vSupply * 100), MIN_BATTERRY_VOLTAGE, MAX_BATTERRY_VOLTAGE, 0, 100);
+            // csak 0-100% között lehet
+            if (bat < 0) {
+                bat = 0;
+            } else if (bat > 100) {
+                bat = 100;
+            }
+
+            // Szín beállítása az alacsony feszültségekhez
+            uint32_t colorBatt = TFT_DARKCYAN;
+            if (bat < 5) {
+                colorBatt = TFT_COLOR(248, 252, 0);
+            } else if (bat < 15) {
+                colorBatt = TFT_ORANGE;
+            }
+
+            tft.drawRect(saverX + 145, saverY, 38, 18, colorBatt);
+            tft.drawRect(saverX + 184, saverY + 4, 2, 10, colorBatt);
+            tft.setFreeFont();
+            tft.setTextSize(1);
+            tft.setTextDatum(BC_DATUM);
+            tft.drawString(String(bat) + "%", saverX + 164, saverY + 13);
+        }
     }
 }

@@ -72,18 +72,31 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
     spr.setTextColor(colors.active);
     spr.drawString(freq, x, FREQ_7SEGMENT_HEIGHT);
 
+    // Megjelenítés
     spr.pushSprite(freqDispX + d, freqDispY + 20);
-    spr.setFreeFont();
     spr.deleteSprite();
 
-    // Mértékegység kirajzolása
+    // kHz/MHz mértékegység kirajzolása
     if (unit != nullptr) {
-        tft.setTextDatum(BC_DATUM);
-        tft.setFreeFont();
+        // Betűtípus és méret beállítása a méretek lekérdezése előtt
+        tft.setFreeFont(); // Standard font használata a mértékegységhez
         tft.setTextSize(2);
+        uint8_t fontHeight = tft.fontHeight(); // Betűmagasság lekérdezése a pozicionáláshoz/törléshez
+        uint16_t unitWidth = tft.textWidth(unit); // Mértékegység szélességének lekérdezése a törléshez
+
+        // Szöveg tulajdonságainak beállítása a rajzoláshoz
+        tft.setTextDatum(BL_DATUM); // Bottom-Left (bal alsó) igazítás használata a számjegyek utáni pozicionáláshoz
         tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-        uint16_t xOffset = screenSaverActive ? 205 : 215;
-        tft.drawString(unit, freqDispX + xOffset + d, freqDispY + 60);
+
+        // X pozíció kiszámítása a frekvencia számjegyek jobb széléhez képest
+        uint16_t unitX = freqDispX + d + x + 5; // Pozicionáljuk a mértékegységet 5 pixellel a számjegyek jobb széle után
+
+        // Y pozíció kiszámítása, hogy az alapvonal a számjegyek alapvonalához igazodjon
+        uint16_t unitY = freqDispY + 20 + FREQ_7SEGMENT_HEIGHT; // Igazítás a számjegyek alapvonalához
+
+        // Terület törlése és a mértékegység kiírása
+        tft.fillRect(unitX, unitY - fontHeight, unitWidth + 2, fontHeight + 2, TFT_COLOR_BACKGROUND); // Terület törlése
+        tft.drawString(unit, unitX, unitY);
     }
 }
 
@@ -317,12 +330,12 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             mask = F("188.88");                   // FM maszk
 
             // FM esetén kicsit balrább toljuk a kijelzést (d-10)
-            // Itt a drawFrequency rajzolja a mértékegységet a régi helyre (freqDispY + 60)
             drawFrequency(freqStr, mask, d - 10, colors, unit);
 
         } else {  // AM, LW, MW módok
-            unit = F("kHz");
+
             // AM/LW/MW esetén a frekvencia kHz-ben van tárolva
+            unit = F("kHz");
             displayFreqHz = currentFrequency;
             freqStr = String(displayFreqHz);  // Nincs tizedesjegy
 
@@ -337,7 +350,6 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
                 freqStr = String(displayFreqMHz, 3);
                 mask = F("88.888");
             }
-            // Itt a drawFrequency rajzolja a mértékegységet a régi helyre (freqDispY + 60)
             drawFrequency(freqStr, mask, d, colors, unit);
         }
     }
