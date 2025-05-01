@@ -1013,11 +1013,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
 
         processed = true;
 
-    } else if (STREQ("Scan", event.label)) {
-        // Képernyő váltás !!!
-        ::newDisplay = DisplayBase::DisplayType::freqScan;
-        processed = true;
-
     } else if (STREQ("BFO", event.label)) {
 
         // Csak SSB/CW módban engedélyezzük
@@ -1038,6 +1033,11 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         } else {
             Utils::beepError();  // Hiba hangjelzés, ha nem támogatott módban nyomják meg
         }
+
+    } else if (STREQ("Scan", event.label)) {
+        // Képernyő váltás !!!
+        ::newDisplay = DisplayBase::DisplayType::freqScan;
+        processed = true;
     }
 
     return processed;
