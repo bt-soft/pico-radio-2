@@ -7,8 +7,8 @@
 #define FREQ_7SEGMENT_SEEK_WIDTH 194  // Seek alatt a kijelző szélessége
 
 namespace SevenSegmentConstants {
-constexpr int DigitXStart[] = {141, 171, 200};     // Digit X koordináták kezdőértékei
-constexpr int DigitWidth = 30;                     // Egy digit szélessége
+constexpr int DigitXStart[] = {141, 171, 200};     // Digit X koordináták kezdőértékei az aláhúzáshoz
+constexpr int DigitWidth = 25;                     // Egy digit szélessége az aláhúzáshoz
 constexpr int DigitHeight = FREQ_7SEGMENT_HEIGHT;  // Digit magassága
 constexpr int DigitYStart = 20;                    // Digit Y kezdőértéke
 constexpr int UnderlineYOffset = 60;               // Aláhúzás Y eltolása
@@ -29,9 +29,9 @@ const SegmentColors bfoColors = {TFT_ORANGE, TFT_BROWN, TFT_ORANGE};
  * @param colors A szegmensek színei.
  * @param unit A mértékegység.
  */
-void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, uint16_t d, const SegmentColors& colors, const __FlashStringHelper* unit) {
+void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, int16_t d, const SegmentColors& colors, const __FlashStringHelper* unit) {
 
-    DEBUG("SevenSegmentFreq::drawFrequency ->freqStr: %s,  mask: %s, d: %d\n", freq.c_str(), mask, d);
+    DEBUG("SevenSegmentFreq::drawFrequency() -> freqStr: %s,  mask: %s, d: %d\n", freq.c_str(), mask, d);
 
     // uint16_t spriteWidth = rtv::bfoOn ? FREQ_7SEGMENT_BFO_WIDTH : tft.width() / 2;
     uint16_t spriteWidth = tft.width() / 2;
@@ -261,7 +261,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             tft.setTextDatum(BR_DATUM);
             tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
 
-            // Animáció BFO be/ki kapcsolásakor
+            // Animáció a BFO be/ki kapcsolásakor
             if (rtv::bfoTr) {
                 rtv::bfoTr = false;  // Animációs flag törlése
 
@@ -274,9 +274,9 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
                     tft.fillRect(freqDispX + d, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + 20, TFT_COLOR_BACKGROUND);  // Teljes terület törlése
 
                     // Új méretű frekvencia kirajzolása
-                    constexpr uint16_t X_OFFSET = 230;                                          // X pozíció eltolás
-                    constexpr uint16_t Y_OFFSET = 62;                                           // Y pozíció eltolás
-                    tft.drawString(String(s), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);  // Pozíciót ellenőrizni!
+                    constexpr uint16_t X_OFFSET = 230;  // X pozíció eltolás
+                    constexpr uint16_t Y_OFFSET = 62;   // Y pozíció eltolás
+                    tft.drawString(String(s), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);
                     delay(100);
                 }
             }
@@ -300,23 +300,33 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             drawStepUnderline(d, colors);  // Aláhúzás kirajzolása a lépésköz jelzésére
         }
 
-        // Ha a BFO be van kapcsolva, kirajzoljuk a BFO értéket (ScreenSave módban nem)
+        // Ha a BFO be van kapcsolva, kirajzoljuk a BFO értéket (ScreenSaver módban nem)
         if (rtv::bfoOn) {
+
+            // 0. Nagyobb terület törlése a BFO és a fő frekvencia kiírása előtt
+            // Lefedjük a 7-szegmenses BFO helyét és a kisebb fő frekvencia helyét is.
+            uint16_t clearX = freqDispX + d;
+            uint16_t clearY = freqDispY + 20;  // A 7-szegmenses Y kezdete
+            uint16_t clearW = 250;             // Szélesség, ami lefedi mindkét frekvencia helyét (kb. a nem-BFO mód szélessége + margó)
+            uint16_t clearH = 62;              // Magasság: Y_OFFSET a kisebb frekvenciához + kb. font magasság (size 2)
+            tft.fillRect(clearX, clearY, clearW, clearH, TFT_COLOR_BACKGROUND);
+            // --- Törlés vége ---
 
             // 1. BFO érték kirajzolása a 7 szegmensesre
             drawBfo(config.data.currentBFOmanu, d, colors);
 
             // 2. A fő frekvencia kisebb méretben, a BFO mellett/alatt
+            tft.setTextSize(2);  // Kisebb méret
             tft.setTextDatum(BR_DATUM);
             tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-            tft.setTextSize(2);  // Kisebb méret
+            uint16_t xOffset = 220;            // X pozíció eltolás
+            constexpr uint16_t Y_OFFSET = 62;  // Y pozíció eltolás
+            tft.drawString(String(s), freqDispX + xOffset + d, freqDispY + Y_OFFSET);
 
-            // A formázott string (s) kiírása a megfelelő helyre
-            constexpr uint16_t X_OFFSET = 230;                                          // X pozíció eltolás
-            constexpr uint16_t Y_OFFSET = 62;                                           // Y pozíció eltolás
-            tft.drawString(String(s), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);  // Pozíciót ellenőrizni!
-
-            // Itt nem rajzolunk "kHz"-t, mert a BFO érték mellett van a "Hz"
+            // 3. A "kHz" felirat
+            tft.setTextSize(1);  // Még kisebb méret
+            xOffset = 242;       // X pozíció eltolás
+            tft.drawString("kHz", freqDispX + xOffset + d, freqDispY + Y_OFFSET);
         }
 
         tft.setTextDatum(BC_DATUM);  // Alapértelmezett szöveg igazítás visszaállítása

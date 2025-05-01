@@ -39,7 +39,7 @@ class SevenSegmentFreq {
      * @param colors A szegmensek színei.
      * @param unit A mértékegység.
      */
-    void drawFrequency(const String& freq, const __FlashStringHelper* mask, uint16_t d, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
+    void drawFrequency(const String& freq, const __FlashStringHelper* mask, int16_t d, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
 
     /**
      * @brief Kirajzolja a BFO frekvenciát.
