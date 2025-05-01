@@ -58,14 +58,6 @@ void DisplayBase::drawBfoStatus(bool initFont) {
         tft.setTextDatum(BC_DATUM);
     }
 
-    uint8_t currMod = band.getCurrentBand().varData.currMod;
-
-    uint16_t color = TFT_SILVER;
-    if ((currMod == LSB || currMod == USB || currMod == CW) && config.data.currentBFOmanu != 0) {
-        color = BfoStepColor;
-    }
-    tft.setTextColor(color, TFT_BLACK);
-
     // BFO státusz szöveg előállítás
     char bfoText[10];  // Buffer a szövegnek (pl. "25Hz" vagy " BFO ")
     if (rtv::bfoOn) {
@@ -75,6 +67,9 @@ void DisplayBase::drawBfoStatus(bool initFont) {
         // Másoljuk a flash memóriában tárolt stringet a bufferbe
         strcpy_P(bfoText, PSTR(" BFO "));
     }
+
+    uint16_t color = rtv::bfoOn ? BfoStepColor : TFT_SILVER;
+    tft.setTextColor(color, TFT_BLACK);
     tft.drawString(bfoText, StatusLineBfoX, 15);
     tft.drawRect(0, 2, StatusLineRectWidth, StatusLineHeight, color);
 }
@@ -812,7 +807,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             // CW shift/BFO nullázás
             currentBand.varData.lastmanuBFO = 0;
             if (currentBand.varData.currMod == CW) {
-                currentBand.varData.lastBFO = 0;  
+                currentBand.varData.lastBFO = 0;
                 config.data.currentBFO = currentBand.varData.lastBFO;
                 rtv::CWShift = false;  // CWShift állapot visszaállítása
             }
@@ -888,7 +883,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
 
                 // // Ha CW módra váltunk, akkor nullázzuk a finomhangolási BFO-t
                 if (newMod != CW and rtv::CWShift == true) {
-                    currentBand.varData.lastBFO = 0; 
+                    currentBand.varData.lastBFO = 0;
                     config.data.currentBFO = currentBand.varData.lastBFO;
                     rtv::CWShift = false;
                 }

@@ -221,6 +221,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
     uint8_t currentBandType = band.getCurrentBandType();
 
     int d = 0;  // X eltolás, alapértelmezetten 0
+
     // Megfelelő színek kiválasztása az aktuális mód alapján (normál, BFO, képernyővédő)
     const SegmentColors& colors = rtv::bfoOn ? bfoColors : (screenSaverActive ? screenSaverColors : normalColors);
 
@@ -256,7 +257,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
         sprintf(s, "%ld.%02d", khz_part, hz_tens_part);
 
         // --- BFO kijelzés kezelése ---
-        if (!rtv::bfoOn || rtv::bfoTr) {
+        if (!rtv::bfoOn or rtv::bfoTr) {
             tft.setFreeFont();  // Font beállítása
             tft.setTextDatum(BR_DATUM);
             tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
@@ -283,7 +284,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
             // Ha a BFO nincs bekapcsolva, kirajzoljuk a normál frekvenciát
             if (!rtv::bfoOn) {
-                // A  "88 888.88" maszk szerinti frekvencia kijelzés, mértékegység nem kell, azt külön rajzoljuk ki
+                // A "88 888.88" maszk szerinti frekvencia kijelzés, mértékegység nem kell, azt külön rajzoljuk ki
                 drawFrequency(String(s), F("88 888.88"), d, colors, nullptr);
 
                 // A "kHz" felirat külön kirajzolása
@@ -300,7 +301,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             drawStepUnderline(d, colors);  // Aláhúzás kirajzolása a lépésköz jelzésére
         }
 
-        // Ha a BFO be van kapcsolva, kirajzoljuk a BFO értéket is
+        // Ha a BFO be van kapcsolva, kirajzoljuk a BFO értéket (ScreenSave módban nem)
         if (rtv::bfoOn) {
 
             // 1. BFO érték kirajzolása a 7 szegmensesre
@@ -330,11 +331,11 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
         // FM mód
         if (currDemod == FM) {
             unit = F("MHz");
+            mask = F("188.88");  // FM maszk
 
             // Az FM frekvencia 10kHz-es lépésekben van tárolva (pl. 9390 -> 93.90 MHz)
             float displayFreqMHz = currentFrequency / 100.0f;
             freqStr = String(displayFreqMHz, 2);  // Két tizedesjegy pontossággal
-            mask = F("188.88");                   // FM maszk
 
             // FM esetén kicsit balrább toljuk a kijelzést (d-10)
             drawFrequency(freqStr, mask, d - 10, colors, unit);
@@ -353,9 +354,12 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             } else {  // SW (rövidhullám)
                 // SW esetén MHz-ben, 3 tizedessel jelenítjük meg
                 unit = F("MHz");
+                mask = F("88.888");
+
                 float displayFreqMHz = currentFrequency / 1000.0f;
                 freqStr = String(displayFreqMHz, 3);
-                mask = F("88.888");
+
+                DEBUG("SevenSegmentFreq::freqDispl -> displayFreqMHz: %f, freqStr: %s\n", displayFreqMHz, freqStr.c_str());
             }
             drawFrequency(freqStr, mask, d, colors, unit);
         }
