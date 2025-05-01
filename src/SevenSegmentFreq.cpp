@@ -29,9 +29,12 @@ const SegmentColors bfoColors = {TFT_ORANGE, TFT_BROWN, TFT_ORANGE};
  * @param colors A szegmensek színei.
  * @param unit A mértékegység.
  */
-void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, int d, const SegmentColors& colors, const __FlashStringHelper* unit) {
+void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, uint16_t d, const SegmentColors& colors, const __FlashStringHelper* unit) {
 
-    uint16_t spriteWidth = rtv::bfoOn ? FREQ_7SEGMENT_BFO_WIDTH : tft.width() / 2;
+    DEBUG("SevenSegmentFreq::drawFrequency ->freqStr: %s,  mask: %s, d: %d\n", freq.c_str(), mask, d);
+
+    // uint16_t spriteWidth = rtv::bfoOn ? FREQ_7SEGMENT_BFO_WIDTH : tft.width() / 2;
+    uint16_t spriteWidth = tft.width() / 2;
 
     if (rtv::SEEK) {
         spriteWidth = FREQ_7SEGMENT_SEEK_WIDTH;
@@ -49,10 +52,6 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
     int x = 222;
     if (rtv::bfoOn) {
         x = 110;
-        spr.setTextColor(TFT_BROWN);
-        spr.drawString(mask, x, 38);
-        spr.setTextColor(TFT_ORANGE);
-        spr.drawString(freq, x, 38);
     } else if (currentDemod == FM or currentDemod == AM) {
         x = 190;
     } else if (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) {
@@ -109,7 +108,7 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
  * @param d Az X pozíció eltolása.
  * @param colors A színek.
  */
-void SevenSegmentFreq::drawBfo(int bfoValue, int d, const SegmentColors& colors) {
+void SevenSegmentFreq::drawBfo(int16_t bfoValue, uint16_t d, const SegmentColors& colors) {
 
     drawFrequency(String(bfoValue), F("-888"), d, colors);  // BFO érték rajzolása a 7 szegmensesre
 
@@ -132,7 +131,7 @@ void SevenSegmentFreq::drawBfo(int bfoValue, int d, const SegmentColors& colors)
  * @param d Az X pozíció eltolása.
  * @param colors A színek.
  */
-void SevenSegmentFreq::drawStepUnderline(int d, const SegmentColors& colors) {
+void SevenSegmentFreq::drawStepUnderline(uint16_t d, const SegmentColors& colors) {
 
     // Ha nem nincs touch, akkor aláhúzás sem kell
     if (isDisableHandleTouch()) {
@@ -358,8 +357,6 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
                 float displayFreqMHz = currentFrequency / 1000.0f;
                 freqStr = String(displayFreqMHz, 3);
-
-                DEBUG("SevenSegmentFreq::freqDispl -> displayFreqMHz: %f, freqStr: %s\n", displayFreqMHz, freqStr.c_str());
             }
             drawFrequency(freqStr, mask, d, colors, unit);
         }

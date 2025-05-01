@@ -39,7 +39,7 @@ class SevenSegmentFreq {
      * @param colors A szegmensek színei.
      * @param unit A mértékegység.
      */
-    void drawFrequency(const String& freq, const __FlashStringHelper* mask, int d, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
+    void drawFrequency(const String& freq, const __FlashStringHelper* mask, uint16_t d, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
 
     /**
      * @brief Kirajzolja a BFO frekvenciát.
@@ -48,7 +48,7 @@ class SevenSegmentFreq {
      * @param d Az X pozíció eltolása.
      * @param colors A színek.
      */
-    void drawBfo(int bfoValue, int d, const SegmentColors& colors);
+    void drawBfo(int16_t bfoValue, uint16_t d, const SegmentColors& colors);
 
     /**
      * @brief Kirajzolja a frekvencia lépésének jelzésére az aláhúzást.
@@ -56,7 +56,7 @@ class SevenSegmentFreq {
      * @param d Az X pozíció eltolása.
      * @param colors A színek.
      */
-    void drawStepUnderline(int d, const SegmentColors& colors);
+    void drawStepUnderline(uint16_t d, const SegmentColors& colors);
 
     /**
      * @brief Ellenőrzi, hogy a touch események kezelése szükséges-e.
