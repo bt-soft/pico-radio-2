@@ -29,6 +29,16 @@ FreqScanDisplay::FreqScanDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : Di
     // A kötelező gombokat (pl. Scan) a Base osztály kezeli, itt nem kellenek.
     buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), false);
 
+    // "Back" gomb megkeresése és jobbra igazítása
+    TftButton* backButton = findButtonByLabel("Back");
+    if (backButton != nullptr) {
+        // Új X pozíció kiszámítása (jobbra igazítva)
+        uint16_t backButtonX = tft.width() - SCREEN_HBTNS_X_START - SCRN_BTN_W; // Jobb szélhez igazítva
+        // Y pozíció lekérdezése (az automatikus elrendezés már beállította)
+        uint16_t backButtonY = getAutoButtonPosition(ButtonOrientation::Horizontal, ARRAY_ITEM_COUNT(horizontalButtonsData) - 1, false); // Y pozíció lekérése az utolsó elemhez
+        backButton->setPosition(backButtonX, backButtonY);
+    }
+
     // Vertikális gombok (a Base osztályból jönnek a kötelezőek)
     buildVerticalScreenButtons(nullptr, 0, false);  // Nincs egyedi vertikális gombunk, nem kellenek a defaultak sem
 }

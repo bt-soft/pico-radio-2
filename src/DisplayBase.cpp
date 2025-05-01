@@ -648,9 +648,8 @@ void DisplayBase::updateButtonStatus() {
     // A "Step" gomb SSB/CW módban csak akkor engedélyezett, ha a BFO be van kapcsolva
     TftButton *btnStep = findButtonByLabel("Step");
     if (btnStep != nullptr) {
-        // A gomb csak akkor engedélyezett, ha a BFO be van kapcsolva ÉS a mód LSB/USB/CW.
-        // Minden más esetben le van tiltva.
-        bool stepDisabled = !(rtv::bfoOn and (currMod == LSB or currMod == USB or currMod == CW));
+        // A "Step" gomb mindig engedélyezett, KIVÉVE ha LSB/USB/CW módban vagyunk ÉS a BFO ki van kapcsolva.
+        bool stepDisabled = ((currMod == LSB || currMod == USB || currMod == CW) && !rtv::bfoOn);
         btnStep->setState(stepDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
     }
 }
@@ -895,7 +894,8 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                 band.bandSet(false);
 
                 // Státuszsor frissítése az új mód kijelzéséhez
-                dawStatusLine();  // Frissíteni kell a státuszsort!
+                dawStatusLine();       // Frissíteni kell a státuszsort!
+                updateButtonStatus();  // <<<--- Gombok állapotának frissítése módváltás után
             },
             band.getCurrentBandModeDesc());
         processed = true;
@@ -1036,8 +1036,9 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             // Step gomb tiltása/engedélyezése BFO módban
             TftButton *btnStep = findButtonByLabel("Step");
             if (btnStep != nullptr) {
-                // Engedélyezve (Off), ha BFO be van kapcsolva, egyébként tiltva (Disabled)
-                btnStep->setState(rtv::bfoOn ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled);
+                // ÚJ LOGIKA: A gomb csak akkor tiltott, ha LSB/USB/CW módban vagyunk ÉS a BFO ki van kapcsolva.
+                // Mivel itt LSB/USB/CW módban vagyunk, a tiltás csak akkor érvényes, ha !rtv::bfoOn.
+                btnStep->setState(!rtv::bfoOn ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
             }
             drawBfoStatus(true);      // BFO állapotának frissítése a státuszsoron
             frequencyChanged = true;  // Kijelző frissítés kérése
