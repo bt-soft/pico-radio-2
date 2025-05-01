@@ -812,7 +812,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             // CW shift/BFO nullázás
             currentBand.varData.lastmanuBFO = 0;
             if (currentBand.varData.currMod == CW) {
-                currentBand.varData.lastBFO = 0;  // CW_SHIFT_FREQUENCY;
+                currentBand.varData.lastBFO = 0;  
                 config.data.currentBFO = currentBand.varData.lastBFO;
                 rtv::CWShift = false;  // CWShift állapot visszaállítása
             }
@@ -888,7 +888,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
 
                 // // Ha CW módra váltunk, akkor nullázzuk a finomhangolási BFO-t
                 if (newMod != CW and rtv::CWShift == true) {
-                    currentBand.varData.lastBFO = 0;  // CW_SHIFT_FREQUENCY;
+                    currentBand.varData.lastBFO = 0; 
                     config.data.currentBFO = currentBand.varData.lastBFO;
                     rtv::CWShift = false;
                 }

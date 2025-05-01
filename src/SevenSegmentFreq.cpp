@@ -235,7 +235,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
     uint32_t displayFreqHz = 0;  // A megjelenítendő frekvencia Hz-ben
 
     // Ha nem ScreenSaver módban vagyunk és SSB vagy CW az üzemmód
-    if (!screenSaverActive && (currDemod == LSB || currDemod == USB || currDemod == CW)) {
+    if (!screenSaverActive and (currDemod == LSB or currDemod == USB or currDemod == CW)) {
 
         // Kiszámítjuk a pontos frekvenciát Hz-ben a BFO eltolással
         uint32_t bfoOffset = simpleMode ? 0 : currentBand.varData.lastBFO;  // BFO eltolás
@@ -323,8 +323,8 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
     } else {  // Nem SSB/CW mód (FM, AM, LW, MW)
 
-        const __FlashStringHelper* unit = nullptr;  // Mértékegység pointere
         String freqStr;                             // Formázott frekvencia string
+        const __FlashStringHelper* unit = nullptr;  // Mértékegység pointere
         const __FlashStringHelper* mask = nullptr;  // Kijelző maszk
 
         // FM mód

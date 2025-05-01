@@ -5,9 +5,6 @@
 
 //---- Pinouts ------------------------------------------
 // TFT (A TFT_eSPI_User_Setup.h-ban a pinout)
-// TFT háttérvilágítás max érték
-#define TFT_BACKGROUND_LED_MAX_BRIGHTNESS 255
-#define TFT_BACKGROUND_LED_MIN_BRIGHTNESS 5
 
 // I2C si4735
 #define PIN_SI4735_I2C_SDA 8
@@ -24,6 +21,17 @@
 #define PIN_AUDIO_MUTE 20
 #define PIN_BEEPER 22
 //---- Pinouts ------------------------------------------
+
+// TFT háttérvilágítás max érték
+#define TFT_BACKGROUND_LED_MAX_BRIGHTNESS 255
+#define TFT_BACKGROUND_LED_MIN_BRIGHTNESS 5
+
+//--- Batterry ---
+#define MIN_BATTERRY_VOLTAGE 270  // Minimum akkumulátor feszültség (V*100)
+#define MAX_BATTERRY_VOLTAGE 405  // Maximum akkumulátor feszültség (V*100)
+
+//--- ScreenSaver
+#define SCREEN_SAVER_TIME 1000 * 60 * 1  // 10 perc a képernyővédő időzítése
 
 //--- Debug ---
 #define __DEBUG  // Debug mód bekapcsolása
@@ -56,8 +64,5 @@
 #else
 #define DEBUG(fmt, ...)  // Üres makró, ha __DEBUG nincs definiálva
 #endif
-
-#define MIN_BATTERRY_VOLTAGE 270  // Minimum akkumulátor feszültség (V*100)
-#define MAX_BATTERRY_VOLTAGE 405  // Maximum akkumulátor feszültség (V*100)
 
 #endif  // __DEFINES_H

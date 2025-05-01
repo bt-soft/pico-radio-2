@@ -503,7 +503,7 @@ void Band::tuneMemoryStation(uint16_t frequency, int16_t bfoOffset, uint8_t band
     // 2. Demodulátor beállítása a chipen.  Ha CW módra váltunk, akkor nullázzuk a finomhangolási BFO-t
     uint8_t savedMod = demodModIndex;  // A demodulációs mód kiemelése
     if (savedMod != CW and rtv::CWShift == true) {
-        currentBand.varData.lastBFO = 0;  // CW_SHIFT_FREQUENCY;
+        currentBand.varData.lastBFO = 0;  
         config.data.currentBFO = currentBand.varData.lastBFO;
         rtv::CWShift = false;
     }

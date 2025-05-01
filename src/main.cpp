@@ -6,7 +6,6 @@
 #include "utils.h"
 
 //------------------ TFT
-#define SCREEN_SAVER_TIME 1000 * 60 * 1  // 10 perc a képernyővédő időzítése
 #include <TFT_eSPI.h>                    // TFT_eSPI könyvtár
 TFT_eSPI tft;                            // TFT objektum
 
