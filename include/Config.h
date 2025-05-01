@@ -29,8 +29,8 @@ struct Config_t {
 
     // BFO
     int currentBFO;
-    uint8_t currentBFOStep;
-    int currentBFOmanu;
+    uint8_t currentBFOStep;  // BFO lépésköz (pl. 1, 10, 25 Hz)
+    int currentBFOmanu;      // Manuális BFO eltolás (pl. -999 ... +999 Hz)
 
     // Squelch
     uint8_t currentSquelch;

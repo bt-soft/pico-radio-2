@@ -25,12 +25,12 @@ const Config_t DEFAULT_CONFIG = {
     .ssIdxFM = 1,  // Band::stepSizeFM[] index szerint -> 100kHz
 
     // BFO
-    .currentBFO = 0,
-    .currentBFOStep = 25,
-    .currentBFOmanu = 0,
+    .currentBFO = 0, 
+    .currentBFOStep = 25,  // BFO lépésköz (pl. 1, 10, 25 Hz)
+    .currentBFOmanu = 0,   // Manuális BFO eltolás (pl. -999 ... +999 Hz)
 
     // Squelch
-    .currentSquelch = 0,
+    .currentSquelch = 0, // Squelch szint (0...50)
     .squelchUsesRSSI = true,  // A squlech RSSI alapú legyen?
 
     // FM RDS

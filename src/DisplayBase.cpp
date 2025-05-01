@@ -235,7 +235,7 @@ void DisplayBase::dawStatusLine() {
     tft.setTextDatum(BC_DATUM);
 
     // BFO Step
-    drawBfoStatus();
+    drawBfoStatus(); // Ez már létezik, csak biztosítjuk, hogy hívva legyen
 
     // AGC Status
     drawAgcAttStatus();
@@ -568,6 +568,7 @@ void DisplayBase::buildHorizontalScreenButtons(BuildButtonData screenHButtonsDat
         {"Band", TftButton::ButtonType::Pushable},   //
         {"DeMod", TftButton::ButtonType::Pushable},  //
         {"BndW", TftButton::ButtonType::Pushable},   //
+        {"BFO", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off}, // BFO gomb hozzáadása
         {"Step", TftButton::ButtonType::Pushable},   //
         {"Scan", TftButton::ButtonType::Pushable},   //
     };
@@ -631,6 +632,13 @@ void DisplayBase::updateButtonStatus() {
         // FM módban a BandWidth gomb tiltva van
         bool bndwDisabled = (currMod == FM);
         btnBndW->setState(bndwDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
+    }
+
+    // BFO gomb állapotának frissítése
+    TftButton *btnBfo = findButtonByLabel("BFO");
+    if (btnBfo != nullptr) {
+        bool bfoDisabled = !(currMod == LSB || currMod == USB || currMod == CW); // Csak SSB/CW módban engedélyezett
+        btnBfo->setState(bfoDisabled ? TftButton::ButtonState::Disabled : (rtv::bfoOn ? TftButton::ButtonState::On : TftButton::ButtonState::Off));
     }
 }
 
@@ -976,6 +984,24 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         // Képernyő váltás !!!
         ::newDisplay = DisplayBase::DisplayType::freqScan;
         processed = true;
+    }
+    else if (STREQ("BFO", event.label)) {
+        // Csak SSB/CW módban engedélyezzük
+        uint8_t currMod = band.getCurrentBand().varData.currMod;
+        if (currMod == LSB || currMod == USB || currMod == CW) {
+            rtv::bfoOn = event.state == TftButton::ButtonState::On; // Állapot beállítása a gomb állapota alapján
+            rtv::bfoTr = true; // Animáció indítása
+
+            // Step gomb tiltása/engedélyezése BFO módban
+            TftButton *btnStep = findButtonByLabel("Step");
+            if (btnStep != nullptr) {
+                 btnStep->setState(rtv::bfoOn ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
+            }
+            frequencyChanged = true; // Kijelző frissítés kérése
+            processed = true;
+        } else {
+            Utils::beepError(); // Hiba hangjelzés, ha nem támogatott módban nyomják meg
+        }
     }
 
     return processed;

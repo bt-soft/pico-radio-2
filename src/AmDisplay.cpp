@@ -130,38 +130,55 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
     uint8_t currMod = currentBand.varData.currMod;
     uint16_t currentFrequency = si4735.getFrequency();
 
-    // SSB vagy CW módban a BFO-val finomhangolunk, de csak akkor ha a lépés nem 1000Hz, amit az si4735 amúgy is támogat
-    if (currMod == LSB or currMod == USB or currMod == CW) {
-
+    // --- ÚJ BFO Logika ---
+    if (rtv::bfoOn && (currMod == LSB || currMod == USB || currMod == CW)) {
+        // BFO módban a manuális BFO offsetet állítjuk
+        int16_t step = config.data.currentBFOStep; // BFO lépésköz a configból
         if (encoderState.direction == RotaryEncoder::Direction::Up) {
-
-            // Felfelé hangolásnál
-            rtv::freqDec = rtv::freqDec - rtv::freqstep;
-            uint32_t freqTot = (uint32_t)(currentFrequency * 1000) + (rtv::freqDec * -1);
-            if (freqTot > (uint32_t)(currentBand.pConstData->maximumFreq * 1000)) {
-                si4735.setFrequency(currentBand.pConstData->maximumFreq);
-                rtv::freqDec = 0;
-            }
-
-            if (rtv::freqDec <= -16000) {  // Felfelé átfordulás ága
-                rtv::freqDec = rtv::freqDec + 16000;
-                int16_t freqPlus16 = currentFrequency + 16;
-                Si4735Utils::hardwareAudioMuteOn();
-                si4735.setFrequency(freqPlus16);
-                delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától a kijelzett érték
-            }
-
+            config.data.currentBFOmanu += step;
         } else {
+            config.data.currentBFOmanu -= step;
+        }
+        // Korlátozás +/- 999 Hz között (vagy amilyen tartományt szeretnél)
+        config.data.currentBFOmanu = constrain(config.data.currentBFOmanu, -999, 999);
 
-            // Lefelé hangolásnál
-            rtv::freqDec = rtv::freqDec + rtv::freqstep;
-            uint32_t freqTot = (uint32_t)(currentFrequency * 1000) - rtv::freqDec;
-            if (freqTot < (uint32_t)(currentBand.pConstData->minimumFreq * 1000)) {
-                si4735.setFrequency(currentBand.pConstData->minimumFreq);
-                rtv::freqDec = 0;
+        // BFO beállítása a chipen (alap + manuális)
+        const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
+        int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
+        si4735.setSSBBfo(bfoToSet);
+
+        // Kijelző frissítés kérése (a BFO érték megjelenítéséhez)
+        DisplayBase::frequencyChanged = true;
+
+    } else if (currMod == LSB || currMod == USB || currMod == CW) {
+        // Normál SSB/CW hangolás (1kHz-es lépések a freqDec/currentBFO változóval)
+         if (encoderState.direction == RotaryEncoder::Direction::Up) {
+             // Felfelé hangolásnál
+             rtv::freqDec = rtv::freqDec - rtv::freqstep; // rtv::freqstep itt 1000, 100 vagy 10 lehet
+             uint32_t freqTot = (uint32_t)(currentFrequency * 1000) + (rtv::freqDec * -1);
+             if (freqTot > (uint32_t)(currentBand.pConstData->maximumFreq * 1000)) {
+                 si4735.setFrequency(currentBand.pConstData->maximumFreq);
+                 rtv::freqDec = 0;
+             }
+
+             if (rtv::freqDec <= -16000) {  // Felfelé átfordulás ága
+                 rtv::freqDec = rtv::freqDec + 16000;
+                 int16_t freqPlus16 = currentFrequency + 16;
+                 Si4735Utils::hardwareAudioMuteOn();
+                 si4735.setFrequency(freqPlus16);
+                 delay(10);
+             }
+
+         } else {
+             // Lefelé hangolásnál
+             rtv::freqDec = rtv::freqDec + rtv::freqstep;
+             uint32_t freqTot = (uint32_t)(currentFrequency * 1000) - rtv::freqDec;
+             if (freqTot < (uint32_t)(currentBand.pConstData->minimumFreq * 1000)) {
+                 si4735.setFrequency(currentBand.pConstData->minimumFreq);
+                 rtv::freqDec = 0;
             }
 
-            if (rtv::freqDec >= 16000) {  // Lefelé átfordulás ága
+             if (rtv::freqDec >= 16000) {  // Lefelé átfordulás ága
                 rtv::freqDec = rtv::freqDec - 16000;
                 int16_t freqMin16 = currentFrequency - 16;
                 Si4735Utils::hardwareAudioMuteOn();
@@ -169,12 +186,13 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                 delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától a kijelzett érték
             }
         }
-
-        config.data.currentBFO = rtv::freqDec;                 // freqDec a finomhangolás mértéke
-        currentBand.varData.lastBFO = config.data.currentBFO;  // Mentsük el a finomhangolást
+        // BFO beállítása a chipen (alap + manuális)
+        config.data.currentBFO = rtv::freqDec; // freqDec a durva hangolás mértéke
+        currentBand.varData.lastBFO = config.data.currentBFO; // Mentsük el a durva hangolást
         const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
         int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
         si4735.setSSBBfo(bfoToSet);
+
         checkAGC();
 
     } else {

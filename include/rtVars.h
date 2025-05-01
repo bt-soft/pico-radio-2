@@ -20,8 +20,10 @@ extern uint16_t freqstep;
 extern int16_t freqDec;
 
 // BFO
-extern bool bfoOn;
-extern bool bfoTr;
+extern bool bfoOn;      // BFO mód aktív?
+extern bool bfoTr;      // BFO kijelző animáció trigger
+// extern int16_t currentBFOmanu; // Ezt a configban tároljuk: config.data.currentBFOmanu
+// extern uint8_t currentBFOStep; // Ezt a configban tároljuk: config.data.currentBFOStep
 
 // Mute
 #define AUDIO_MUTE_ON true
