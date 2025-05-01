@@ -78,24 +78,26 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
 
     // kHz/MHz mértékegység kirajzolása
     if (unit != nullptr) {
+        // Explicit font és méret beállítás a tft-n a mértékegységhez
+        tft.setFreeFont();  // Standard font használata a mértékegységhez
         // Betűtípus és méret beállítása a méretek lekérdezése előtt
-        tft.setFreeFont(); // Standard font használata a mértékegységhez
+        tft.setFreeFont();  // Standard font használata a mértékegységhez
         tft.setTextSize(2);
-        uint8_t fontHeight = tft.fontHeight(); // Betűmagasság lekérdezése a pozicionáláshoz/törléshez
-        uint16_t unitWidth = tft.textWidth(unit); // Mértékegység szélességének lekérdezése a törléshez
+        uint8_t fontHeight = tft.fontHeight();     // Betűmagasság lekérdezése a pozicionáláshoz/törléshez
+        uint16_t unitWidth = tft.textWidth(unit);  // Mértékegység szélességének lekérdezése a törléshez
 
         // Szöveg tulajdonságainak beállítása a rajzoláshoz
-        tft.setTextDatum(BL_DATUM); // Bottom-Left (bal alsó) igazítás használata a számjegyek utáni pozicionáláshoz
+        tft.setTextDatum(BL_DATUM);  // Bottom-Left (bal alsó) igazítás használata a számjegyek utáni pozicionáláshoz
         tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
 
         // X pozíció kiszámítása a frekvencia számjegyek jobb széléhez képest
-        uint16_t unitX = freqDispX + d + x + 5; // Pozicionáljuk a mértékegységet 5 pixellel a számjegyek jobb széle után
+        uint16_t unitX = freqDispX + d + x + 5;  // Pozicionáljuk a mértékegységet 5 pixellel a számjegyek jobb széle után
 
         // Y pozíció kiszámítása, hogy az alapvonal a számjegyek alapvonalához igazodjon
-        uint16_t unitY = freqDispY + 20 + FREQ_7SEGMENT_HEIGHT; // Igazítás a számjegyek alapvonalához
+        uint16_t unitY = freqDispY + 20 + FREQ_7SEGMENT_HEIGHT;  // Igazítás a számjegyek alapvonalához
 
         // Terület törlése és a mértékegység kiírása
-        tft.fillRect(unitX, unitY - fontHeight, unitWidth + 2, fontHeight + 2, TFT_COLOR_BACKGROUND); // Terület törlése
+        tft.fillRect(unitX, unitY - fontHeight, unitWidth + 2, fontHeight + 2, TFT_COLOR_BACKGROUND);  // Terület törlése
         tft.drawString(unit, unitX, unitY);
     }
 }
@@ -109,11 +111,15 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
  */
 void SevenSegmentFreq::drawBfo(int bfoValue, int d, const SegmentColors& colors) {
 
-    drawFrequency(String(bfoValue), F("-888"), d, colors); // BFO érték rajzolása a 7 szegmensesre
+    drawFrequency(String(bfoValue), F("-888"), d, colors);  // BFO érték rajzolása a 7 szegmensesre
+
+    // Hz felirat kirajzolása
     tft.setTextSize(2);
     tft.setTextDatum(BL_DATUM);
     tft.setTextColor(colors.indicator, TFT_BLACK);
     tft.drawString("Hz", freqDispX + 120 + d, freqDispY + 40);
+
+    // BFO felirat kirajzolása
     tft.setTextColor(TFT_BLACK, colors.active);
     tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);
     tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);
@@ -128,8 +134,8 @@ void SevenSegmentFreq::drawBfo(int bfoValue, int d, const SegmentColors& colors)
  */
 void SevenSegmentFreq::drawStepUnderline(int d, const SegmentColors& colors) {
 
-    // Képernyővédő vagy egyszerű üzemmódban nincs aláhúzás a touch-hoz
-    if (screenSaverActive or simpleMode) {
+    // Ha nem nincs touch, akkor aláhúzás sem kell
+    if (isDisableHandleTouch()) {
         return;
     }
 
@@ -151,9 +157,9 @@ void SevenSegmentFreq::drawStepUnderline(int d, const SegmentColors& colors) {
  */
 bool SevenSegmentFreq::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
-    // Képernyővédő vagy egyszerű üzemmódban nincs touch a digiteken
-    if (screenSaverActive or simpleMode) {
-        return false;
+    // BFO, Képernyővédő vagy egyszerű üzemmódban nincs touch a digiteken
+    if (isDisableHandleTouch()) {
+        return false;  // Nem kezeltük az eseményt
     }
 
     using namespace SevenSegmentConstants;
@@ -251,6 +257,7 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
         // --- BFO kijelzés kezelése ---
         if (!rtv::bfoOn || rtv::bfoTr) {
+            tft.setFreeFont();  // Font beállítása
             tft.setTextDatum(BR_DATUM);
             tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
 
@@ -258,17 +265,17 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             if (rtv::bfoTr) {
                 rtv::bfoTr = false;  // Animációs flag törlése
 
-                // Méretváltás animációja (ez a rész opcionális, a régi kódból átvéve)
+                // Méretváltás animációja
                 for (uint8_t i = 4; i > 1; i--) {
 
                     tft.setTextSize(rtv::bfoOn ? i : (6 - i));  // Méret beállítása
 
                     // Régi frekvencia törlése az animációhoz
-                    tft.fillRect(freqDispX + d, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + 20, TFT_COLOR_BACKGROUND); // Teljes terület törlése
+                    tft.fillRect(freqDispX + d, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + 20, TFT_COLOR_BACKGROUND);  // Teljes terület törlése
 
                     // Új méretű frekvencia kirajzolása
-                    constexpr uint16_t X_OFFSET = 230; // X pozíció eltolás
-                    constexpr uint16_t Y_OFFSET = 62; // Y pozíció eltolás
+                    constexpr uint16_t X_OFFSET = 230;                                          // X pozíció eltolás
+                    constexpr uint16_t Y_OFFSET = 62;                                           // Y pozíció eltolás
                     tft.drawString(String(s), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);  // Pozíciót ellenőrizni!
                     delay(100);
                 }
@@ -276,18 +283,18 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
             // Ha a BFO nincs bekapcsolva, kirajzoljuk a normál frekvenciát
             if (!rtv::bfoOn) {
-                // A maszk ("88 888.88") megfelelőnek tűnik az új formátumhoz
-                drawFrequency(String(s), F("88 888.88"), d, colors, F("kHz")); // Mértékegységet is átadjuk
+                // A  "88 888.88" maszk szerinti frekvencia kijelzés, mértékegység nem kell, azt külön rajzoljuk ki
+                drawFrequency(String(s), F("88 888.88"), d, colors, nullptr);
 
-                // A "kHz" felirat kirajzolása külön
-                // tft.setTextDatum(BC_DATUM);
-                // tft.setFreeFont();   // Font beállítása (biztonság kedvéért)
-                // tft.setTextSize(2);  // Méret beállítása (biztonság kedvéért)
-                // tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
+                // A "kHz" felirat külön kirajzolása
+                tft.setTextDatum(BC_DATUM);
+                tft.setFreeFont();   // Font beállítása (biztonság kedvéért)
+                tft.setTextSize(2);  // Méret beállítása (biztonság kedvéért)
+                tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
                 //
-                // constexpr uint16_t X_OFFSET = 215;  // X pozíció eltolás (a digit szélessége + 5 pixel)
-                // constexpr uint16_t Y_OFFSET = 85;
-                // tft.drawString(F("kHz"), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);  // Y pozíció
+                constexpr uint16_t X_OFFSET = 215;  // X pozíció eltolás (a digit szélessége + 5 pixel)
+                constexpr uint16_t Y_OFFSET = 80;   // Y pozíció
+                tft.drawString(F("kHz"), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);
             }
 
             drawStepUnderline(d, colors);  // Aláhúzás kirajzolása a lépésköz jelzésére
@@ -302,11 +309,11 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             // 2. A fő frekvencia kisebb méretben, a BFO mellett/alatt
             tft.setTextDatum(BR_DATUM);
             tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-            tft.setTextSize(2); // Kisebb méret
+            tft.setTextSize(2);  // Kisebb méret
 
             // A formázott string (s) kiírása a megfelelő helyre
-            constexpr uint16_t X_OFFSET = 230; // X pozíció eltolás
-            constexpr uint16_t Y_OFFSET = 62; // Y pozíció eltolás
+            constexpr uint16_t X_OFFSET = 230;                                          // X pozíció eltolás
+            constexpr uint16_t Y_OFFSET = 62;                                           // Y pozíció eltolás
             tft.drawString(String(s), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);  // Pozíciót ellenőrizni!
 
             // Itt nem rajzolunk "kHz"-t, mert a BFO érték mellett van a "Hz"

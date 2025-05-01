@@ -58,6 +58,14 @@ class SevenSegmentFreq {
      */
     void drawStepUnderline(int d, const SegmentColors& colors);
 
+    /**
+     * @brief Ellenőrzi, hogy a touch események kezelése szükséges-e.
+     */
+    inline bool isDisableHandleTouch() {
+        // Ha van BFO, vagy Képernyővédő vagy egyszerű üzemmódban vagyunk, akkor nincs aláhúzás a touch-hoz
+        return screenSaverActive or simpleMode or rtv::bfoOn;
+    }
+
    public:
     /**
      *
