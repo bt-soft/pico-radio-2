@@ -130,32 +130,23 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
     uint8_t currMod = currentBand.varData.currMod;
     uint16_t currentFrequency = si4735.getFrequency();
 
-    if (currMod == LSB or currMod == USB or currMod == CW) {
+    bool isSsbCwMode = (currMod == LSB || currMod == USB || currMod == CW);
 
+    if (isSsbCwMode) {
         // Manuális BFO Logika
-        if (rtv::bfoOn) {
+        if (rtv::bfoOn) {  // --- BFO Finomhangolás ---
             // BFO módban a manuális BFO offsetet állítjuk
             int16_t step = config.data.currentBFOStep;  // BFO lépésköz a configból
-            if (encoderState.direction == RotaryEncoder::Direction::Up) {
-                config.data.currentBFOmanu += step;
-            } else {
-                config.data.currentBFOmanu -= step;
-            }
+
+            // Hozzáadás/kivonás a lépésközhöz az irány alapján
+            config.data.currentBFOmanu += (encoderState.direction == RotaryEncoder::Direction::Up) ? step : -step;
 
             // Korlátozás +/- 999 Hz között (vagy amilyen tartományt szeretnél)
             config.data.currentBFOmanu = constrain(config.data.currentBFOmanu, -999, 999);
 
-            // BFO beállítása a chipen (alap + manuális)
-            const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
-            int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
-            si4735.setSSBBfo(bfoToSet);
+            // Kijelző frissítés kérése (a BFO érték megjelenítéséhez) a végén van
 
-            // Kijelző frissítés kérése (a BFO érték megjelenítéséhez)
-            DisplayBase::frequencyChanged = true;
-
-        } else {
-
-            // Normál SSB/CW hangolás (1kHz-es lépések a freqDec/currentBFO változóval)
+        } else {  // --- Normál SSB/CW Durva Hangolás (BFO OFF) ---
             if (encoderState.direction == RotaryEncoder::Direction::Up) {
                 // Felfelé hangolásnál
                 rtv::freqDec = rtv::freqDec - rtv::freqstep;  // rtv::freqstep itt 1000, 100 vagy 10 lehet
@@ -190,15 +181,16 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                     delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától a kijelzett érték
                 }
             }
-            // BFO beállítása a chipen (alap + manuális)
             config.data.currentBFO = rtv::freqDec;                 // freqDec a durva hangolás mértéke
             currentBand.varData.lastBFO = config.data.currentBFO;  // Mentsük el a durva hangolást
-            const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
-            int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
-            si4735.setSSBBfo(bfoToSet);
-
-            checkAGC();
         }
+
+        // --- Közös BFO beállítás és AGC ellenőrzés SSB/CW módhoz ---
+        const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
+        int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
+        si4735.setSSBBfo(bfoToSet);
+        checkAGC();  // AGC ellenőrzése BFO beállítás után
+
     } else {
         // AM - sima frekvencia léptetés sávhatár ellenőrzéssel
         // Használjuk a rotary encoder gyorsítását (encoderState.value)
