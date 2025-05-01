@@ -41,15 +41,7 @@ class SevenSegmentFreq {
      */
     void drawFrequency(const String& freq, const __FlashStringHelper* mask, int16_t d, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
 
-    /**
-     * @brief Kirajzolja a BFO frekvenciát.
-     *
-     * @param bfoValue A BFO frekvencia értéke.
-     * @param d Az X pozíció eltolása.
-     * @param colors A színek.
-     */
-    void drawBfo(int16_t bfoValue, uint16_t d, const SegmentColors& colors);
-
+  
     /**
      * @brief Kirajzolja a frekvencia lépésének jelzésére az aláhúzást.
      *

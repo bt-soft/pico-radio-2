@@ -102,30 +102,6 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
 }
 
 /**
- * @brief Kirajzolja a BFO frekvenciát.
- *
- * @param bfoValue A BFO frekvencia értéke.
- * @param d Az X pozíció eltolása.
- * @param colors A színek.
- */
-void SevenSegmentFreq::drawBfo(int16_t bfoValue, uint16_t d, const SegmentColors& colors) {
-
-    drawFrequency(String(bfoValue), F("-888"), d, colors);  // BFO érték rajzolása a 7 szegmensesre
-
-    // Hz felirat kirajzolása
-    tft.setTextSize(2);
-    tft.setTextDatum(BL_DATUM);
-    tft.setTextColor(colors.indicator, TFT_BLACK);
-    tft.drawString("Hz", freqDispX + 120 + d, freqDispY + 40);
-
-    // BFO felirat kirajzolása
-    tft.setTextColor(TFT_BLACK, colors.active);
-    tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);
-    tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);
-    tft.setTextDatum(BR_DATUM);
-}
-
-/**
  * @brief Kirajzolja a frekvencia lépésének jelzésére az aláhúzást.
  *
  * @param d Az X pozíció eltolása.
@@ -313,7 +289,19 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
             // --- Törlés vége ---
 
             // 1. BFO érték kirajzolása a 7 szegmensesre
-            drawBfo(config.data.currentBFOmanu, d, colors);
+            drawFrequency(String(config.data.currentBFOmanu), F("-888"), d, colors);  // BFO érték rajzolása a 7 szegmensesre
+
+            // Hz felirat kirajzolása
+            tft.setTextSize(2);
+            tft.setTextDatum(BL_DATUM);
+            tft.setTextColor(colors.indicator, TFT_BLACK);
+            tft.drawString("Hz", freqDispX + 120 + d, freqDispY + 40);
+
+            // BFO felirat kirajzolása
+            tft.setTextColor(TFT_BLACK, colors.active);
+            tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);
+            tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);
+            tft.setTextDatum(BR_DATUM);
 
             // 2. A fő frekvencia kisebb méretben, a BFO mellett/alatt
             tft.setTextSize(2);  // Kisebb méret
