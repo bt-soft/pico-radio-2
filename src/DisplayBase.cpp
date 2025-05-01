@@ -978,7 +978,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
 
         // Az aktuális freki lépés felirata
         const char *currentStepStr = band.currentStepSizeStr();
-        DEBUG("currentStepStr: %s\n", currentStepStr);
 
         DisplayBase::pDialog = new MultiButtonDialog(
             this, DisplayBase::tft, w, h, title, labels, labelsCount,  //
