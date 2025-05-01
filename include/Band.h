@@ -90,6 +90,8 @@ class Band {
     static const FrequencyStep stepSizeAM[4];
     static const FrequencyStep stepSizeFM[3];
 
+    static const FrequencyStep stepSizeBFO[4];
+
     Band(SI4735 &si4735);
     virtual ~Band() = default;
 
@@ -248,6 +250,22 @@ class Band {
     }
 
     /**
+     * A lépésköz értékének lekérdezése az index alapján
+     * @param bandWidth A lépésköz tömbje
+     * @param index A keresett lépésköz indexe
+     * @return A lépésköz labelje, vagy nullptr, ha nem található
+     */
+    template <size_t N>
+    const uint16_t getStepSizeByIndex(const FrequencyStep (&stepSizeTable)[N], uint8_t index) {
+        // Ellenőrizzük, hogy az index érvényes-e a tömbhöz
+        if (index < N) {
+            return stepSizeTable[index].value;  // Közvetlenül visszaadjuk a labelt az index alapján
+        }
+
+        return 0;  // Ha az index érvénytelen
+    }
+
+    /**
      * A lépésköz labeljének lekérdezése az index alapján
      * @param bandWidth A lépésköz tömbje
      * @param index A keresett lépésköz indexe
@@ -267,15 +285,23 @@ class Band {
      */
     const char *currentStepSizeStr() {
 
-        static const char *currentStepStr = nullptr;
+        // Statikus buffer a formázott string tárolására
+        static char formattedStepStr[10];  // Elég nagynak kell lennie (pl. "100Hz" + '\0')
 
+        // BFO esetén az érték az érték :')
+        if (rtv::bfoOn) {
+            snprintf(formattedStepStr, sizeof(formattedStepStr), "%dHz", config.data.currentBFOStep);
+            return formattedStepStr;  // Visszaadjuk a buffer pointerét
+        }
+
+        const char *currentStepStr = nullptr;
         BandTable &currentBand = getCurrentBand();
-
         uint8_t currentBandType = currentBand.pConstData->bandType;  // Kikeressük az aktuális Band típust
+        
         if (currentBandType == FM_BAND_TYPE) {
             currentStepStr = getStepSizeLabelByIndex(Band::stepSizeFM, config.data.ssIdxFM);
 
-        } else {
+        } else {  // Nem FM
 
             // Ha SSB vagy CW, akkor a lépésköz a BFO-val van megoldva
             if (currentBand.varData.currMod == LSB or currentBand.varData.currMod == USB or currentBand.varData.currMod == CW) {
@@ -292,7 +318,7 @@ class Band {
                         break;
                 }
 
-            } else {
+            } else {  // AM/LW/MW
 
                 uint8_t index = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? config.data.ssIdxMW : config.data.ssIdxAM;
                 currentStepStr = getStepSizeLabelByIndex(Band::stepSizeAM, index);

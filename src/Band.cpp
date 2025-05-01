@@ -87,18 +87,26 @@ const BandWidth Band::bandWidthFM[] = {{"AUTO", 0}, {"110", 1}, {"84", 2}, {"60"
 const BandWidth Band::bandWidthAM[] = {{"1.0", 4}, {"1.8", 5}, {"2.0", 3}, {"2.5", 6}, {"3.0", 2}, {"4.0", 1}, {"6.0", 0}};
 const BandWidth Band::bandWidthSSB[] = {{"0.5", 4}, {"1.0", 5}, {"1.2", 0}, {"2.2", 1}, {"3.0", 2}, {"4.0", 3}};
 
-// AM Lépésköz konfigurációk definíciója (érték beállításához)
+// AM Lépésköz
 const FrequencyStep Band::stepSizeAM[] = {
     {"1kHz", 1},   // "1kHz" -> 1
     {"5kHz", 5},   // "5kHz" -> 5
     {"9kHz", 9},   // "9kHz" -> 9
     {"10kHz", 10}  // "10kHz" -> 10
 };
-// FM Lépésköz konfigurációk definíciója (érték beállításához)
+// FM Lépésköz
 const FrequencyStep Band::stepSizeFM[] = {
     {"50kHz", 5},    // "50kHz" -> 5
     {"100kHz", 10},  // "100kHz" -> 10
     {"1MHz", 100}    // "1MHz" -> 100
+};
+
+// BFO Lépésköz
+const FrequencyStep Band::stepSizeBFO[] = {
+    {"1Hz", 1},
+    {"5Hz", 5},
+    {"10Hz", 10},
+    {"25Hz", 25},
 };
 
 /**
@@ -306,7 +314,7 @@ void Band::useBand() {
 
             // BFO beállítása
             // CW mód: Fix BFO offset (pl. 700 Hz) + manuális finomhangolás
-            const int16_t cwBaseOffset = isCWMode ? CW_SHIFT_FREQUENCY : 0; // Alap CW eltolás
+            const int16_t cwBaseOffset = isCWMode ? CW_SHIFT_FREQUENCY : 0;  // Alap CW eltolás
             si4735.setSSBBfo(cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu);
             rtv::CWShift = isCWMode;  // Jelezzük a kijelzőnek
 

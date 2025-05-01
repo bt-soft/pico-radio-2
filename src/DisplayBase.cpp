@@ -49,6 +49,8 @@ constexpr int VolumeMax = 63;
 void DisplayBase::drawBfoStatus(bool initFont) {
     using namespace DisplayConstants;
 
+    tft.fillRect(0, 2, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);  // Törlés háttérszínnel
+
     if (initFont) {
         tft.setFreeFont();
         tft.setTextSize(1);
@@ -57,17 +59,23 @@ void DisplayBase::drawBfoStatus(bool initFont) {
 
     uint8_t currMod = band.getCurrentBand().varData.currMod;
 
-    uint16_t bfoStepColor = TFT_SILVER;
-    if ((currMod == LSB || currMod == USB || currMod == CW) && config.data.currentBFOmanu) {
-        bfoStepColor = BfoStepColor;
+    uint16_t color = TFT_SILVER;
+    if ((currMod == LSB || currMod == USB || currMod == CW) && config.data.currentBFOmanu != 0) {
+        color = BfoStepColor;
     }
-    tft.setTextColor(bfoStepColor, TFT_BLACK);
+    tft.setTextColor(color, TFT_BLACK);
 
-    // TODO: A BFO-t még ki kell találni
-    if (!rtv::bfoOn) {
-        tft.drawString(F(" BFO "), StatusLineBfoX, 15);
+    // BFO státusz szöveg előállítás
+    char bfoText[10];  // Buffer a szövegnek (pl. "25Hz" vagy " BFO ")
+    if (rtv::bfoOn) {
+        // Formázzuk a lépésközt és a "Hz"-t a bufferbe
+        snprintf(bfoText, sizeof(bfoText), "%dHz", config.data.currentBFOStep);
+    } else {
+        // Másoljuk a flash memóriában tárolt stringet a bufferbe
+        strcpy_P(bfoText, PSTR(" BFO "));
     }
-    tft.drawRect(0, 2, StatusLineRectWidth, StatusLineHeight, bfoStepColor);
+    tft.drawString(bfoText, StatusLineBfoX, 15);
+    tft.drawRect(0, 2, StatusLineRectWidth, StatusLineHeight, color);
 }
 
 /**
@@ -235,7 +243,7 @@ void DisplayBase::dawStatusLine() {
     tft.setTextDatum(BC_DATUM);
 
     // BFO Step
-    drawBfoStatus(); // Ez már létezik, csak biztosítjuk, hogy hívva legyen
+    drawBfoStatus();
 
     // AGC Status
     drawAgcAttStatus();
@@ -564,13 +572,13 @@ void DisplayBase::buildHorizontalScreenButtons(BuildButtonData screenHButtonsDat
 
     // Kötelező horizontális Képernyőgombok definiálása
     DisplayBase::BuildButtonData mandatoryHButtons[] = {
-        {"Ham", TftButton::ButtonType::Pushable},    //
-        {"Band", TftButton::ButtonType::Pushable},   //
-        {"DeMod", TftButton::ButtonType::Pushable},  //
-        {"BndW", TftButton::ButtonType::Pushable},   //
-        {"BFO", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off}, // BFO gomb hozzáadása
-        {"Step", TftButton::ButtonType::Pushable},   //
-        {"Scan", TftButton::ButtonType::Pushable},   //
+        {"Ham", TftButton::ButtonType::Pushable},                                 //
+        {"Band", TftButton::ButtonType::Pushable},                                //
+        {"DeMod", TftButton::ButtonType::Pushable},                               //
+        {"BndW", TftButton::ButtonType::Pushable},                                //
+        {"BFO", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off},  // BFO gomb hozzáadása
+        {"Step", TftButton::ButtonType::Pushable},                                //
+        {"Scan", TftButton::ButtonType::Pushable},                                //
     };
     uint8_t mandatoryHButtonsLength = ARRAY_ITEM_COUNT(mandatoryHButtons);
 
@@ -611,13 +619,6 @@ void DisplayBase::updateButtonStatus() {
     BandTable &currentBand = band.getCurrentBand();
     uint8_t currMod = currentBand.varData.currMod;
 
-    // A "Step" gomb SSB/CW módban tiltva van
-    TftButton *btnStep = findButtonByLabel("Step");
-    if (btnStep != nullptr) {
-        bool stepDisabled = (currMod == LSB or currMod == USB or currMod == CW);
-        btnStep->setState(stepDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
-    }
-
     TftButton *btnSquelch = findButtonByLabel("Squel");
     if (btnSquelch != nullptr) {
         // Ellenőrizzük a squelch értékét
@@ -637,8 +638,18 @@ void DisplayBase::updateButtonStatus() {
     // BFO gomb állapotának frissítése
     TftButton *btnBfo = findButtonByLabel("BFO");
     if (btnBfo != nullptr) {
-        bool bfoDisabled = !(currMod == LSB || currMod == USB || currMod == CW); // Csak SSB/CW módban engedélyezett
+        // A gomb csak akkor engedélyezett, ha a mód LSB, USB vagy CW.
+        bool bfoDisabled = !(currMod == LSB or currMod == USB or currMod == CW);
         btnBfo->setState(bfoDisabled ? TftButton::ButtonState::Disabled : (rtv::bfoOn ? TftButton::ButtonState::On : TftButton::ButtonState::Off));
+    }
+
+    // A "Step" gomb SSB/CW módban csak akkor engedélyezett, ha a BFO be van kapcsolva
+    TftButton *btnStep = findButtonByLabel("Step");
+    if (btnStep != nullptr) {
+        // A gomb csak akkor engedélyezett, ha a BFO be van kapcsolva ÉS a mód LSB/USB/CW.
+        // Minden más esetben le van tiltva.
+        bool stepDisabled = !(rtv::bfoOn and (currMod == LSB or currMod == USB or currMod == CW));
+        btnStep->setState(stepDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
     }
 }
 
@@ -790,15 +801,17 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             BandTable &currentBand = band.getCurrentBand();
             currentBand.varData.currFreq = targetFreq;
             Si4735Utils::si4735.setFrequency(targetFreq);  // Itt használjuk a Si4735Utils::si4735-öt
-            DEBUG("Frequency set via Dialog to: %d (%s)\n", targetFreq, (bandType == FM_BAND_TYPE) ? "10kHz" : "kHz");
 
-            // Opcionális: BFO nullázás (ha szükséges)
-            // ...
+            // CW shift/BFO nullázás
+            currentBand.varData.lastmanuBFO = 0;
+            if (currentBand.varData.currMod == CW) {
+                currentBand.varData.lastBFO = 0;  // CW_SHIFT_FREQUENCY;
+                config.data.currentBFO = currentBand.varData.lastBFO;
+                rtv::CWShift = false;  // CWShift állapot visszaállítása
+            }
 
             // Képernyő frissítése (pl. frekvencia kijelző)
             DisplayBase::frequencyChanged = true;  // Jelezzük a fő loopnak a frissítést
-            // Vagy közvetlen hívás, ha a DisplayBase-nek van ilyen metódusa
-            // updateFrequencyDisplayOnScreen();
         });
 
         processed = true;  // Jelöljük, hogy kezeltük az eseményt
@@ -807,6 +820,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
     else if (STREQ("Setup", event.label)) {              // Beállítások
         ::newDisplay = DisplayBase::DisplayType::setup;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
         processed = true;
+
     } else if (STREQ("Memo", event.label)) {              // Beállítások
         ::newDisplay = DisplayBase::DisplayType::memory;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
         processed = true;
@@ -832,6 +846,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBand().pConstData->bandName);
         processed = true;
+
     } else if (STREQ("Band", event.label)) {
         // Kigyűjtjük az összes NEM HAM sáv nevét
         uint8_t bandCount;
@@ -849,6 +864,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBand().pConstData->bandName);
         processed = true;
+
     } else if (STREQ("DeMod", event.label)) {
 
         // Kigyűjtjük az összes NEM HAM sáv nevét
@@ -881,6 +897,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBandModeDesc());
         processed = true;
+
     } else if (STREQ("BndW", event.label)) {
 
         uint8_t currMod = band.getCurrentBand().varData.currMod;  // Demodulációs mód
@@ -931,6 +948,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             currentBandWidthLabel);  // Az aktuális sávszélesség felirata
         processed = true;
+
     } else if (STREQ("Step", event.label)) {
 
         uint8_t currentBandType = band.getCurrentBandType();      // Kikeressük az aktuális Band típust
@@ -940,12 +958,17 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         const __FlashStringHelper *title;
         size_t labelsCount;
         const char **labels;
-        uint16_t w = 310;
-        uint16_t h = 100;
+        uint16_t w = 200;
+        uint16_t h = 130;
 
-        if (currMod == FM) {
+        if (rtv::bfoOn) {
+            title = F("Step tune BFO");
+            labels = band.getStepSizeLabels(Band::stepSizeBFO, labelsCount);
+
+        } else if (currMod == FM) {
             title = F("Step tune FM");
             labels = band.getStepSizeLabels(Band::stepSizeFM, labelsCount);
+
         } else {
             title = F("Step tune AM/SSB");
             labels = band.getStepSizeLabels(Band::stepSizeAM, labelsCount);
@@ -955,6 +978,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
 
         // Az aktuális freki lépés felirata
         const char *currentStepStr = band.currentStepSizeStr();
+        DEBUG("currentStepStr: %s\n", currentStepStr);
 
         DisplayBase::pDialog = new MultiButtonDialog(
             this, DisplayBase::tft, w, h, title, labels, labelsCount,  //
@@ -968,39 +992,52 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                 // Demodulációs mód
                 uint8_t currMod = band.getCurrentBand().varData.currMod;
 
-                // Beállítjuk a konfigban a stepSize-t
-                if (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) {
-                    config.data.ssIdxMW = btnIdx;
-                } else if (currMod == FM) {
-                    config.data.ssIdxFM = btnIdx;
+                if (rtv::bfoOn) {
+                    // BFO step állítás
+                    config.data.currentBFOStep = band.getStepSizeByIndex(Band::stepSizeBFO, btnIdx);
+
                 } else {
-                    config.data.ssIdxAM = btnIdx;
+                    // Beállítjuk a konfigban a stepSize-t
+                    if (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) {
+                        config.data.ssIdxMW = btnIdx;
+
+                    } else if (currMod == FM) {
+                        config.data.ssIdxFM = btnIdx;
+
+                    } else {
+                        config.data.ssIdxAM = btnIdx;
+                    }
+                    Si4735Utils::setStep();
                 }
-                Si4735Utils::setStep();
             },
             currentStepStr);  // Az aktuális lépés felirata
+
         processed = true;
+
     } else if (STREQ("Scan", event.label)) {
         // Képernyő váltás !!!
         ::newDisplay = DisplayBase::DisplayType::freqScan;
         processed = true;
-    }
-    else if (STREQ("BFO", event.label)) {
+
+    } else if (STREQ("BFO", event.label)) {
+
         // Csak SSB/CW módban engedélyezzük
         uint8_t currMod = band.getCurrentBand().varData.currMod;
-        if (currMod == LSB || currMod == USB || currMod == CW) {
-            rtv::bfoOn = event.state == TftButton::ButtonState::On; // Állapot beállítása a gomb állapota alapján
-            rtv::bfoTr = true; // Animáció indítása
+        if (currMod == LSB or currMod == USB or currMod == CW) {
+            rtv::bfoOn = event.state == TftButton::ButtonState::On;  // Állapot beállítása a gomb állapota alapján
+            rtv::bfoTr = true;                                       // Animáció indítása
 
             // Step gomb tiltása/engedélyezése BFO módban
             TftButton *btnStep = findButtonByLabel("Step");
             if (btnStep != nullptr) {
-                 btnStep->setState(rtv::bfoOn ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
+                btnStep->setState(rtv::bfoOn ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled);
             }
-            frequencyChanged = true; // Kijelző frissítés kérése
+            drawBfoStatus(true);      // BFO állapotának frissítése a státuszsoron
+            frequencyChanged = true;  // Kijelző frissítés kérése
             processed = true;
+
         } else {
-            Utils::beepError(); // Hiba hangjelzés, ha nem támogatott módban nyomják meg
+            Utils::beepError();  // Hiba hangjelzés, ha nem támogatott módban nyomják meg
         }
     }
 

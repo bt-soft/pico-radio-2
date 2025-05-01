@@ -6,9 +6,9 @@
 #include "utils.h"
 
 //------------------ TFT
-#define SCREEN_SAVER_TIME 1000 * 60 * 10  // 10 perc a képernyővédő időzítése
-#include <TFT_eSPI.h>                     // TFT_eSPI könyvtár
-TFT_eSPI tft;                             // TFT objektum
+#define SCREEN_SAVER_TIME 1000 * 60 * 1  // 10 perc a képernyővédő időzítése
+#include <TFT_eSPI.h>                    // TFT_eSPI könyvtár
+TFT_eSPI tft;                            // TFT objektum
 
 //------------------- Rotary Encoder
 #define __USE_ROTARY_ENCODER_IN_HW_TIMER

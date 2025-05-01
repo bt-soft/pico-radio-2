@@ -96,8 +96,12 @@ void ScreenSaverDisplay::displayLoop() {
         saverY = random(tft.height() / 2) + 5;
 
         // Frekvencia kijelzése
-        uint8_t currentDemod = band.getCurrentBand().varData.currMod;
-        uint8_t xOffset = (currentDemod == FM or currentDemod == AM) ? 30 : 50;  // FM/AM esetén 30 pixel eltolás, SSB/CW esetén 50 pixel eltolás
+        int8_t currentDemod = band.getCurrentBand().varData.currMod;
+        int8_t xOffset = (currentDemod == FM or currentDemod == AM) ? 30 : 50;  // FM/AM esetén 30 pixel eltolás, SSB/CW esetén 50 pixel eltolás
+        if (rtv::bfoOn) {
+            xOffset = -10;  // BFO esetén a frekvenciakijelzés eltolása
+        }
+
         pSevenSegmentFreq->setPositions(saverX - xOffset, saverY);
         pSevenSegmentFreq->freqDispl(currentFrequency);
 
