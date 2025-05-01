@@ -1021,17 +1021,15 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             rtv::bfoOn = event.state == TftButton::ButtonState::On;  // Állapot beállítása a gomb állapota alapján
             rtv::bfoTr = true;                                       // Animáció indítása
 
-            // --- ÚJ: BFO kikapcsolásakor a manuális offset nullázása és újrahangolás ---
-            if (!rtv::bfoOn) { // Ha a BFO ki lett kapcsolva
-                config.data.currentBFOmanu = 0; // Finomhangolás nullázása
+            // BFO kikapcsolásakor a manuális offset nullázása és újrahangolás
+            if (!rtv::bfoOn) {                   // Ha a BFO ki lett kapcsolva
+                config.data.currentBFOmanu = 0;  // Finomhangolás nullázása
 
                 // Újrahangolás a chipen a nullázott manuális BFO-val
                 const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
-                int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu; // currentBFOmanu itt már 0
+                int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;  // currentBFOmanu itt már 0
                 si4735.setSSBBfo(bfoToSet);
-                DEBUG("BFO turned OFF, manual offset reset, retuned to base BFO: %d\n", bfoToSet);
             }
-            // --- ÚJ VÉGE ---
 
             // Step gomb tiltása/engedélyezése BFO módban
             TftButton *btnStep = findButtonByLabel("Step");
