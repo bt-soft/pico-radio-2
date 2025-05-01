@@ -23,7 +23,8 @@ VirtualKeyboardDialog::VirtualKeyboardDialog(IDialogParent* pParent, TFT_eSPI& t
     : DialogBase(pParent, tft, 456, 260, title),  // Méretet ellenőrizd/állítsd be!
       targetString(target),
       originalString(target),  // Eredeti string mentése
-      currentInput(target)     // Kezdetben a szerkesztendő stringgel inicializáljuk
+      currentInput(target),    // Kezdetben a szerkesztendő stringgel inicializáljuk
+      shiftActive(false)       // Shift kezdetben inaktív
 {
     DEBUG("VirtualKeyboardDialog::VirtualKeyboardDialog\n");
 
@@ -50,7 +51,7 @@ VirtualKeyboardDialog::~VirtualKeyboardDialog() {
     delete backspaceButton;
     delete clearButton;
     delete spaceButton;
-    // TODO: Töröld az esetleges további speciális gombokat (Space, Shift)
+    delete shiftButton;  // Shift gomb törlése
 
     // Karakter gombok törlése a vektorból
     for (TftButton* btn : keyboardButtons) {
@@ -84,7 +85,12 @@ void VirtualKeyboardDialog::buildKeyboard() {
 
         for (uint8_t c = 0; c < rowLen; ++c) {
             char keyChar[2] = {rowLayout[c], '\0'};  // Gomb felirata (1 karakter + null terminátor)
-            TftButton* keyButton = new TftButton(btnId++, tft, startX + c * (KEY_WIDTH + KEY_GAP_X), currentY, KEY_WIDTH, KEY_HEIGHT, keyChar, TftButton::ButtonType::Pushable);
+            // Nagybetűs kezdőállapot, ha a shift aktív (bár a konstruktorban még nem az)
+            // A redrawKeyboardKeys majd beállítja a helyeset a drawDialog előtt/alatt
+            char displayChar = shiftActive ? toupper(rowLayout[c]) : rowLayout[c];
+            char displayKeyStr[2] = {displayChar, '\0'};
+            TftButton* keyButton =
+                new TftButton(btnId++, tft, startX + c * (KEY_WIDTH + KEY_GAP_X), currentY, KEY_WIDTH, KEY_HEIGHT, displayKeyStr, TftButton::ButtonType::Pushable);
             keyboardButtons.push_back(keyButton);
         }
         currentY += KEY_HEIGHT + KEY_GAP_Y;
@@ -94,12 +100,15 @@ void VirtualKeyboardDialog::buildKeyboard() {
     // Ezeket a karakter gombok alá helyezzük el
     uint16_t specialBtnY = currentY + KEY_GAP_Y;  // Egy kis extra rés
     uint16_t btnWidthSpecial = 60;                // Speciális gombok szélessége
-    // Teljes szélesség: Clear + Bksp + Space + Cancel + OK + 4 rés
-    uint16_t totalSpecialWidth = (btnWidthSpecial * 4) + SPACE_BTN_WIDTH + (KEY_GAP_X * 4);
+    // Teljes szélesség: Shift + Clear + Bksp + Space + Cancel + OK + 5 rés
+    uint16_t totalSpecialWidth = (btnWidthSpecial * 5) + SPACE_BTN_WIDTH + (KEY_GAP_X * 5);
     uint16_t startXSpecial = x + (w - totalSpecialWidth) / 2;
 
     // Gombok létrehozása sorban
     uint16_t currentXSpecial = startXSpecial;
+
+    shiftButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Shift", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off);
+    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
 
     clearButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Clear", TftButton::ButtonType::Pushable);
     currentXSpecial += btnWidthSpecial + KEY_GAP_X;
@@ -139,6 +148,7 @@ void VirtualKeyboardDialog::drawDialog() {
     }
 
     // Speciális gombok kirajzolása
+    shiftButton->draw();
     clearButton->draw();
     backspaceButton->draw();
     spaceButton->draw();
@@ -213,6 +223,23 @@ void VirtualKeyboardDialog::toggleCursor() {
 }
 
 /**
+ * Újrarajzolja a billentyűzet karaktergombjait a shift állapotnak megfelelően.
+ */
+void VirtualKeyboardDialog::redrawKeyboardKeys() {
+    for (TftButton* btn : keyboardButtons) {
+        const char* currentLabel = btn->getLabel();
+        if (strlen(currentLabel) == 1) {  // Csak karaktergombokkal foglalkozunk
+            char originalChar = currentLabel[0];
+            // Mindig az eredeti kisbetűs karakterből indulunk ki (feltételezve, hogy az van a layoutban)
+            char lowerChar = tolower(originalChar);
+            char newChar = shiftActive ? toupper(lowerChar) : lowerChar;
+            char newLabel[2] = {newChar, '\0'};
+            btn->setLabel(newLabel);  // Ez újrarajzolja a gombot
+        }
+    }
+}
+
+/**
  * Billentyű lenyomásának kezelése
  */
 void VirtualKeyboardDialog::handleKeyPress(const char* key) {
@@ -244,12 +271,22 @@ void VirtualKeyboardDialog::handleKeyPress(const char* key) {
         } else {
             Utils::beepError();
         }
-    }
-    // TODO: Kezeld a  Shift stb. gombokat
-    // else if (strcmp(key, "Space") == 0) { ... }
-    else if (strlen(key) == 1) {  // Feltételezzük, hogy a többi az karakter gomb
+    } else if (strcmp(key, "Shift") == 0) {
+        shiftActive = !shiftActive;  // Shift állapot váltása
+        // Shift gomb állapotának frissítése (On, ha aktív, Off, ha nem)
+        shiftButton->setState(shiftActive ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
+        // Billentyűk újrarajzolása a megfelelő kis/nagybetűvel
+        redrawKeyboardKeys();
+        // Nem kell inputChanged, mert a szöveg nem változott
+    } else if (strlen(key) == 1) {  // Karakter gomb
+        char pressedChar = key[0];
+        // Ha a Shift aktív, nagybetűsítünk
+        if (shiftActive) {
+            pressedChar = toupper(pressedChar);
+        }
+
         if (currentInput.length() < MAX_INPUT_LEN) {
-            currentInput += key;
+            currentInput += pressedChar; // Javítás: a módosított karaktert fűzzük hozzá
             inputChanged = true;
         } else {
             Utils::beepError();
@@ -293,7 +330,10 @@ bool VirtualKeyboardDialog::handleTouch(bool touched, uint16_t tx, uint16_t ty) 
         handleKeyPress("Space");
         return true;
     }
-    // TODO: Ellenőrizd a többi speciális gombot ( Shift)
+    if (shiftButton->handleTouch(touched, tx, ty)) {
+        handleKeyPress("Shift");
+        return true;
+    }
 
     // Karakter gombok ellenőrzése
     for (TftButton* btn : keyboardButtons) {

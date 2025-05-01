@@ -19,14 +19,14 @@ class VirtualKeyboardDialog : public DialogBase {
     TftButton* backspaceButton;
     TftButton* clearButton;
     TftButton* spaceButton;
-    // TODO: egyéb speciális gombok (Shift, Space, stb.)
+    TftButton* shiftButton;  // Shift gomb
 
     // Billentyűzet kiosztás
     const char* keyLayout[4] = {
-        "1234567890",  //
-        "QWERTZUIOP",  //
-        "ASDFGHJKL",   //
-        "YXCVBNM.-",   //
+        "1234567890", // Számok maradnak
+        "qwertzuiop", // Kisbetűk
+        "asdfghjkl",  // Kisbetűk
+        "yxcvbnm.-",  // Kisbetűk és szimbólumok
     };
     uint8_t keyRows = 4;
 
@@ -38,9 +38,13 @@ class VirtualKeyboardDialog : public DialogBase {
     bool cursorVisible = true;
     static const unsigned long CURSOR_BLINK_INTERVAL = 500;  // Villogás sebessége (ms)
 
+    // Shift állapot
+    bool shiftActive = false;
+
     void buildKeyboard();
     void updateInputDisplay(bool redrawCursorOnly = false);  // Módosítás: Opcionális paraméter
     void handleKeyPress(const char* key);
+    void redrawKeyboardKeys();  // Billentyűk újrarajzolása (kis/nagybetű)
 
     // Kurzorral kapcsolatos metódusok
     void drawCursor();    // Csak a kurzort rajzoló/törlő metódus
