@@ -124,6 +124,22 @@ void SevenSegmentFreq::drawStepUnderline(uint16_t d, const SegmentColors& colors
 }
 
 /**
+ * @brief Kiválasztja a megfelelő szegmens színeket az aktuális mód alapján.
+ * @return A kiválasztott SegmentColors struktúra.
+ */
+const SegmentColors& SevenSegmentFreq::getSegmentColors() const {
+    if (rtv::bfoOn) {
+        return bfoColors;
+    } else if (screenSaverActive) {
+        return screenSaverColors;
+    } else {
+        return normalColors;
+    }
+}
+
+// --- Helper method implementations ---
+
+/**
  * @brief Kezeli az érintési eseményeket a frekvencia kijelzőn.
  *
  * @param touchX Az érintés X koordinátája.
@@ -184,179 +200,158 @@ bool SevenSegmentFreq::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 }
 
 /**
+ * @brief Letörli a frekvencia kijelző területét.
+ * @param d Az X eltolás.
+ */
+void SevenSegmentFreq::clearDisplayArea(int d) {
+
+    // Képernyővédő és egyszerű módban (ahol nincs aláhúzás és kevesebb helyet foglal) vagyunk, akkor nem törlünk
+    if (screenSaverActive or simpleMode) {
+        return;
+    }
+
+    // A törlendő terület magassága: mindig töröljük az aláhúzás helyét is, hogy a módváltáskor biztosan eltűnjön.
+    uint32_t clearHeightCorr = SevenSegmentConstants::UnderlineHeight + 15;  // a kHz feliratot is töröljük
+
+    // A szélességnek elég nagynak kell lennie, hogy minden módot lefedjen
+    tft.fillRect(freqDispX + d, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + clearHeightCorr, TFT_COLOR_BACKGROUND);
+}
+
+/**
  * @brief Frekvencia kijelzése a megfelelő formátumban.
  *
  * @param currentFrequency Az aktuális frekvencia (kHz-ben AM/SSB/CW, vagy 10kHz-ben FM esetén).
  */
 void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
-    // Lekérjük az aktuális sáv (band) adatait
-    BandTable& currentBand = band.getCurrentBand();
-    uint8_t currDemod = currentBand.varData.currMod;
-    uint8_t currentBandType = band.getCurrentBandType();
-
+    // Lekérjük az aktuális módot és színeket
+    const uint8_t currDemod = band.getCurrentBand().varData.currMod;
     int d = 0;  // X eltolás, alapértelmezetten 0
+    const SegmentColors& colors = getSegmentColors();
+    clearDisplayArea(d);  // Kijelző terület törlése
 
-    // Megfelelő színek kiválasztása az aktuális mód alapján (normál, BFO, képernyővédő)
-    const SegmentColors& colors = rtv::bfoOn ? bfoColors : (screenSaverActive ? screenSaverColors : normalColors);
-
-    // Előző érték törlése a kijelzőről (csak ha nem képernyővédő módban vagyunk)
-    if (!screenSaverActive) {
-        // A törlendő terület szélessége/magassága függhet a módtól, figyeljünk, hogy a BFO mód vagy más speciális esetek ne okozzanak vizuális hibát
-        // pl: Lépést jelző aláhúzást is töröljük, de FM esetén ilyen nincs, belelógna a törlés a STEREO feliratba
-        uint32_t clearHeightCorr = currentBandType == FM_BAND_TYPE ? 0 : SevenSegmentConstants::UnderlineHeight;
-        tft.fillRect(freqDispX + d, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + 2 + clearHeightCorr, TFT_COLOR_BACKGROUND);
+    // Mód alapján a megfelelő megjelenítő függvény hívása
+    if (!screenSaverActive and (currDemod == LSB or currDemod == USB or currDemod == CW)) {
+        // SSB vagy CW mód (BFO kezeléssel)
+        displaySsbCwFrequency(currentFrequency, colors, d);
+    } else {
+        // FM, AM, LW, MW mód
+        displayFmAmFrequency(currentFrequency, colors, d);
     }
 
-    uint32_t displayFreqHz = 0;  // A megjelenítendő frekvencia Hz-ben
+    // Alapértelmezett szöveg igazítás visszaállítása, ha szükséges
+    tft.setTextDatum(BC_DATUM);
+}
 
-    // Ha nem ScreenSaver módban vagyunk és SSB vagy CW az üzemmód
-    if (!screenSaverActive and (currDemod == LSB or currDemod == USB or currDemod == CW)) {
+/**
+ * @brief SSB/CW frekvencia kijelzése (BFO-val vagy anélkül).
+ * @param currentFrequency Az aktuális frekvencia (kHz).
+ * @param colors A használandó színek.
+ * @param d Az X eltolás.
+ */
+void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const SegmentColors& colors, int d) {
+    BandTable& currentBand = band.getCurrentBand();
+    uint8_t currDemod = currentBand.varData.currMod;
 
-        // Kiszámítjuk a pontos frekvenciát Hz-ben a BFO eltolással
-        uint32_t bfoOffset = simpleMode ? 0 : currentBand.varData.lastBFO;  // BFO eltolás
-        displayFreqHz = (uint32_t)currentFrequency * 1000 - bfoOffset;
+    // Kiszámítjuk a pontos frekvenciát Hz-ben a BFO eltolással
+    uint32_t bfoOffset = simpleMode ? 0 : currentBand.varData.lastBFO;
+    uint32_t displayFreqHz = (uint32_t)currentFrequency * 1000 - bfoOffset;
 
-        // // CW módban további 700Hz eltolás (ha aktív a CW shift)
-        // if (rtv::CWShift) {
-        //     displayFreqHz -= CW_SHIFT_FREQUENCY;
-        // }
+    // Formázás: kHz érték és a 100Hz/10Hz rész kiszámítása
+    long khz_part = displayFreqHz / 1000;
+    int hz_tens_part = abs((int)(displayFreqHz % 1000)) / 10;  // Előjel nélküli érték kell
 
-        // Formázás: kHz érték és a 100Hz/10Hz rész kiszámítása
-        long khz_part = displayFreqHz / 1000;            // Egész kHz rész
-        int hz_tens_part = (displayFreqHz % 1000) / 10;  // A 100Hz és 10Hz-es rész (00-99)
+    char s[12];
+    sprintf(s, "%ld.%02d", khz_part, hz_tens_part);
 
-        // Formázás: kHz.százHz tízHz
-        // A sprintf %ld formátumot használunk a long int (khz_part) és %02d-t a hz_tens_part-hoz (két számjegy, vezető nullával)
-        char s[12] = {'\0'};  // String buffer a formázott frekvenciának
-        sprintf(s, "%ld.%02d", khz_part, hz_tens_part);
+    // --- BFO kijelzés kezelése ---
+    if (!rtv::bfoOn or rtv::bfoTr) {
+        tft.setFreeFont();
+        tft.setTextDatum(BR_DATUM);
+        tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
 
-        // --- BFO kijelzés kezelése ---
-        if (!rtv::bfoOn or rtv::bfoTr) {
-            tft.setFreeFont();  // Font beállítása
-            tft.setTextDatum(BR_DATUM);
-            tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-
-            // Animáció a BFO be/ki kapcsolásakor
-            if (rtv::bfoTr) {
-                rtv::bfoTr = false;  // Animációs flag törlése
-
-                // Méretváltás animációja
-                for (uint8_t i = 4; i > 1; i--) {
-
-                    tft.setTextSize(rtv::bfoOn ? i : (6 - i));  // Méret beállítása
-
-                    // Régi frekvencia törlése az animációhoz
-                    tft.fillRect(freqDispX + d, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + 20, TFT_COLOR_BACKGROUND);  // Teljes terület törlése
-
-                    // Új méretű frekvencia kirajzolása
-                    constexpr uint16_t X_OFFSET = 230;  // X pozíció eltolás
-                    constexpr uint16_t Y_OFFSET = 62;   // Y pozíció eltolás
-                    tft.drawString(String(s), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);
-                    delay(100);
-                }
+        // Animáció a BFO be/ki kapcsolásakor
+        if (rtv::bfoTr) {
+            rtv::bfoTr = false;
+            for (uint8_t i = 4; i > 1; i--) {
+                tft.setTextSize(rtv::bfoOn ? i : (6 - i));
+                clearDisplayArea(d);  // Törlés minden lépésben
+                tft.drawString(String(s), freqDispX + 230 + d, freqDispY + 62);
+                delay(100);
             }
-
-            // Ha a BFO nincs bekapcsolva, kirajzoljuk a normál frekvenciát
-            if (!rtv::bfoOn) {
-                // A "88 888.88" maszk szerinti frekvencia kijelzés, mértékegység nem kell, azt külön rajzoljuk ki
-                drawFrequency(String(s), F("88 888.88"), d, colors, nullptr);
-
-                // A "kHz" felirat külön kirajzolása
-                tft.setTextDatum(BC_DATUM);
-                tft.setFreeFont();   // Font beállítása (biztonság kedvéért)
-                tft.setTextSize(2);  // Méret beállítása (biztonság kedvéért)
-                tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-                //
-                constexpr uint16_t X_OFFSET = 215;  // X pozíció eltolás (a digit szélessége + 5 pixel)
-                constexpr uint16_t Y_OFFSET = 80;   // Y pozíció
-                tft.drawString(F("kHz"), freqDispX + X_OFFSET + d, freqDispY + Y_OFFSET);
-            }
-
-            drawStepUnderline(d, colors);  // Aláhúzás kirajzolása a lépésköz jelzésére
         }
 
-        // Ha a BFO be van kapcsolva, kirajzoljuk a BFO értéket (ScreenSaver módban nem)
-        if (rtv::bfoOn) {
+        // Ha a BFO nincs bekapcsolva, kirajzoljuk a normál frekvenciát
+        if (!rtv::bfoOn) {
+            drawFrequency(String(s), F("88 888.88"), d, colors, nullptr);  // Fő frekvencia
 
-            // 0. Nagyobb terület törlése a BFO és a fő frekvencia kiírása előtt
-            // Lefedjük a 7-szegmenses BFO helyét és a kisebb fő frekvencia helyét is.
-            uint16_t clearX = freqDispX + d;
-            uint16_t clearY = freqDispY + 20;  // A 7-szegmenses Y kezdete
-            uint16_t clearW = 250;             // Szélesség, ami lefedi mindkét frekvencia helyét (kb. a nem-BFO mód szélessége + margó)
-            uint16_t clearH = 62;              // Magasság: Y_OFFSET a kisebb frekvenciához + kb. font magasság (size 2)
-            tft.fillRect(clearX, clearY, clearW, clearH, TFT_COLOR_BACKGROUND);
-            // --- Törlés vége ---
-
-            // 1. BFO érték kirajzolása a 7 szegmensesre
-            drawFrequency(String(config.data.currentBFOmanu), F("-888"), d, colors);  // BFO érték rajzolása a 7 szegmensesre
-
-            // Hz felirat kirajzolása
+            // "kHz" felirat
+            tft.setTextDatum(BC_DATUM);
+            tft.setFreeFont();
             tft.setTextSize(2);
-            tft.setTextDatum(BL_DATUM);
-            tft.setTextColor(colors.indicator, TFT_BLACK);
-            tft.drawString("Hz", freqDispX + 120 + d, freqDispY + 40);
-
-            // BFO felirat kirajzolása
-            tft.setTextColor(TFT_BLACK, colors.active);
-            tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);
-            tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);
-            tft.setTextDatum(BR_DATUM);
-
-            // 2. A fő frekvencia kisebb méretben, a BFO mellett/alatt
-            tft.setTextSize(2);  // Kisebb méret
-            tft.setTextDatum(BR_DATUM);
             tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-            uint16_t xOffset = 220;            // X pozíció eltolás
-            constexpr uint16_t Y_OFFSET = 62;  // Y pozíció eltolás
-            tft.drawString(String(s), freqDispX + xOffset + d, freqDispY + Y_OFFSET);
+            tft.drawString(F("kHz"), freqDispX + 215 + d, freqDispY + 80);
 
-            // 3. A "kHz" felirat
-            tft.setTextSize(1);  // Még kisebb méret
-            xOffset = 242;       // X pozíció eltolás
-            tft.drawString("kHz", freqDispX + xOffset + d, freqDispY + Y_OFFSET);
+            drawStepUnderline(d, colors);  // Aláhúzás
         }
+    }
 
-        tft.setTextDatum(BC_DATUM);  // Alapértelmezett szöveg igazítás visszaállítása
+    // Ha a BFO be van kapcsolva, kirajzoljuk a BFO értéket
+    if (rtv::bfoOn) {
+        // 0. Nagyobb terület törlése (a clearDisplayArea már megtörtént, de itt lehet finomítani)
+        // tft.fillRect(freqDispX + d, freqDispY + 20, 250, 62, TFT_COLOR_BACKGROUND);
 
-    } else {  // Nem SSB/CW mód (FM, AM, LW, MW)
+        // 1. BFO érték kirajzolása a 7 szegmensesre
+        drawFrequency(String(config.data.currentBFOmanu), F("-888"), d, colors);
 
-        String freqStr;                             // Formázott frekvencia string
-        const __FlashStringHelper* unit = nullptr;  // Mértékegység pointere
-        const __FlashStringHelper* mask = nullptr;  // Kijelző maszk
+        // Hz felirat
+        tft.setTextSize(2);
+        tft.setTextDatum(BL_DATUM);
+        tft.setTextColor(colors.indicator, TFT_BLACK);
+        tft.drawString("Hz", freqDispX + 120 + d, freqDispY + 40);
 
-        // FM mód
-        if (currDemod == FM) {
-            unit = F("MHz");
-            mask = F("188.88");  // FM maszk
+        // BFO felirat
+        tft.setTextColor(TFT_BLACK, colors.active);
+        tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);
+        tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);
+        tft.setTextDatum(BR_DATUM);
 
-            // Az FM frekvencia 10kHz-es lépésekben van tárolva (pl. 9390 -> 93.90 MHz)
-            float displayFreqMHz = currentFrequency / 100.0f;
-            freqStr = String(displayFreqMHz, 2);  // Két tizedesjegy pontossággal
+        // 2. Fő frekvencia kisebb méretben
+        tft.setTextSize(2);
+        tft.setTextDatum(BR_DATUM);
+        tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
+        tft.drawString(String(s), freqDispX + 220 + d, freqDispY + 62);
 
-            // FM esetén kicsit balrább toljuk a kijelzést (d-10)
-            drawFrequency(freqStr, mask, d - 10, colors, unit);
+        // 3. "kHz" felirat
+        tft.setTextSize(1);
+        tft.drawString("kHz", freqDispX + 242 + d, freqDispY + 62);
+    }
+}
 
-        } else {  // AM, LW, MW módok
+/**
+ * @brief FM/AM/LW/MW frekvencia kijelzése.
+ * @param currentFrequency Az aktuális frekvencia (10kHz FM, kHz egyébként).
+ * @param colors A használandó színek.
+ * @param d Az X eltolás.
+ */
+void SevenSegmentFreq::displayFmAmFrequency(uint16_t currentFrequency, const SegmentColors& colors, int d) {
+    String freqStr;
+    const __FlashStringHelper* unit = nullptr;
+    const __FlashStringHelper* mask = nullptr;
+    uint8_t currentBandType = band.getCurrentBandType();
+    uint8_t currDemod = band.getCurrentBand().varData.currMod;  // Szükséges az FM ellenőrzéshez
 
-            // AM/LW/MW esetén a frekvencia kHz-ben van tárolva
-            unit = F("kHz");
-            displayFreqHz = currentFrequency;
-            freqStr = String(displayFreqHz);  // Nincs tizedesjegy
-
-            // LW/MW esetén más maszkot használunk
-            if (currentBandType == MW_BAND_TYPE || currentBandType == LW_BAND_TYPE) {
-                mask = F("8888");
-
-            } else {  // SW (rövidhullám)
-                // SW esetén MHz-ben, 3 tizedessel jelenítjük meg
-                unit = F("MHz");
-                mask = F("88.888");
-
-                float displayFreqMHz = currentFrequency / 1000.0f;
-                freqStr = String(displayFreqMHz, 3);
-            }
-            drawFrequency(freqStr, mask, d, colors, unit);
-        }
+    if (currDemod == FM) {
+        unit = F("MHz");
+        mask = F("188.88");
+        float displayFreqMHz = currentFrequency / 100.0f;
+        freqStr = String(displayFreqMHz, 2);
+        drawFrequency(freqStr, mask, d - 10, colors, unit);  // FM eltolás
+    } else {                                                 // AM, LW, MW, SW
+        unit = F("kHz");
+        mask = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? F("8888") : F("88.888");
+        freqStr = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? String(currentFrequency) : String(currentFrequency / 1000.0f, 3);
+        if (currentBandType != MW_BAND_TYPE and currentBandType != LW_BAND_TYPE) unit = F("MHz");  // SW MHz-ben
+        drawFrequency(freqStr, mask, d, colors, unit);
     }
 }
