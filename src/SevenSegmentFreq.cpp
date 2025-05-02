@@ -43,11 +43,10 @@ uint32_t SevenSegmentFreq::calcFreqSpriteXPosition() const {
  *
  * @param freq A megjelenítendő frekvencia.
  * @param mask A nem aktív szegmensek maszkja.
- * @param d Az X pozíció eltolása.
  * @param colors A szegmensek színei.
  * @param unit A mértékegység.
  */
-void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, int16_t d, const SegmentColors& colors, const __FlashStringHelper* unit) {
+void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, const SegmentColors& colors, const __FlashStringHelper* unit) {
 
     // --- Sprite szélességének meghatározása a maszk alapján ---
     spr.setFreeFont(&DSEG7_Classic_Mini_Regular_34);
@@ -58,7 +57,7 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
 
     // --- Sprite létrehozása és rajzolás ---
     // Sprite X pozíciójának kiszámítása a jobb szél igazításához
-    uint16_t spritePushX = freqDispX + d + x - contentWidth;
+    uint16_t spritePushX = freqDispX + x - contentWidth;
     uint16_t spritePushY = freqDispY + 20;
 
     spr.createSprite(contentWidth, FREQ_7SEGMENT_HEIGHT);
@@ -111,10 +110,9 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
 /**
  * @brief Kirajzolja a frekvencia lépésének jelzésére az aláhúzást.
  *
- * @param d Az X pozíció eltolása.
  * @param colors A színek.
  */
-void SevenSegmentFreq::drawStepUnderline(uint16_t d, const SegmentColors& colors) {
+void SevenSegmentFreq::drawStepUnderline(const SegmentColors& colors) {
 
     // Ha nem nincs touch, akkor aláhúzás sem kell
     if (isDisableHandleTouch()) {
@@ -124,10 +122,10 @@ void SevenSegmentFreq::drawStepUnderline(uint16_t d, const SegmentColors& colors
     using namespace SevenSegmentConstants;
 
     // Töröljük a korábbi aláhúzást
-    tft.fillRect(freqDispX + DigitXStart[0] + d, freqDispY + UnderlineYOffset, DigitWidth * 3, UnderlineHeight, TFT_COLOR_BACKGROUND);
+    tft.fillRect(freqDispX + DigitXStart[0], freqDispY + UnderlineYOffset, DigitWidth * 3, UnderlineHeight, TFT_COLOR_BACKGROUND);
 
     // Rajzoljuk ki az aktuális aláhúzást
-    tft.fillRect(freqDispX + DigitXStart[rtv::freqstepnr] + d, freqDispY + UnderlineYOffset, DigitWidth, UnderlineHeight, colors.indicator);
+    tft.fillRect(freqDispX + DigitXStart[rtv::freqstepnr], freqDispY + UnderlineYOffset, DigitWidth, UnderlineHeight, colors.indicator);
 }
 
 /**
@@ -198,7 +196,7 @@ bool SevenSegmentFreq::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         }
 
         // Frissítsük az aláhúzást a kijelzőn
-        drawStepUnderline(0, normalColors);
+        drawStepUnderline(normalColors);
 
         return true;  // Esemény kezelve
     }
@@ -208,9 +206,8 @@ bool SevenSegmentFreq::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
 /**
  * @brief Letörli a frekvencia kijelző területét.
- * @param d Az X eltolás.
  */
-void SevenSegmentFreq::clearDisplayArea(int d) {
+void SevenSegmentFreq::clearDisplayArea() {
 
     // Képernyővédő és egyszerű módban (ahol nincs aláhúzás és kevesebb helyet foglal) vagyunk, akkor nem törlünk
     if (screenSaverActive or simpleMode) {
@@ -221,7 +218,7 @@ void SevenSegmentFreq::clearDisplayArea(int d) {
     uint32_t clearHeightCorr = SevenSegmentConstants::UnderlineHeight + 15;  // a kHz feliratot is töröljük
 
     // A szélességnek elég nagynak kell lennie, hogy minden módot lefedjen
-    tft.fillRect(freqDispX + d, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + clearHeightCorr, TFT_COLOR_BACKGROUND);
+    tft.fillRect(freqDispX, freqDispY + 20, 240, FREQ_7SEGMENT_HEIGHT + clearHeightCorr, TFT_COLOR_BACKGROUND);
 }
 
 /**
@@ -231,9 +228,6 @@ void SevenSegmentFreq::clearDisplayArea(int d) {
  */
 void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
-    int d = 0;  // X eltolás, alapértelmezetten 0  <--- TODO: ezt majd kiszervezni, nem használjuk a 'd'-t
-    // clearDisplayArea(d);  // Kijelző terület törlése --- EZT KIVESSZÜK ---
-
     // Lekérjük az aktuális színeket
     const SegmentColors& colors = getSegmentColors();
 
@@ -241,10 +235,10 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
     const uint8_t currDemod = band.getCurrentBand().varData.currMod;
     if (!screenSaverActive and (currDemod == LSB or currDemod == USB or currDemod == CW)) {
         // SSB vagy CW mód (BFO kezeléssel)
-        displaySsbCwFrequency(currentFrequency, colors, d);
+        displaySsbCwFrequency(currentFrequency, colors);
     } else {
         // FM, AM, LW, MW mód
-        displayFmAmFrequency(currentFrequency, colors, d);
+        displayFmAmFrequency(currentFrequency, colors);
     }
 
     // Alapértelmezett szöveg igazítás visszaállítása, ha szükséges
@@ -255,9 +249,8 @@ void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
  * @brief SSB/CW frekvencia kijelzése (BFO-val vagy anélkül).
  * @param currentFrequency Az aktuális frekvencia (kHz).
  * @param colors A használandó színek.
- * @param d Az X eltolás.
  */
-void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const SegmentColors& colors, int d) {
+void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const SegmentColors& colors) {
     BandTable& currentBand = band.getCurrentBand();
     uint8_t currDemod = currentBand.varData.currMod;
 
@@ -285,24 +278,24 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
             rtv::bfoTr = false;
             for (uint8_t i = 4; i > 1; i--) {
                 tft.setTextSize(rtv::bfoOn ? i : (6 - i));
-                clearDisplayArea(d);  // Törlés minden lépésben
-                tft.drawString(String(s), freqDispX + MINI_FREQ_X + d, freqDispY + MINI_FREQ_Y);
+                clearDisplayArea();  // Törlés minden lépésben
+                tft.drawString(String(s), freqDispX + MINI_FREQ_X, freqDispY + MINI_FREQ_Y);
                 delay(100);
             }
         }
 
         // Ha a BFO nincs bekapcsolva, kirajzoljuk a normál frekvenciát + a métrékegységet
         if (!rtv::bfoOn) {
-            drawFrequency(String(s), F("88 888.88"), d, colors, nullptr);  // Fő frekvencia
+            drawFrequency(String(s), F("88 888.88"), colors, nullptr);  // Fő frekvencia
 
             // "kHz" felirat
             tft.setTextDatum(BC_DATUM);
             tft.setFreeFont();
             tft.setTextSize(2);
             tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-            tft.drawString(F("kHz"), freqDispX + 215 + d, freqDispY + 80);
+            tft.drawString(F("kHz"), freqDispX + 215, freqDispY + 80);
 
-            drawStepUnderline(d, colors);  // Aláhúzás
+            drawStepUnderline(colors);  // Aláhúzás
         }
     }
 
@@ -312,29 +305,29 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
         // tft.fillRect(freqDispX + d, freqDispY + 20, 250, 62, TFT_COLOR_BACKGROUND);
 
         // 1. BFO érték kirajzolása a 7 szegmensesre
-        drawFrequency(String(config.data.currentBFOmanu), F("-888"), d, colors, nullptr);
+        drawFrequency(String(config.data.currentBFOmanu), F("-888"), colors, nullptr);
 
         // Hz felirat
         tft.setTextSize(2);
         tft.setTextDatum(BL_DATUM);
         tft.setTextColor(colors.indicator, TFT_BLACK);  // Vagy TFT_COLOR_BACKGROUND, ha kell törlés
-        tft.drawString("Hz", freqDispX + 120 + d, freqDispY + 40);
+        tft.drawString("Hz", freqDispX + 120, freqDispY + 40);
 
         // BFO felirat
         tft.setTextColor(TFT_BLACK, colors.active);
-        tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);  // Háttér
-        tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);                // Szöveg
-        tft.setTextDatum(BR_DATUM);                                                // Visszaállítás
+        tft.fillRect(freqDispX + 156, freqDispY + 21, 42, 20, colors.active);  // Háttér
+        tft.drawString("BFO", freqDispX + 160, freqDispY + 40);                // Szöveg
+        tft.setTextDatum(BR_DATUM);                                            // Visszaállítás
 
         // 2. Fő frekvencia kisebb méretben
         tft.setTextSize(2);
         tft.setTextDatum(BR_DATUM);
         tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);  // Háttérszínnel töröl
-        tft.drawString(String(s), freqDispX + MINI_FREQ_X + d, freqDispY + MINI_FREQ_Y);
+        tft.drawString(String(s), freqDispX + MINI_FREQ_X, freqDispY + MINI_FREQ_Y);
 
         // 3. Fő frekvencia "kHz" felirata
         tft.setTextSize(1);
-        tft.drawString("kHz", freqDispX + MINI_FREQ_X + 20 + d, freqDispY + MINI_FREQ_Y);
+        tft.drawString("kHz", freqDispX + MINI_FREQ_X + 20, freqDispY + MINI_FREQ_Y);
     }
 }
 
@@ -344,7 +337,7 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
  * @param colors A használandó színek.
  * @param d Az X eltolás.
  */
-void SevenSegmentFreq::displayFmAmFrequency(uint16_t currentFrequency, const SegmentColors& colors, int d) {
+void SevenSegmentFreq::displayFmAmFrequency(uint16_t currentFrequency, const SegmentColors& colors) {
     String freqStr;
     const __FlashStringHelper* unit = nullptr;
     const __FlashStringHelper* mask = nullptr;
@@ -356,12 +349,13 @@ void SevenSegmentFreq::displayFmAmFrequency(uint16_t currentFrequency, const Seg
         mask = F("188.88");
         float displayFreqMHz = currentFrequency / 100.0f;
         freqStr = String(displayFreqMHz, 2);
-        drawFrequency(freqStr, mask, d - 10, colors, unit);  // FM eltolás
-    } else {                                                 // AM, LW, MW, SW
+        drawFrequency(freqStr, mask, colors, unit);  // FM eltolás
+
+    } else {  // AM, LW, MW, SW
         unit = F("kHz");
         mask = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? F("8888") : F("88.888");
         freqStr = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? String(currentFrequency) : String(currentFrequency / 1000.0f, 3);
         if (currentBandType != MW_BAND_TYPE and currentBandType != LW_BAND_TYPE) unit = F("MHz");  // SW MHz-ben
-        drawFrequency(freqStr, mask, d, colors, unit);
+        drawFrequency(freqStr, mask, colors, unit);
     }
 }

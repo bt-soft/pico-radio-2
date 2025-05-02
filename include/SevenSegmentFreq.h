@@ -28,18 +28,17 @@ class SevenSegmentFreq {
 
     uint16_t freqDispX, freqDispY;
     bool screenSaverActive;
-    bool simpleMode = false;             // Egyszerű mód, csak a frekvenciát mutatja
+    bool simpleMode = false;  // Egyszerű mód, csak a frekvenciát mutatja
 
     /**
      * @brief Kirajzolja a frekvenciát a megadott formátumban.
      *
      * @param freq A megjelenítendő frekvencia.
      * @param mask A nem aktív szegmensek maszkja.
-     * @param d Az X pozíció eltolása.
      * @param colors A szegmensek színei.
      * @param unit A mértékegység.
      */
-    void drawFrequency(const String& freq, const __FlashStringHelper* mask, int16_t d, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
+    void drawFrequency(const String& freq, const __FlashStringHelper* mask, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
 
     /**
      * @brief Kiválasztja a megfelelő szegmens színeket az aktuális mód alapján.
@@ -51,23 +50,20 @@ class SevenSegmentFreq {
      * @brief SSB/CW frekvencia kijelzése (BFO-val vagy anélkül).
      * @param currentFrequency Az aktuális frekvencia (kHz).
      * @param colors A használandó színek.
-     * @param d Az X eltolás.
      */
-    void displaySsbCwFrequency(uint16_t currentFrequency, const SegmentColors& colors, int d);
+    void displaySsbCwFrequency(uint16_t currentFrequency, const SegmentColors& colors);
 
     /**
      * @brief FM/AM/LW/MW frekvencia kijelzése.
      * @param currentFrequency Az aktuális frekvencia (10kHz FM, kHz egyébként).
      * @param colors A használandó színek.
-     * @param d Az X eltolás.
      */
-    void displayFmAmFrequency(uint16_t currentFrequency, const SegmentColors& colors, int d);
+    void displayFmAmFrequency(uint16_t currentFrequency, const SegmentColors& colors);
 
     /**
      * @brief Letörli a frekvencia kijelző területét.
-     * @param d Az X eltolás.
      */
-    void clearDisplayArea(int d);
+    void clearDisplayArea();
 
     /**
      * @brief Kiszámítja a frekvencia kijelzés jobb szélének referencia X pozícióját a fő képernyőn.
@@ -78,10 +74,9 @@ class SevenSegmentFreq {
     /**
      * @brief Kirajzolja a frekvencia lépésének jelzésére az aláhúzást.
      *
-     * @param d Az X pozíció eltolása.
      * @param colors A színek.
      */
-    void drawStepUnderline(uint16_t d, const SegmentColors& colors);
+    void drawStepUnderline(const SegmentColors& colors);
 
     /**
      * @brief Ellenőrzi, hogy a touch események kezelése szükséges-e.
