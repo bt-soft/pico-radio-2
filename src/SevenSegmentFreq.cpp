@@ -31,7 +31,7 @@ uint32_t SevenSegmentFreq::calcFreqSpriteXPosition() const {
     if (rtv::SEEK) {
         x = 144;  // SEEK módban fix pozíció
     } else if (rtv::bfoOn and !screenSaverActive) {
-        x = 110;  // BFO módban (nem képernyővédőn) kisebb X kell a Hz kijelzés miatt
+        x = 115;  // BFO módban (nem képernyővédőn) kisebb X kell a Hz kijelzés miatt
     } else if (currentDemod == FM or currentDemod == AM) {
         x = 190;  // FM/AM módban
     } else {
