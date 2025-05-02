@@ -62,7 +62,7 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
     uint16_t spritePushY = freqDispY + 20;
 
     spr.createSprite(contentWidth, FREQ_7SEGMENT_HEIGHT);
-    spr.fillScreen(TFT_COLOR_BACKGROUND);
+    spr.fillScreen(TFT_COLOR_BACKGROUND);  // Sprite belső tartalmának törlése (freki törlés)
     spr.setTextSize(1);
     spr.setTextPadding(0);
     spr.setFreeFont(&DSEG7_Classic_Mini_Regular_34);  // Font beállítása a sprite-on is
