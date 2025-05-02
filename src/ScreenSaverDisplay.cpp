@@ -97,7 +97,7 @@ void ScreenSaverDisplay::displayLoop() {
 
         // Frekvencia kijelzése
         int8_t currentDemod = band.getCurrentBand().varData.currMod;
-        int8_t xOffset = (currentDemod == FM or currentDemod == AM) ? 30 : 50;  // FM/AM esetén 30 pixel eltolás, SSB/CW esetén 50 pixel eltolás
+        int8_t xOffset = (currentDemod == FM or currentDemod == AM) ? 20 : 50;  // FM/AM esetén 30 pixel eltolás, SSB/CW esetén 50 pixel eltolás
         if (rtv::bfoOn) {
             xOffset = -50;  // BFO esetén a frekvenciakijelzés eltolása
         }
@@ -119,9 +119,9 @@ void ScreenSaverDisplay::displayLoop() {
             // Szín beállítása az alacsony feszültségekhez
             uint32_t colorBatt = TFT_DARKCYAN;
             if (bat < 5) {
-                colorBatt = TFT_COLOR(248, 252, 0);
+                colorBatt = TFT_COLOR_DRAINED_BATTERRY;
             } else if (bat < 15) {
-                colorBatt = TFT_ORANGE;
+                colorBatt = TFT_COLOR_SUMBERSIBLE_BATTERRY;
             }
 
             tft.drawRect(saverX + 145, saverY, 38, 18, colorBatt);

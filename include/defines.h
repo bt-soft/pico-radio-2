@@ -30,6 +30,9 @@
 #define MIN_BATTERRY_VOLTAGE 270  // Minimum akkumulátor feszültség (V*100)
 #define MAX_BATTERRY_VOLTAGE 405  // Maximum akkumulátor feszültség (V*100)
 
+#define TFT_COLOR_DRAINED_BATTERRY TFT_COLOR(248, 252, 0)
+#define TFT_COLOR_SUMBERSIBLE_BATTERRY TFT_ORANGE
+
 //--- ScreenSaver
 #define SCREEN_SAVER_TIME 1000 * 60 * 1  // 10 perc a képernyővédő időzítése
 
