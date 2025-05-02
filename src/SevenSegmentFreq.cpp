@@ -265,14 +265,13 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
     uint32_t bfoOffset = simpleMode ? 0 : currentBand.varData.lastBFO;
     uint32_t displayFreqHz = (uint32_t)currentFrequency * 1000 - bfoOffset;
 
-    // Formázás: kHz érték és a 100Hz/10Hz rész kiszámítása
-    long khz_part = displayFreqHz / 1000;
-    int hz_tens_part = abs((int)(displayFreqHz % 1000)) / 10;  // Előjel nélküli érték kell
-
-#define MINI_FREQ_X 215
+#define MINI_FREQ_X 220
 #define MINI_FREQ_Y 62
 
+    // Formázás: kHz érték és a 100Hz/10Hz rész kiszámítása
     char s[12];
+    long khz_part = displayFreqHz / 1000;
+    int hz_tens_part = abs((int)(displayFreqHz % 1000)) / 10;  // Előjel nélküli érték kell
     sprintf(s, "%ld.%02d", khz_part, hz_tens_part);
 
     // --- BFO kijelzés kezelése ---
