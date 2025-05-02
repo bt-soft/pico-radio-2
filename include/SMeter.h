@@ -61,7 +61,7 @@ constexpr uint8_t MeterBarTotalLimit = 15;  // S9 + 6 plusz pont
 // Szöveges címkék rajzolása
 constexpr uint8_t RssiLabelXOffset = 20;
 constexpr uint8_t SnrLabelXOffset = 180;
-constexpr uint8_t SignalLabelYOffset = 50;  // Közös Y eltolás az RSSI és SNR címkékhez
+constexpr uint8_t SignalLabelYOffset = 60;  // Közös Y eltolás az RSSI és SNR címkékhez (Lejjebb hozva)
 
 // RSSI -> S-Pont konverziós konstansok (HF)
 constexpr uint8_t HF_RSSI_S1 = 1, HF_RSSI_S2 = 2, HF_RSSI_S3 = 3, HF_RSSI_S4 = 4;
@@ -217,22 +217,37 @@ class SMeter {
      * S-Meter + RSSI/SNR kiírás (FM esetén nincs SNR/RSSI kijelzés)
      */
     void showRSSI(uint8_t rssi, uint8_t snr, bool isFMMode) {
-        using namespace SMeterConstants;
         smeter(rssi, isFMMode);
 
         if (isFMMode) {
-            return;
+            return;  // Exit early for FM mode
         }
 
-        // RSSI + SNR szöveges megjelenítése
+        using namespace SMeterConstants;
+
+        // --- Szöveg kirajzolása a skála ALATT (snprintf-fel és explicit törléssel) ---
         tft.setFreeFont();
         tft.setTextSize(1);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
 
-        tft.setTextDatum(TL_DATUM);
-        tft.drawString("RSSI " + String(rssi) + " dBuV ", smeterX + RssiLabelXOffset, smeterY + SignalLabelYOffset);
-        tft.setTextDatum(TR_DATUM);
-        tft.drawString(" SNR " + String(snr) + " dB", smeterX + SnrLabelXOffset, smeterY + SignalLabelYOffset);
+        // Statikus változó a maximális szélesség tárolására (törléshez), csak egyszer számoljuk ki.
+        static uint16_t combinedMaxWidth = 0;
+        if (combinedMaxWidth == 0) {  // Csak az első híváskor számoljuk ki
+            // Helyőrző értékekkel számoljuk a maximális szélességet
+            char tempBuffer[40];
+            snprintf(tempBuffer, sizeof(tempBuffer), "RSSI: %3d dBuV  SNR: %3d dB", 100, 100);  // Max értékekkel
+            combinedMaxWidth = tft.textWidth(tempBuffer);
+            if (combinedMaxWidth == 0) combinedMaxWidth = 160;  // Biztonsági érték, ha a textWidth 0-t adna
+        }
+
+        // Formázott string létrehozása snprintf segítségével, fix szélességgel az SNR-nek
+        char signalBuffer[40];  // Buffer a teljes szövegnek
+        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %d dBuV  SNR: %3d dB", rssi, snr);
+
+        // Teljes string kirajzolása egyszerre (Bottom Left igazítás) padding NÉLKÜL, ez törli a korábbi felirat értékeket is
+        tft.setTextDatum(BL_DATUM);
+        tft.setTextPadding(0);  // NINCS padding
+        tft.drawString(signalBuffer, smeterX + RssiLabelXOffset, smeterY + SignalLabelYOffset);
     }
 };
 
