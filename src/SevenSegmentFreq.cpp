@@ -49,16 +49,16 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
     uint8_t currentBandType = band.getCurrentBandType();
     uint8_t currentDemod = band.getCurrentBand().varData.currMod;
 
-    int x = 222;
-    if (rtv::bfoOn and !screenSaverActive) {
-        x = 110;
-    } else if (currentDemod == FM or currentDemod == AM) {
-        x = 190;
-    } else if (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) {
-        x = 222;
-    }
+    uint32_t x;  // X pozíció a sprite-on belüli rajzoláshoz
+
     if (rtv::SEEK) {
-        x = 144;
+        x = 144;  // SEEK módban fix pozíció
+    } else if (rtv::bfoOn and !screenSaverActive) {
+        x = 110;  // BFO módban (nem képernyővédőn) kisebb X kell a Hz kijelzés miatt
+    } else if (currentDemod == FM or currentDemod == AM) {
+        x = 190;  // FM/AM módban
+    } else {
+        x = 222;  // Alapértelmezett (SSB/CW BFO nélkül, MW, LW)
     }
 
     // Először a maszkot rajzoljuk ki
