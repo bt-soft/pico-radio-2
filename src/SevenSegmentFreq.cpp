@@ -50,7 +50,7 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
     uint8_t currentDemod = band.getCurrentBand().varData.currMod;
 
     int x = 222;
-    if (rtv::bfoOn) {
+    if (rtv::bfoOn and !screenSaverActive) {
         x = 110;
     } else if (currentDemod == FM or currentDemod == AM) {
         x = 190;
