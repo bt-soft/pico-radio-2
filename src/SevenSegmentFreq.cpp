@@ -82,9 +82,10 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
     spr.pushSprite(spritePushX, spritePushY);
     spr.deleteSprite();
 
-    // Sárga keret rajzolása a sprite köré a fő TFT-re
     uint16_t spriteRightEdgeX = spritePushX + contentWidth;  // A sprite jobb szélének X koordinátája
-    tft.drawRect(spritePushX, spritePushY, contentWidth, FREQ_7SEGMENT_HEIGHT, TFT_YELLOW);
+
+    // Sárga keret rajzolása a sprite köré a fő TFT-re
+    // tft.drawRect(spritePushX, spritePushY, contentWidth, FREQ_7SEGMENT_HEIGHT, TFT_YELLOW);
 
     // kHz/MHz mértékegység kirajzolása
     if (unit != nullptr) {
@@ -231,8 +232,7 @@ void SevenSegmentFreq::clearDisplayArea(int d) {
 void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
     int d = 0;  // X eltolás, alapértelmezetten 0  <--- TODO: ezt majd kiszervezni, nem használjuk a 'd'-t
-    clearDisplayArea(d);  // Kijelző terület törlése
-
+    // clearDisplayArea(d);  // Kijelző terület törlése --- EZT KIVESSZÜK ---
 
     // Lekérjük az aktuális színeket
     const SegmentColors& colors = getSegmentColors();
@@ -269,6 +269,9 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
     long khz_part = displayFreqHz / 1000;
     int hz_tens_part = abs((int)(displayFreqHz % 1000)) / 10;  // Előjel nélküli érték kell
 
+#define MINI_FREQ_X 215
+#define MINI_FREQ_Y 62
+
     char s[12];
     sprintf(s, "%ld.%02d", khz_part, hz_tens_part);
 
@@ -284,12 +287,12 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
             for (uint8_t i = 4; i > 1; i--) {
                 tft.setTextSize(rtv::bfoOn ? i : (6 - i));
                 clearDisplayArea(d);  // Törlés minden lépésben
-                tft.drawString(String(s), freqDispX + 230 + d, freqDispY + 62);
+                tft.drawString(String(s), freqDispX + MINI_FREQ_X + d, freqDispY + MINI_FREQ_Y);
                 delay(100);
             }
         }
 
-        // Ha a BFO nincs bekapcsolva, kirajzoljuk a normál frekvenciát
+        // Ha a BFO nincs bekapcsolva, kirajzoljuk a normál frekvenciát + a métrékegységet
         if (!rtv::bfoOn) {
             drawFrequency(String(s), F("88 888.88"), d, colors, nullptr);  // Fő frekvencia
 
@@ -315,24 +318,24 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
         // Hz felirat
         tft.setTextSize(2);
         tft.setTextDatum(BL_DATUM);
-        tft.setTextColor(colors.indicator, TFT_BLACK);
+        tft.setTextColor(colors.indicator, TFT_BLACK);  // Vagy TFT_COLOR_BACKGROUND, ha kell törlés
         tft.drawString("Hz", freqDispX + 120 + d, freqDispY + 40);
 
         // BFO felirat
         tft.setTextColor(TFT_BLACK, colors.active);
-        tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);
-        tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);
-        tft.setTextDatum(BR_DATUM);
+        tft.fillRect(freqDispX + 156 + d, freqDispY + 21, 42, 20, colors.active);  // Háttér
+        tft.drawString("BFO", freqDispX + 160 + d, freqDispY + 40);                // Szöveg
+        tft.setTextDatum(BR_DATUM);                                                // Visszaállítás
 
         // 2. Fő frekvencia kisebb méretben
         tft.setTextSize(2);
         tft.setTextDatum(BR_DATUM);
-        tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
-        tft.drawString(String(s), freqDispX + 220 + d, freqDispY + 62);
+        tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);  // Háttérszínnel töröl
+        tft.drawString(String(s), freqDispX + MINI_FREQ_X + d, freqDispY + MINI_FREQ_Y);
 
-        // 3. "kHz" felirat
+        // 3. Fő frekvencia "kHz" felirata
         tft.setTextSize(1);
-        tft.drawString("kHz", freqDispX + 242 + d, freqDispY + 62);
+        tft.drawString("kHz", freqDispX + MINI_FREQ_X + 20 + d, freqDispY + MINI_FREQ_Y);
     }
 }
 

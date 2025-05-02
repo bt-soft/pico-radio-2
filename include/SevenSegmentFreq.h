@@ -28,7 +28,7 @@ class SevenSegmentFreq {
 
     uint16_t freqDispX, freqDispY;
     bool screenSaverActive;
-    bool simpleMode = false;  // Egyszerű mód, csak a frekvenciát mutatja
+    bool simpleMode = false;             // Egyszerű mód, csak a frekvenciát mutatja
 
     /**
      * @brief Kirajzolja a frekvenciát a megadott formátumban.
