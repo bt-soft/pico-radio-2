@@ -230,19 +230,9 @@ class SMeter {
         tft.setTextSize(1);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
 
-        // Statikus változó a maximális szélesség tárolására (törléshez), csak egyszer számoljuk ki.
-        static uint16_t combinedMaxWidth = 0;
-        if (combinedMaxWidth == 0) {  // Csak az első híváskor számoljuk ki
-            // Helyőrző értékekkel számoljuk a maximális szélességet
-            char tempBuffer[40];
-            snprintf(tempBuffer, sizeof(tempBuffer), "RSSI: %3d dBuV  SNR: %3d dB", 100, 100);  // Max értékekkel
-            combinedMaxWidth = tft.textWidth(tempBuffer);
-            if (combinedMaxWidth == 0) combinedMaxWidth = 160;  // Biztonsági érték, ha a textWidth 0-t adna
-        }
-
         // Formázott string létrehozása snprintf segítségével, fix szélességgel az SNR-nek
         char signalBuffer[40];  // Buffer a teljes szövegnek
-        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %d dBuV  SNR: %3d dB", rssi, snr);
+        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %d dBuV      SNR: %3d dB", rssi, snr);
 
         // Teljes string kirajzolása egyszerre (Bottom Left igazítás) padding NÉLKÜL, ez törli a korábbi felirat értékeket is
         tft.setTextDatum(BL_DATUM);
