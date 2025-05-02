@@ -26,7 +26,7 @@ const SegmentColors bfoColors = {TFT_ORANGE, TFT_BROWN, TFT_ORANGE};
  */
 uint32_t SevenSegmentFreq::calcFreqSpriteXPosition() const {
     uint8_t currentDemod = band.getCurrentBand().varData.currMod;
-    uint32_t x;
+    uint32_t x = 222;  // Alapértelmezett (SSB/CW BFO nélkül, MW, LW)
 
     if (rtv::SEEK) {
         x = 144;  // SEEK módban fix pozíció
@@ -34,8 +34,6 @@ uint32_t SevenSegmentFreq::calcFreqSpriteXPosition() const {
         x = 115;  // BFO módban (nem képernyővédőn) kisebb X kell a Hz kijelzés miatt
     } else if (currentDemod == FM or currentDemod == AM) {
         x = 190;  // FM/AM módban
-    } else {
-        x = 222;  // Alapértelmezett (SSB/CW BFO nélkül, MW, LW)
     }
     return x;
 }
@@ -232,13 +230,15 @@ void SevenSegmentFreq::clearDisplayArea(int d) {
  */
 void SevenSegmentFreq::freqDispl(uint16_t currentFrequency) {
 
-    // Lekérjük az aktuális módot és színeket
-    const uint8_t currDemod = band.getCurrentBand().varData.currMod;
-    int d = 0;  // X eltolás, alapértelmezetten 0
-    const SegmentColors& colors = getSegmentColors();
+    int d = 0;  // X eltolás, alapértelmezetten 0  <--- TODO: ezt majd kiszervezni, nem használjuk a 'd'-t
     clearDisplayArea(d);  // Kijelző terület törlése
 
+
+    // Lekérjük az aktuális színeket
+    const SegmentColors& colors = getSegmentColors();
+
     // Mód alapján a megfelelő megjelenítő függvény hívása
+    const uint8_t currDemod = band.getCurrentBand().varData.currMod;
     if (!screenSaverActive and (currDemod == LSB or currDemod == USB or currDemod == CW)) {
         // SSB vagy CW mód (BFO kezeléssel)
         displaySsbCwFrequency(currentFrequency, colors, d);
@@ -310,7 +310,7 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
         // tft.fillRect(freqDispX + d, freqDispY + 20, 250, 62, TFT_COLOR_BACKGROUND);
 
         // 1. BFO érték kirajzolása a 7 szegmensesre
-        drawFrequency(String(config.data.currentBFOmanu), F("-888"), d, colors);
+        drawFrequency(String(config.data.currentBFOmanu), F("-888"), d, colors, nullptr);
 
         // Hz felirat
         tft.setTextSize(2);
