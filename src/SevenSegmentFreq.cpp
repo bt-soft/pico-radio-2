@@ -21,35 +21,12 @@ const SegmentColors screenSaverColors = {TFT_SKYBLUE, TFT_COLOR(50, 50, 50), TFT
 const SegmentColors bfoColors = {TFT_ORANGE, TFT_BROWN, TFT_ORANGE};
 
 /**
- * @brief Kirajzolja a frekvenciát a megadott formátumban.
- *
- * @param freq A megjelenítendő frekvencia.
- * @param mask A nem aktív szegmensek maszkja.
- * @param d Az X pozíció eltolása.
- * @param colors A szegmensek színei.
- * @param unit A mértékegység.
+ * @brief Kiszámítja a frekvencia kijelzés Sprite jobb szélének referencia X pozícióját a fő képernyőn.
+ * @return A kiszámított X pozíció.
  */
-void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, int16_t d, const SegmentColors& colors, const __FlashStringHelper* unit) {
-
-    DEBUG("SevenSegmentFreq::drawFrequency() -> freqStr: %s,  mask: %s, d: %d\n", freq.c_str(), mask, d);
-
-    // uint16_t spriteWidth = rtv::bfoOn ? FREQ_7SEGMENT_BFO_WIDTH : tft.width() / 2;
-    uint16_t spriteWidth = tft.width() / 2;
-
-    if (rtv::SEEK) {
-        spriteWidth = FREQ_7SEGMENT_SEEK_WIDTH;
-    }
-    spr.createSprite(spriteWidth, FREQ_7SEGMENT_HEIGHT);
-    spr.fillScreen(TFT_COLOR_BACKGROUND);
-    spr.setTextSize(1);
-    spr.setTextPadding(0);
-    spr.setFreeFont(&DSEG7_Classic_Mini_Regular_34);
-    spr.setTextDatum(BR_DATUM);
-
-    uint8_t currentBandType = band.getCurrentBandType();
+uint32_t SevenSegmentFreq::calcFreqSpriteXPosition() const {
     uint8_t currentDemod = band.getCurrentBand().varData.currMod;
-
-    uint32_t x;  // X pozíció a sprite-on belüli rajzoláshoz
+    uint32_t x;
 
     if (rtv::SEEK) {
         x = 144;  // SEEK módban fix pozíció
@@ -60,43 +37,74 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
     } else {
         x = 222;  // Alapértelmezett (SSB/CW BFO nélkül, MW, LW)
     }
+    return x;
+}
+
+/**
+ * @brief Kirajzolja a frekvenciát a megadott formátumban.
+ *
+ * @param freq A megjelenítendő frekvencia.
+ * @param mask A nem aktív szegmensek maszkja.
+ * @param d Az X pozíció eltolása.
+ * @param colors A szegmensek színei.
+ * @param unit A mértékegység.
+ */
+void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelper* mask, int16_t d, const SegmentColors& colors, const __FlashStringHelper* unit) {
+
+    // --- Sprite szélességének meghatározása a maszk alapján ---
+    spr.setFreeFont(&DSEG7_Classic_Mini_Regular_34);
+    uint16_t contentWidth = spr.textWidth(mask);  // Szélesség lekérése a sprite kontextusában
+
+    // Referencia X pozíció kiszámítása a segédfüggvénnyel
+    uint32_t x = calcFreqSpriteXPosition();
+
+    // --- Sprite létrehozása és rajzolás ---
+    // Sprite X pozíciójának kiszámítása a jobb szél igazításához
+    uint16_t spritePushX = freqDispX + d + x - contentWidth;
+    uint16_t spritePushY = freqDispY + 20;
+
+    spr.createSprite(contentWidth, FREQ_7SEGMENT_HEIGHT);
+    spr.fillScreen(TFT_COLOR_BACKGROUND);
+    spr.setTextSize(1);
+    spr.setTextPadding(0);
+    spr.setFreeFont(&DSEG7_Classic_Mini_Regular_34);  // Font beállítása a sprite-on is
+    spr.setTextDatum(BR_DATUM);                       // Jobbra-alulra igazítás
 
     // Először a maszkot rajzoljuk ki
     if (config.data.tftDigitLigth) {
         spr.setTextColor(colors.inactive);
-        spr.drawString(mask, x, FREQ_7SEGMENT_HEIGHT);
+        spr.drawString(mask, contentWidth, FREQ_7SEGMENT_HEIGHT);  // Jobbra igazítva a sprite-on belül
     }
 
     // Majd utána a frekvenciát
     spr.setTextColor(colors.active);
-    spr.drawString(freq, x, FREQ_7SEGMENT_HEIGHT);
+    spr.drawString(freq, contentWidth, FREQ_7SEGMENT_HEIGHT);  // Jobbra igazítva a sprite-on belül
 
     // Megjelenítés
-    spr.pushSprite(freqDispX + d, freqDispY + 20);
+    spr.pushSprite(spritePushX, spritePushY);
     spr.deleteSprite();
+
+    // Sárga keret rajzolása a sprite köré a fő TFT-re
+    uint16_t spriteRightEdgeX = spritePushX + contentWidth;  // A sprite jobb szélének X koordinátája
+    tft.drawRect(spritePushX, spritePushY, contentWidth, FREQ_7SEGMENT_HEIGHT, TFT_YELLOW);
 
     // kHz/MHz mértékegység kirajzolása
     if (unit != nullptr) {
-        // Explicit font és méret beállítás a tft-n a mértékegységhez
-        tft.setFreeFont();  // Standard font használata a mértékegységhez
-        // Betűtípus és méret beállítása a méretek lekérdezése előtt
+        // Betűtípus és méret beállítása a méretek lekérdezése és a rajzolás előtt
         tft.setFreeFont();  // Standard font használata a mértékegységhez
         tft.setTextSize(2);
-        uint8_t fontHeight = tft.fontHeight();     // Betűmagasság lekérdezése a pozicionáláshoz/törléshez
-        uint16_t unitWidth = tft.textWidth(unit);  // Mértékegység szélességének lekérdezése a törléshez
 
         // Szöveg tulajdonságainak beállítása a rajzoláshoz
         tft.setTextDatum(BL_DATUM);  // Bottom-Left (bal alsó) igazítás használata a számjegyek utáni pozicionáláshoz
         tft.setTextColor(colors.indicator, TFT_COLOR_BACKGROUND);
 
         // X pozíció kiszámítása a frekvencia számjegyek jobb széléhez képest
-        uint16_t unitX = freqDispX + d + x + 5;  // Pozicionáljuk a mértékegységet 5 pixellel a számjegyek jobb széle után
+        uint16_t unitX = spriteRightEdgeX + 5;  // Pozicionálás a sprite jobb szélétől 5 pixelre
 
         // Y pozíció kiszámítása, hogy az alapvonal a számjegyek alapvonalához igazodjon
-        uint16_t unitY = freqDispY + 20 + FREQ_7SEGMENT_HEIGHT;  // Igazítás a számjegyek alapvonalához
+        uint16_t unitY = spritePushY + FREQ_7SEGMENT_HEIGHT;  // Igazítás a sprite alsó széléhez (alapvonal)
 
         // Terület törlése és a mértékegység kiírása
-        tft.fillRect(unitX, unitY - fontHeight, unitWidth + 2, fontHeight + 2, TFT_COLOR_BACKGROUND);  // Terület törlése
         tft.drawString(unit, unitX, unitY);
     }
 }

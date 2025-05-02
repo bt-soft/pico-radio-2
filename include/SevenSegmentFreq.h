@@ -70,6 +70,12 @@ class SevenSegmentFreq {
     void clearDisplayArea(int d);
 
     /**
+     * @brief Kiszámítja a frekvencia kijelzés jobb szélének referencia X pozícióját a fő képernyőn.
+     * @return A kiszámított X pozíció.
+     */
+    uint32_t calcFreqSpriteXPosition() const;
+
+    /**
      * @brief Kirajzolja a frekvencia lépésének jelzésére az aláhúzást.
      *
      * @param d Az X pozíció eltolása.
