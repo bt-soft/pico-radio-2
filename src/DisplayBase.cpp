@@ -577,10 +577,8 @@ void DisplayBase::buildHorizontalScreenButtons(BuildButtonData screenHButtonsDat
         {"Ham", TftButton::ButtonType::Pushable},                                 //
         {"Band", TftButton::ButtonType::Pushable},                                //
         {"DeMod", TftButton::ButtonType::Pushable},                               //
-        {"BndW", TftButton::ButtonType::Pushable},                                //
-        {"BFO", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off},  // BFO gomb hozzáadása
-        {"Step", TftButton::ButtonType::Pushable},                                //
         {"Scan", TftButton::ButtonType::Pushable},                                //
+        {"Step", TftButton::ButtonType::Pushable},                                //
     };
     uint8_t mandatoryHButtonsLength = ARRAY_ITEM_COUNT(mandatoryHButtons);
 

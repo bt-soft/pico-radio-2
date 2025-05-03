@@ -44,14 +44,16 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     DisplayBase::buildVerticalScreenButtons(nullptr, 0);
 
     // Horizontális Képernyőgombok definiálása
+    // Csak az FM-specifikus gombokat adjuk hozzá.
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
-        {"RDS", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(config.data.rdsEnabled)},  //
+        {"RDS", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(config.data.rdsEnabled)},  // 
         {"SeekD", TftButton::ButtonType::Pushable},                                                   // Seek Down
         {"SeekU", TftButton::ButtonType::Pushable},                                                   // Seek Up
     };
 
-    // Horizontális képernyőgombok legyártása
-    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData));
+    // Horizontális képernyőgombok legyártása:
+    // Összefűzzük a kötelező gombokat (amiből kivettük a BndW, BFO-t) az FM-specifikus gombokkal.
+    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true); // isMandatoryNeed = true
 }
 
 /**

@@ -19,12 +19,16 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     DisplayBase::buildVerticalScreenButtons(nullptr, 0);
 
     // Horizontális képernyőgombok definiálása
+    // Hozzáadjuk az AM-specifikus gombokat ÉS a BndW, BFO gombokat.
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
-        {"AntC", TftButton::ButtonType::Pushable},  //
+        {"BFO", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off},  //
+        {"BndW", TftButton::ButtonType::Pushable},                                //
+        {"AntC", TftButton::ButtonType::Pushable},                                //
     };
 
-    // Horizontális képernyőgombok legyártása
-    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData));
+    // Horizontális képernyőgombok legyártása:
+    // Összefűzzük a kötelező gombokat az AM-specifikus (és BndW, BFO) gombokkal.
+    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
 }
 
 /**
