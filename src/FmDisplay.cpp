@@ -2,12 +2,29 @@
 
 #include <Arduino.h>
 
+// --- Külső Globális Változók Deklarálása ---
+#include "RotaryEncoder.h"           // Szükséges a RotaryEncoder típushoz
+extern RotaryEncoder rotaryEncoder;  // Jelezzük, hogy ez máshol van definiálva
+
+// --- Seek Callback függvények (statikusak, mert a C library ezt várja) ---
+// Hozzáférés a globális/statikus tft és rotaryEncoder objektumokhoz szükséges lehet.
+// Alternatív megoldás lehetne lambda függvények használata, ha a library támogatja a kontextus átadását.
+
+static TFT_eSPI *pSeekTft = nullptr;  // Pointer a TFT objektumra a callbackekhez
+// static RotaryEncoder* pSeekRotary = nullptr; // Ezt nem használjuk közvetlenül
+static SevenSegmentFreq *pSeekFreqDisplay = nullptr;  // Pointer a frekvenciakijelzőre
+static volatile bool seekStoppedByUser = false;       // Flag a keresés megszakításához
+
 /**
  * Konstruktor
  */
 FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tft, si4735, band), pSMeter(nullptr), pRds(nullptr), pSevenSegmentFreq(nullptr) {
 
     DEBUG("FmDisplay::FmDisplay\n");
+
+    // Statikus pointerek beállítása a callbackekhez
+    pSeekTft = &tft;
+    // pSeekRotary = &rotaryEncoder; // Nem tároljuk el a pointert
 
     // SMeter példányosítása
     pSMeter = new SMeter(tft, 0, 80);
@@ -21,6 +38,7 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
 
     // Frekvencia kijelzés pédányosítása
     pSevenSegmentFreq = new SevenSegmentFreq(tft, rtv::freqDispX, rtv::freqDispY, band);
+    pSeekFreqDisplay = pSevenSegmentFreq;  // Pointer beállítása a callbackhez
 
     // Függőleges gombok legyártása, nincs saját függőleges gombsor
     DisplayBase::buildVerticalScreenButtons(nullptr, 0);
@@ -28,6 +46,8 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Horizontális Képernyőgombok definiálása
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"RDS", TftButton::ButtonType::Toggleable, TFT_TOGGLE_BUTTON_STATE(config.data.rdsEnabled)},  //
+        {"SeekD", TftButton::ButtonType::Pushable},                                                   // Seek Down
+        {"SeekU", TftButton::ButtonType::Pushable},                                                   // Seek Up
     };
 
     // Horizontális képernyőgombok legyártása
@@ -53,6 +73,39 @@ FmDisplay::~FmDisplay() {
     if (pSevenSegmentFreq) {
         delete pSevenSegmentFreq;
     }
+}
+
+// --- Seek Callback Implementációk ---
+
+/**
+ * @brief Callback a seek folyamat közbeni frekvencia kijelzéshez.
+ * @param freq Az aktuálisan talált frekvencia (a rádió formátumában, pl. 10kHz FM esetén).
+ */
+static void seekFreqCallback(uint16_t freq) {
+    if (pSeekFreqDisplay) {
+        // Itt csak a frekvenciát frissítjük, a teljes kijelzőt nem rajzoljuk újra.
+        pSeekFreqDisplay->freqDispl(freq);
+    }
+    // Opcionális: Vizuális visszajelzés a keresésről (pl. "SEEK..." szöveg)
+    // Ezt a gombnyomáskor is meg lehet jeleníteni és a keresés végén levenni.
+}
+
+/**
+ * @brief Callback a keresés felhasználói megszakításának ellenőrzéséhez.
+ * @return true, ha a felhasználó megszakította a keresést, egyébként false.
+ */
+static bool checkStopSeekingCallback() {
+    // Közvetlenül a globális rotaryEncoder objektumot használjuk itt,
+    // mivel a seekStationProgress valószínűleg blokkol, és a handleRotary nem fut.
+    if (!pSeekTft) return false;  // TFT pointer ellenőrzése
+
+    uint16_t tx, ty;
+    bool touched = pSeekTft->getTouch(&tx, &ty);                     // Érintés ellenőrzése
+    RotaryEncoder::EncoderState rotaryState = rotaryEncoder.read();  // Közvetlen olvasás a globális objektumból
+
+    seekStoppedByUser = touched || (rotaryState.direction != RotaryEncoder::Direction::None) || (rotaryState.buttonState != RotaryEncoder::ButtonState::Open);
+
+    return seekStoppedByUser;
 }
 
 /**
@@ -107,6 +160,58 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
         } else {
             pRds->clearRds();
         }
+
+    } else if (STREQ("SeekD", event.label) or STREQ("SeekU", event.label)) {
+
+        // Állomáskeresés irányának meghatározása
+        bool seekUp = STREQ("SeekU", event.label);
+
+        // Vizuális visszajelzés indítása
+        tft.setFreeFont();
+        tft.setTextSize(2);
+        tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
+        tft.setTextDatum(TL_DATUM);  // Top-Left datum (szöveg bal felső sarka)
+
+        constexpr uint16_t seekTextX = 20;
+        constexpr uint16_t seekTextY = 65;
+        const char *seekText = seekUp ? "Seek Up..." : "Seek Down...";
+        uint16_t textWidth = tft.textWidth(seekText);    // Szöveg szélességének lekérése
+        uint16_t textHeight = tft.fontHeight();          // Szöveg magasságának lekérése
+        tft.drawString(seekText, seekTextX, seekTextY);  // Szöveg kirajzolása
+
+        // Callback flag reset
+        seekStoppedByUser = false;
+
+        // Keresés indítása a megfelelő callbackekkel
+        // A setSeekFmSpacing és setSeekFmLimits beállítását feltételezzük,
+        // hogy a bandSet() vagy a rádió inicializálása során megtörtént.
+        si4735.seekStationProgress(seekFreqCallback, checkStopSeekingCallback, seekUp ? SEEK_UP : SEEK_DOWN);
+
+        // Pontosan a szöveg helyét töröljük a kiszámított koordinátákkal
+        tft.fillRect(seekTextX, seekTextY, textWidth, textHeight, TFT_COLOR_BACKGROUND);
+
+        // Ha nem a felhasználó állította le
+        if (!seekStoppedByUser) {
+
+            // Új frekvencia lekérdezése és beállítása
+            uint16_t newFreq = si4735.getFrequency();
+            band.getCurrentBand().varData.currFreq = newFreq;
+
+            // RDS törlése az új frekvencián
+            pRds->clearRds();
+
+            // Kijelző frissítésének jelzése
+            DisplayBase::frequencyChanged = true;
+
+            // Mono/Stereo frissítése az új frekvencián
+            si4735.getCurrentReceivedSignalQuality();  // Szükséges lehet a pilot lekérdezése előtt
+            this->showMonoStereo(si4735.getCurrentPilot());
+
+        } else {
+            // Ha a felhasználó állította le, a frekvencia már visszaállt az eredetire a seekStationProgress által (feltételezve)
+            // Csak a kijelzőt kell frissíteni az eredeti frekvenciával
+            DisplayBase::frequencyChanged = true;
+        }
     }
 }
 
@@ -139,6 +244,12 @@ void FmDisplay::showMonoStereo(bool stereo) {
  */
 bool FmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
 
+    // Ha éppen keresünk, ne reagáljunk a forgatásra (a megszakítást a callback kezeli)
+    // Bár a seekStationProgress valószínűleg blokkol, ez biztonsági ellenőrzés.
+    // A seekStoppedByUser flaget a callback állítja be. Ha a keresés fut, ez false.
+    // Ha a felhasználó forgat, a callback true-ra állítja és a seekStationProgress leáll.
+    // Így ide már csak akkor jutunk el, ha a keresés nem aktív.
+
     BandTable &currentBand = band.getCurrentBand();
 
     // Kiszámítjuk a frekvencia lépés nagyságát
@@ -163,6 +274,12 @@ bool FmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
  * Esemény nélküli display loop -> Adatok periódikus megjelenítése
  */
 void FmDisplay::displayLoop() {
+
+    // Ha éppen keresünk (a seekStoppedByUser false, de a keresés elindult),
+    // akkor ne frissítsük a kijelzőt itt, mert a callback frissíti a frekvenciát.
+    // A seekStationProgress valószínűleg blokkoló jellegű lehet a callbackekkel,
+    // így ez a loop ritkábban fut le keresés alatt.
+    // A biztonság kedvéért ellenőrizhetnénk egy 'seeking' flag-et, amit a gombnyomáskor állítunk.
 
     // Ha van dialóg, akkor nem frissítjük a komponenseket
     if (DisplayBase::pDialog != nullptr) {
