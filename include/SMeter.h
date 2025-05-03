@@ -59,9 +59,9 @@ constexpr uint8_t MeterBarSPointLimit = 9;  // S9-ig
 constexpr uint8_t MeterBarTotalLimit = 15;  // S9 + 6 plusz pont
 
 // Szöveges címkék rajzolása
-constexpr uint8_t RssiLabelXOffset = 20;
-constexpr uint8_t SnrLabelXOffset = 180;
-constexpr uint8_t SignalLabelYOffset = 60;  // Közös Y eltolás az RSSI és SNR címkékhez (Lejjebb hozva)
+constexpr uint8_t RssiLabelXOffset = 10;
+// constexpr uint8_t SignalLabelYOffset = 60;  // Közös Y eltolás az RSSI és SNR címkékhez (Lejjebb hozva)
+constexpr uint8_t SignalLabelYOffset = 0;  // Közös Y eltolás az RSSI és SNR címkékhez (Lejjebb hozva)
 
 // RSSI -> S-Pont konverziós konstansok (HF)
 constexpr uint8_t HF_RSSI_S1 = 1, HF_RSSI_S2 = 2, HF_RSSI_S3 = 3, HF_RSSI_S4 = 4;
@@ -215,6 +215,8 @@ class SMeter {
 
     /**
      * S-Meter + RSSI/SNR kiírás (FM esetén nincs SNR/RSSI kijelzés)
+     *  @param rssi the current receive signal strength (0–127 dBμV)
+     *  @param snr the current SNR metric (0–127 dB)
      */
     void showRSSI(uint8_t rssi, uint8_t snr, bool isFMMode) {
         smeter(rssi, isFMMode);
@@ -232,7 +234,7 @@ class SMeter {
 
         // Formázott string létrehozása snprintf segítségével, fix szélességgel az SNR-nek
         char signalBuffer[40];  // Buffer a teljes szövegnek
-        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %d dBuV      SNR: %3d dB", rssi, snr);
+        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %3d dBuV    SNR: %3d dB", rssi, snr);
 
         // Teljes string kirajzolása egyszerre (Bottom Left igazítás) padding NÉLKÜL, ez törli a korábbi felirat értékeket is
         tft.setTextDatum(BL_DATUM);
