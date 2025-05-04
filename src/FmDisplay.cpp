@@ -27,13 +27,13 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // pSeekRotary = &rotaryEncoder; // Nem tároljuk el a pointert
 
     // SMeter példányosítása
-    pSMeter = new SMeter(tft, 0, 80);
+    pSMeter = new SMeter(tft, 0, 110);
 
     // RDS példányosítása
     pRds = new Rds(tft, si4735, 80, 62,  // Station x,y
                    0, 80,                // Message x,y
                    2, 42,                // Time x,y
-                   0, 140                // program type x,y
+                   0, 105                // program type x,y
     );
 
     // Frekvencia kijelzés pédányosítása

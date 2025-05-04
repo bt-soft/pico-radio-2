@@ -6,7 +6,7 @@
 
 #include "utils.h"
 
-#define DEFAULT_MAX_SCROLL_WIDTH 16  // Maximális görgetési szélesség (karakterekben)
+#define DEFAULT_MAX_SCROLL_WIDTH 20  // Maximális görgetési szélesség (karakterekben)
 
 /**
  *

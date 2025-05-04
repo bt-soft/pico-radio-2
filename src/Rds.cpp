@@ -112,26 +112,27 @@ void Rds::scrollRdsText() {
     }
 
     // 1. Szövegjellemzők beállítása
-    tft.setTextSize(1);                      // Betűméret a görgetett szöveghez
+    tft.setTextSize(2);                      // Betűméret a görgetett szöveghez
     tft.setTextColor(TFT_WHITE, TFT_BLACK);  // Fehér szöveg fekete háttéren
     tft.setTextDatum(TL_DATUM);              // Top-Left datum a drawString-hoz
 
     // 2. Szélességek kiszámítása
     // Lekérdezzük a teljes rdsInfo szöveg pixelben mért szélességét
     uint16_t textWidth = tft.textWidth(rdsInfo);
+
     // A maximális megjelenítési szélesség pixelben (a konstruktorban megadott karakter * font szélesség)
-    uint16_t displayWidth = font1Width * maxScrollWidth;
+    uint16_t scrollDisplayWidth = font2Width * maxScrollWidth;
 
     // 3. Statikus változók a görgetés állapotának kezeléséhez
-    static int currentPixelOffset = 0;          // Aktuális pixel eltolás balra
-    const int PIXEL_STEP = 3;                   // Hány pixelt görgessen egy lépésben - sebesség
-    const int SLIDE_IN_GAP_PIXELS = textWidth;  // Szóköz a szöveg vége és az újra megjelenés között
+    static int currentPixelOffset = 0;                   // Aktuális pixel eltolás balra
+    const int PIXEL_STEP = 3;                            // Hány pixelt görgessen egy lépésben - sebesség
+    const int SLIDE_IN_GAP_PIXELS = scrollDisplayWidth;  // Szóköz a szöveg vége és az újra megjelenés között
 
     // 4. Görgetési logika végrehajtása (minden híváskor)
-    if (textWidth <= displayWidth) {
+    if (textWidth <= scrollDisplayWidth) {
         // Szöveg elfér, nincs szükség görgetésre ->  Nincs szükség viewportra
         if (rdsInfoChanged) {
-            tft.fillRect(msgX, msgY, displayWidth, font1Height, TFT_BLACK);  // Terület törlése
+            tft.fillRect(msgX, msgY, scrollDisplayWidth, font2Height, TFT_BLACK);  // Terület törlése
             tft.setCursor(msgX, msgY);
             tft.setTextDatum(TL_DATUM);  // Visszaállítás a printhez
             tft.print(rdsInfo);
@@ -141,10 +142,15 @@ void Rds::scrollRdsText() {
         }
 
     } else {
+        if (rdsInfoChanged) {
+            currentPixelOffset = 0;  // Eltolás nullázása
+            rdsInfoChanged = false;  // Flag reset
+        }
+
         // Szöveg túl hosszú -> görgetés
         // Viewport beállítása és rajzolás relatív koordinátákkal
-        tft.fillRect(msgX, msgY, displayWidth, font1Height, TFT_BLACK);  // Terület törlése
-        tft.setViewport(msgX, msgY, displayWidth, font1Height);          // Viewport beállítása
+        tft.fillRect(msgX, msgY, scrollDisplayWidth, font2Height, TFT_BLACK);  // Terület törlése
+        tft.setViewport(msgX, msgY, scrollDisplayWidth, font2Height);          // Viewport beállítása
 
         // 1. Fő szöveg rajzolása (ami balra kiúszik)
         // A '-currentPixelOffset' miatt a szöveg balra mozog, ahogy currentPixelOffset nő.
@@ -157,8 +163,8 @@ void Rds::scrollRdsText() {
         int slideInRelativeX = -currentPixelOffset + textWidth + SLIDE_IN_GAP_PIXELS;
 
         // Csak akkor rajzoljuk ki a második szöveget, ha a kezdő X pozíciója
-        // már a látható területen belülre (< displayWidth) kerülne.
-        if (slideInRelativeX < displayWidth) {             // Ellenőrzés a viewport szélességéhez képest
+        // már a látható területen belülre (< scrollDisplayWidth) kerülne.
+        if (slideInRelativeX < scrollDisplayWidth) {       // Ellenőrzés a viewport szélességéhez képest
             tft.drawString(rdsInfo, slideInRelativeX, 0);  // Relatív X, Y=0
         }
 
@@ -214,7 +220,6 @@ void Rds::displayRds(bool forceDisplay) {
     // Idő
     char dateTime[20];
     uint16_t year, month, day, hour, minute;
-
     bool rdsDateTimeSuccess = si4735.getRdsDateTime(&year, &month, &day, &hour, &minute);
     if (forceDisplay or rdsDateTimeSuccess) {
         tft.setTextSize(1);
@@ -233,9 +238,9 @@ void Rds::displayRds(bool forceDisplay) {
         if (forceDisplay or rdsProgramType != p) {
             tft.fillRect(ptyX, ptyY, font2Width * ptyArrayMaxLength, font2Height, TFT_BLACK);
             rdsProgramType = p;
-            tft.setTextSize(2);
+            tft.setTextSize(1);
             tft.setTextDatum(BC_DATUM);
-            tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+            tft.setTextColor(TFT_ORANGE, TFT_BLACK);
             tft.setCursor(ptyX, ptyY);
             tft.print((const __FlashStringHelper *)rdsProgramType);
         }
