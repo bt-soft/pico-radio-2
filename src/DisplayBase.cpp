@@ -64,8 +64,7 @@ void DisplayBase::drawBfoStatus(bool initFont) {
         // Formázzuk a lépésközt és a "Hz"-t a bufferbe
         snprintf(bfoText, sizeof(bfoText), "%dHz", config.data.currentBFOStep);
     } else {
-        // Másoljuk a flash memóriában tárolt stringet a bufferbe
-        strcpy_P(bfoText, PSTR(" BFO "));
+        strcpy(bfoText, " BFO ");
     }
 
     uint16_t color = rtv::bfoOn ? BfoStepColor : TFT_SILVER;

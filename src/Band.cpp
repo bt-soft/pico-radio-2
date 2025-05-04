@@ -1,12 +1,11 @@
 #include "Band.h"
 
-#include <avr/pgmspace.h>
 #include <patch_full.h>  // SSB patch for whole SSBRX full download
 
 #include "rtVars.h"
 
 // PROGMEM - ben tárolt állandó tábla
-const BandTableConst bandTableConst[] PROGMEM = {
+const BandTableConst bandTableConst[] = {
     {"FM", FM_BAND_TYPE, FM, 6400, 10800, 9390, 10, false},    //  FM          0   // 93.9MHz Petőfi
     {"LW", LW_BAND_TYPE, AM, 100, 514, 198, 9, false},         //  LW          1
     {"MW", MW_BAND_TYPE, AM, 514, 1800, 540, 9, false},        //  MW          2   // 540kHz Kossuth
@@ -40,7 +39,7 @@ const BandTableConst bandTableConst[] PROGMEM = {
 };
 
 /// Itt határozzuk meg a BAND_COUNT értékét!
-const size_t BANDTABLE_COUNT = sizeof(bandTableConst) / sizeof(BandTableConst);
+const size_t BANDTABLE_COUNT = ARRAY_ITEM_COUNT(bandTableConst);
 
 // A Kombinált tábla RAM-ban
 BandTable bandTable[BANDTABLE_COUNT];
@@ -130,8 +129,7 @@ BandTable& Band::getBandByIdx(uint8_t bandIdx) {
 int8_t Band::getBandIdxByBandName(const char* bandName) {
 
     for (size_t i = 0; i < BANDTABLE_COUNT; i++) {
-        const char* namePtr = (const char*)pgm_read_ptr(&bandTableConst[i].bandName);
-        if (strcmp_P(bandName, namePtr) == 0) {
+        if (strcmp(bandName, bandTableConst[i].bandName) == 0) {
             return i;  // Megtaláltuk az indexet
         }
     }
@@ -150,9 +148,8 @@ const char** Band::getBandNames(uint8_t& count, bool isHamFilter) {
     count = 0;                                          // Kezdőérték
 
     for (size_t i = 0; i < BANDTABLE_COUNT; i++) {
-        if (bandTableConst[i].isHam == isHamFilter) {  // HAM sáv szűrés
-            // Olvassuk ki a pointert a PROGMEM-ből
-            filteredNames[count++] = (const char*)pgm_read_ptr(&bandTableConst[i].bandName);  // Hozzáadás a listához
+        if (bandTableConst[i].isHam == isHamFilter) {             // HAM sáv szűrés
+            filteredNames[count++] = bandTableConst[i].bandName;  // Közvetlen pointer hozzáadás
         }
     }
 

@@ -8,39 +8,38 @@
 /**
  * PTY típusok a PROGMEM-be töltve
  */
-const char *RDS_PTY_ARRAY[] PROGMEM = {"No defined",
-                                       "News",
-                                       "Current affairs",
-                                       "Information",
-                                       "Sport",
-                                       "Education",
-                                       "Drama",
-                                       "Culture",
-                                       "Science",
-                                       "Varied",
-                                       "Pop Nusic",
-                                       "Rock Music",
-                                       "Easy Listening",
-                                       "Light Classical",
-                                       "Serious Classical",
-                                       "Other Music",
-                                       "Weather",
-                                       "Finance",
-                                       "Children's Programmes",
-                                       "Social Affairs",
-                                       "Religion",
-                                       "Phone-in",
-                                       "Travel",
-                                       "Leisure",
-                                       "Jazz Music",
-                                       "Country Music",
-                                       "National Music",
-                                       "Oldies Music",
-                                       "Folk Music",
-                                       "Documentary",
-                                       "Alarm Test",
-                                       "Alarm"};
-// #define RDS_PTY_COUNT (sizeof(RDS_PTY_ARRAY) / sizeof(char *))
+const char *RDS_PTY_ARRAY[] = {"No defined",
+                               "News",
+                               "Current affairs",
+                               "Information",
+                               "Sport",
+                               "Education",
+                               "Drama",
+                               "Culture",
+                               "Science",
+                               "Varied",
+                               "Pop Nusic",
+                               "Rock Music",
+                               "Easy Listening",
+                               "Light Classical",
+                               "Serious Classical",
+                               "Other Music",
+                               "Weather",
+                               "Finance",
+                               "Children's Programmes",
+                               "Social Affairs",
+                               "Religion",
+                               "Phone-in",
+                               "Travel",
+                               "Leisure",
+                               "Jazz Music",
+                               "Country Music",
+                               "National Music",
+                               "Oldies Music",
+                               "Folk Music",
+                               "Documentary",
+                               "Alarm Test",
+                               "Alarm"};
 #define RDS_PTY_COUNT ARRAY_ITEM_COUNT(RDS_PTY_ARRAY)
 
 //-----------------------------------------------------------------------------------------------------------------
@@ -49,7 +48,7 @@ const char *RDS_PTY_ARRAY[] PROGMEM = {"No defined",
  */
 const char *getPtyStrPointer(uint8_t ptyIndex) {
     if (ptyIndex < RDS_PTY_COUNT) {
-        return (const char *)pgm_read_ptr(&RDS_PTY_ARRAY[ptyIndex]);
+        return RDS_PTY_ARRAY[ptyIndex];
     }
     return PSTR("Unknown PTY");
 }
@@ -61,11 +60,11 @@ int getLongestPtyStrLength() {
     uint8_t maxLength = 0;
 
     for (uint8_t i = 0; i < RDS_PTY_COUNT; i++) {
-        const char *ptr = getPtyStrPointer(i);  // PROGMEM pointer megszerzése
+        const char *ptr = RDS_PTY_ARRAY[i];
         uint8_t length = 0;
 
         // Karakterenként olvassuk, amíg nullát nem találunk
-        while (pgm_read_byte(ptr + length) != '\0') {
+        while (*(ptr + length) != '\0') {
             length++;
         }
 
@@ -151,7 +150,7 @@ void Rds::displayRds(bool forceDisplay) {
     // RDS program type (PTY)
     uint8_t rdsPty = si4735.getRdsProgramType();
     if (rdsPty < RDS_PTY_COUNT) {
-        const char *p = getPtyStrPointer(rdsPty);  // PTY String PROGMEM pointerének megszerzése
+        const char *p = getPtyStrPointer(rdsPty);  
 
         // Ha izomból kell megjeleníteni vagy változás van
         if (forceDisplay or rdsProgramType != p) {
