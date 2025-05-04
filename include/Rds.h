@@ -25,7 +25,7 @@ class Rds {
     char rdsInfo[MAX_MESSAGE_LENGTH];
     bool rdsInfoChanged = false;  // Flag a szöveg megváltozásának jelzésére
 
-#define MAX_TIME_LENGTH 5
+#define MAX_TIME_LENGTH 8 //hh:mm:ss
 
     // Program Type
     uint8_t ptyArrayMaxLength;   // A RDS_PTY_ARRAY leghosszabb stringjének hossza, a képernyő törléshez
@@ -49,7 +49,10 @@ class Rds {
     uint16_t ptyX;
     uint16_t ptyY;
 
-    // Új tagváltozó a görgetési szélességhez
+    // Sprite a villogásmentes görgetéshez
+    TFT_eSprite scrollSprite;
+
+    // Görgetés szélessége (karakterekben)
     uint8_t maxScrollWidth;
 
     /**

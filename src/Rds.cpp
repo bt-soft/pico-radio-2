@@ -82,7 +82,19 @@ int getLongestPtyStrLength() {
  */
 Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, uint16_t msgX, uint16_t msgY, uint16_t timeX, uint16_t timeY, uint16_t ptyX, uint16_t ptyY,
          uint8_t maxScrollWidth)
-    : tft(tft), si4735(si4735), stationX(stationX), stationY(stationY), msgX(msgX), msgY(msgY), timeX(timeX), timeY(timeY), ptyX(ptyX), ptyY(ptyY), maxScrollWidth(maxScrollWidth) {
+    : tft(tft),
+      si4735(si4735),
+      stationX(stationX),
+      stationY(stationY),
+      msgX(msgX),
+      msgY(msgY),
+      timeX(timeX),
+      timeY(timeY),
+      ptyX(ptyX),
+      ptyY(ptyY),
+      maxScrollWidth(maxScrollWidth),
+      scrollSprite(&tft)  // Sprite inicializálása a TFT pointerrel
+{
 
     // Lekérjük a fontok méreteit (Fontos előtte beállítani a fontot!!)
     tft.setFreeFont();
@@ -99,6 +111,14 @@ Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, ui
 
     // Megállapítjuk a leghosszabb karakterlánc hosszát a PTY PROGMEM tömbben
     ptyArrayMaxLength = getLongestPtyStrLength();
+
+    // Sprite létrehozása és beállítása
+    uint16_t scrollDisplayWidth = font2Width * maxScrollWidth;  // Kiszámoljuk itt is a sprite méretéhez
+    scrollSprite.createSprite(scrollDisplayWidth, font2Height);
+    scrollSprite.setFreeFont();   // Font beállítása a sprite-hoz
+    scrollSprite.setTextSize(2);  // A görgetéshez használt méret
+    scrollSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+    scrollSprite.setTextDatum(TL_DATUM);
 }
 
 /**
@@ -111,61 +131,60 @@ void Rds::scrollRdsText() {
         return;
     }
 
-    // 1. Szövegjellemzők beállítása
-    tft.setTextSize(2);                      // Betűméret a görgetett szöveghez
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);  // Fehér szöveg fekete háttéren
-    tft.setTextDatum(TL_DATUM);              // Top-Left datum a drawString-hoz
+    // 1. Szövegjellemzők beállítása (már a sprite-on be van állítva a konstruktorban)
+    // tft.setTextSize(2);
+    // tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    // tft.setTextDatum(TL_DATUM);
 
     // 2. Szélességek kiszámítása
+    // A sprite már ismeri a saját méreteit, de a textWidth kell
     // Lekérdezzük a teljes rdsInfo szöveg pixelben mért szélességét
-    uint16_t textWidth = tft.textWidth(rdsInfo);
+    uint16_t textWidth = tft.textWidth(rdsInfo);  // Ezt még a tft-n mérjük, mert a sprite nem biztos, hogy elég széles a teljes szöveghez
 
     // A maximális megjelenítési szélesség pixelben (a konstruktorban megadott karakter * font szélesség)
-    uint16_t scrollDisplayWidth = font2Width * maxScrollWidth;
+    uint16_t scrollDisplayWidth = font2Width * maxScrollWidth;  // Ezt a sprite is tudja: scrollSprite.width()
 
     // 3. Statikus változók a görgetés állapotának kezeléséhez
     static int currentPixelOffset = 0;                   // Aktuális pixel eltolás balra
-    const int PIXEL_STEP = 3;                            // Hány pixelt görgessen egy lépésben - sebesség
+    const int PIXEL_STEP = 2;                            // Hány pixelt görgessen egy lépésben - sebesség
     const int SLIDE_IN_GAP_PIXELS = scrollDisplayWidth;  // Szóköz a szöveg vége és az újra megjelenés között
 
     // 4. Görgetési logika végrehajtása (minden híváskor)
     if (textWidth <= scrollDisplayWidth) {
-        // Szöveg elfér, nincs szükség görgetésre ->  Nincs szükség viewportra
-        if (rdsInfoChanged) {
-            tft.fillRect(msgX, msgY, scrollDisplayWidth, font2Height, TFT_BLACK);  // Terület törlése
-            tft.setCursor(msgX, msgY);
-            tft.setTextDatum(TL_DATUM);  // Visszaállítás a printhez
-            tft.print(rdsInfo);
-            currentPixelOffset = 0;  // Eltolás nullázása
-
-            rdsInfoChanged = false;  // Flag reset
+        // Szöveg elfér, nincs szükség görgetésre
+        if (rdsInfoChanged) {                    // Csak akkor rajzolunk, ha változott
+            scrollSprite.fillScreen(TFT_BLACK);  // Sprite törlése
+            // A print nem működik sprite-on, drawString-et használunk
+            scrollSprite.drawString(rdsInfo, 0, 0);  // Rajzolás a sprite bal felső sarkába
+            currentPixelOffset = 0;                  // Eltolás nullázása
+            rdsInfoChanged = false;                  // Flag reset
+            scrollSprite.pushSprite(msgX, msgY);     // Sprite kirakása a képernyőre
         }
 
     } else {
+        // Szöveg túl hosszú -> görgetés
         if (rdsInfoChanged) {
-            currentPixelOffset = 0;  // Eltolás nullázása
+            currentPixelOffset = 0;  // Eltolás nullázása, ha új szöveg jött
             rdsInfoChanged = false;  // Flag reset
         }
 
-        // Szöveg túl hosszú -> görgetés
-        // Viewport beállítása és rajzolás relatív koordinátákkal
-        tft.fillRect(msgX, msgY, scrollDisplayWidth, font2Height, TFT_BLACK);  // Terület törlése
-        tft.setViewport(msgX, msgY, scrollDisplayWidth, font2Height);          // Viewport beállítása
+        // Rajzolás a sprite-ra
+        scrollSprite.fillScreen(TFT_BLACK);  // Sprite törlése
 
         // 1. Fő szöveg rajzolása (ami balra kiúszik)
         // A '-currentPixelOffset' miatt a szöveg balra mozog, ahogy currentPixelOffset nő.
-        // A viewport levágja a bal oldalon kilógó részt.
-        tft.drawString(rdsInfo, -currentPixelOffset, 0);  // Relatív X, Y=0
+        // A sprite levágja a kilógó részt.
+        scrollSprite.drawString(rdsInfo, -currentPixelOffset, 0);  // Rajzolás a sprite-ra
 
         // 2. Az "újra beúszó" rész rajzolása
-        // Kiszámoljuk a második szöveg kezdő X pozícióját a viewporton belül.
+        // Kiszámoljuk a második szöveg kezdő X pozícióját a sprite-on belül.
         // Ez az első szöveg vége után van 'SLIDE_IN_GAP_PIXELS' távolságra.
         int slideInRelativeX = -currentPixelOffset + textWidth + SLIDE_IN_GAP_PIXELS;
 
         // Csak akkor rajzoljuk ki a második szöveget, ha a kezdő X pozíciója
         // már a látható területen belülre (< scrollDisplayWidth) kerülne.
-        if (slideInRelativeX < scrollDisplayWidth) {       // Ellenőrzés a viewport szélességéhez képest
-            tft.drawString(rdsInfo, slideInRelativeX, 0);  // Relatív X, Y=0
+        if (slideInRelativeX < scrollDisplayWidth) {                // Ellenőrzés a sprite szélességéhez képest
+            scrollSprite.drawString(rdsInfo, slideInRelativeX, 0);  // Rajzolás a sprite-ra
         }
 
         // Eltolás növelése a következő lépéshez
@@ -174,12 +193,12 @@ void Rds::scrollRdsText() {
         // 3. Ciklus újraindítása
         // Amikor az első szöveg (plusz a szóköz) teljesen kiúszott balra...
         if (currentPixelOffset >= textWidth + SLIDE_IN_GAP_PIXELS) {
-            // ...akkor a második szöveg eleje pont a viewport bal szélére (X=0) ért.
-            // Nullázzuk az eltolást, így az első szöveg újra a viewport elejéről indul,
+            // ...akkor a második szöveg eleje pont a sprite bal szélére (X=0) ért.
+            // Nullázzuk az eltolást, így az első szöveg újra a sprite elejéről indul,
             // és a ciklus kezdődik elölről.
             currentPixelOffset = 0;  // Kezdjük elölről
         }
-        tft.resetViewport();  // Viewport eltávolítása
+        scrollSprite.pushSprite(msgX, msgY);  // Sprite kirakása a képernyőre
     }
 }
 
@@ -272,9 +291,11 @@ void Rds::clearRds() {
     tft.fillRect(stationX, stationY, font2Width * MAX_STATION_NAME_LENGTH, font2Height, TFT_BLACK);
     rdsStationName = NULL;
 
-    // clear RDS rdsMsg
-    tft.fillRect(msgX, msgY, font1Width * MAX_MESSAGE_LENGTH, font1Height, TFT_BLACK);
+    // clear RDS rdsInfo
     rdsInfo[0] = '\0';
+    rdsInfoChanged = true;                // Jelezzük, hogy változott (üres lett)
+    scrollSprite.fillScreen(TFT_BLACK);   // A sprite-ot is törölni kell
+    scrollSprite.pushSprite(msgX, msgY);  // Törölt sprite kirakása
 
     // clear RDS rdsTime
     tft.fillRect(timeX, timeY, font1Width * MAX_TIME_LENGTH, font1Height, TFT_BLACK);

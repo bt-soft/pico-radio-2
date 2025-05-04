@@ -318,7 +318,7 @@ void FmDisplay::displayLoop() {
     // Az RDS szöveg görgetése nagyobb sebességgel történik
     static uint32_t rdsScrollTime = 0;  // Kezdőérték nulla
     if (config.data.rdsEnabled) {
-        if ((millis() - rdsScrollTime) >= 200) {  // 200ms
+        if ((millis() - rdsScrollTime) >= 100) {  // 200ms
             pRds->scrollRdsText();
             rdsScrollTime = millis();  // Frissítjük az időbélyeget
         }
