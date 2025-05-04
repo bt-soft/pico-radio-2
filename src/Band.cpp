@@ -5,72 +5,38 @@
 
 #include "rtVars.h"
 
-// Sávnevek tárolása PROGMEM-ben tömbként
-const char bandNames[][5] PROGMEM = {
-    "FM",    // 0
-    "LW",    // 1
-    "MW",    // 2
-    "800m",  // 3
-    "630m",  // 4
-    "160m",  // 5
-    "120m",  // 6
-    "90m",   // 7
-    "80m",   // 8
-    "75m",   // 9
-    "60m",   // 10
-    "49m",   // 11
-    "40m",   // 12
-    "41m",   // 13
-    "31m",   // 14
-    "30m",   // 15
-    "25m",   // 16
-    "22m",   // 17
-    "20m",   // 18
-    "19m",   // 19
-    "17m",   // 20
-    "16m",   // 21
-    "15m",   // 22
-    "14m",   // 23
-    "13m",   // 24
-    "12m",   // 25
-    "11m",   // 26
-    "CB",    // 27
-    "10m",   // 28
-    "SW"     // 29
-};
-
 // PROGMEM - ben tárolt állandó tábla
 const BandTableConst bandTableConst[] PROGMEM = {
-    {bandNames[0], FM_BAND_TYPE, FM, 6400, 10800, 9390, 10, false},    //  FM          0   // 93.9MHz Petőfi
-    {bandNames[1], LW_BAND_TYPE, AM, 100, 514, 198, 9, false},         //  LW          1
-    {bandNames[2], MW_BAND_TYPE, AM, 514, 1800, 540, 9, false},        //  MW          2   // 540kHz Kossuth
-    {bandNames[3], SW_BAND_TYPE, AM, 280, 470, 284, 1, true},          // Ham  800M    3
-    {bandNames[4], SW_BAND_TYPE, LSB, 470, 480, 475, 1, true},         // Ham  630M    4
-    {bandNames[5], SW_BAND_TYPE, LSB, 1800, 2000, 1850, 1, true},      // Ham  160M    5
-    {bandNames[6], SW_BAND_TYPE, AM, 2000, 3200, 2400, 5, false},      //      120M    6
-    {bandNames[7], SW_BAND_TYPE, AM, 3200, 3500, 3300, 5, false},      //       90M    7
-    {bandNames[8], SW_BAND_TYPE, LSB, 3500, 3900, 3630, 1, true},      // Ham   80M    8
-    {bandNames[9], SW_BAND_TYPE, AM, 3900, 5300, 3950, 5, false},      //       75M    9
-    {bandNames[10], SW_BAND_TYPE, USB, 5300, 5900, 5375, 1, true},     // Ham   60M   10
-    {bandNames[11], SW_BAND_TYPE, AM, 5900, 7000, 6000, 5, false},     //       49M   11
-    {bandNames[12], SW_BAND_TYPE, LSB, 7000, 7500, 7074, 1, true},     // Ham   40M   12
-    {bandNames[13], SW_BAND_TYPE, AM, 7200, 9000, 7210, 5, false},     //       41M   13
-    {bandNames[14], SW_BAND_TYPE, AM, 9000, 10000, 9600, 5, false},    //       31M   14
-    {bandNames[15], SW_BAND_TYPE, USB, 10000, 10100, 10100, 1, true},  // Ham   30M   15
-    {bandNames[16], SW_BAND_TYPE, AM, 10200, 13500, 11700, 5, false},  //       25M   16
-    {bandNames[17], SW_BAND_TYPE, AM, 13500, 14000, 13700, 5, false},  //       22M   17
-    {bandNames[18], SW_BAND_TYPE, USB, 14000, 14500, 14074, 1, true},  // Ham   20M   18
-    {bandNames[19], SW_BAND_TYPE, AM, 14500, 17500, 15700, 5, false},  //       19M   19
-    {bandNames[20], SW_BAND_TYPE, AM, 17500, 18000, 17600, 5, false},  //       17M   20
-    {bandNames[21], SW_BAND_TYPE, USB, 18000, 18500, 18100, 1, true},  // Ham   16M   21
-    {bandNames[22], SW_BAND_TYPE, AM, 18500, 21000, 18950, 5, false},  //       15M   22
-    {bandNames[23], SW_BAND_TYPE, USB, 21000, 21500, 21074, 1, true},  // Ham   14M   23
-    {bandNames[24], SW_BAND_TYPE, AM, 21500, 24000, 21500, 5, false},  //       13M   24
-    {bandNames[25], SW_BAND_TYPE, USB, 24000, 25500, 24940, 1, true},  // Ham   12M   25
-    {bandNames[26], SW_BAND_TYPE, AM, 25500, 26100, 25800, 5, false},  //       11M   26
-    {bandNames[27], SW_BAND_TYPE, AM, 26100, 28000, 27200, 1, false},  // CB band     27
-    {bandNames[28], SW_BAND_TYPE, USB, 28000, 30000, 28500, 1, true},  // Ham   10M   28
-    {bandNames[29], SW_BAND_TYPE, AM, 100, 30000, 15500, 5, false}     // Whole SW    29
+    {"FM", FM_BAND_TYPE, FM, 6400, 10800, 9390, 10, false},    //  FM          0   // 93.9MHz Petőfi
+    {"LW", LW_BAND_TYPE, AM, 100, 514, 198, 9, false},         //  LW          1
+    {"MW", MW_BAND_TYPE, AM, 514, 1800, 540, 9, false},        //  MW          2   // 540kHz Kossuth
+    {"800m", SW_BAND_TYPE, AM, 280, 470, 284, 1, true},        // Ham  800M    3
+    {"630m", SW_BAND_TYPE, LSB, 470, 480, 475, 1, true},       // Ham  630M    4
+    {"160m", SW_BAND_TYPE, LSB, 1800, 2000, 1850, 1, true},    // Ham  160M    5
+    {"120m", SW_BAND_TYPE, AM, 2000, 3200, 2400, 5, false},    //      120M    6
+    {"90m", SW_BAND_TYPE, AM, 3200, 3500, 3300, 5, false},     //       90M    7
+    {"80m", SW_BAND_TYPE, LSB, 3500, 3900, 3630, 1, true},     // Ham   80M    8
+    {"75m", SW_BAND_TYPE, AM, 3900, 5300, 3950, 5, false},     //       75M    9
+    {"60m", SW_BAND_TYPE, USB, 5300, 5900, 5375, 1, true},     // Ham   60M   10
+    {"49m", SW_BAND_TYPE, AM, 5900, 7000, 6000, 5, false},     //       49M   11
+    {"40m", SW_BAND_TYPE, LSB, 7000, 7500, 7074, 1, true},     // Ham   40M   12
+    {"41m", SW_BAND_TYPE, AM, 7200, 9000, 7210, 5, false},     //       41M   13
+    {"31m", SW_BAND_TYPE, AM, 9000, 10000, 9600, 5, false},    //       31M   14
+    {"30m", SW_BAND_TYPE, USB, 10000, 10100, 10100, 1, true},  // Ham   30M   15
+    {"25m", SW_BAND_TYPE, AM, 10200, 13500, 11700, 5, false},  //       25M   16
+    {"22m", SW_BAND_TYPE, AM, 13500, 14000, 13700, 5, false},  //       22M   17
+    {"20m", SW_BAND_TYPE, USB, 14000, 14500, 14074, 1, true},  // Ham   20M   18
+    {"19m", SW_BAND_TYPE, AM, 14500, 17500, 15700, 5, false},  //       19M   19
+    {"17m", SW_BAND_TYPE, AM, 17500, 18000, 17600, 5, false},  //       17M   20
+    {"16m", SW_BAND_TYPE, USB, 18000, 18500, 18100, 1, true},  // Ham   16M   21
+    {"15m", SW_BAND_TYPE, AM, 18500, 21000, 18950, 5, false},  //       15M   22
+    {"14m", SW_BAND_TYPE, USB, 21000, 21500, 21074, 1, true},  // Ham   14M   23
+    {"13m", SW_BAND_TYPE, AM, 21500, 24000, 21500, 5, false},  //       13M   24
+    {"12m", SW_BAND_TYPE, USB, 24000, 25500, 24940, 1, true},  // Ham   12M   25
+    {"11m", SW_BAND_TYPE, AM, 25500, 26100, 25800, 5, false},  //       11M   26
+    {"CB", SW_BAND_TYPE, AM, 26100, 28000, 27200, 1, false},   // CB band     27
+    {"10m", SW_BAND_TYPE, USB, 28000, 30000, 28500, 1, true},  // Ham   10M   28
+    {"SW", SW_BAND_TYPE, AM, 100, 30000, 15500, 5, false}      // Whole SW    29
 };
 
 /// Itt határozzuk meg a BAND_COUNT értékét!
@@ -164,7 +130,8 @@ BandTable& Band::getBandByIdx(uint8_t bandIdx) {
 int8_t Band::getBandIdxByBandName(const char* bandName) {
 
     for (size_t i = 0; i < BANDTABLE_COUNT; i++) {
-        if (strcmp_P(bandName, bandTableConst[i].bandName) == 0) {
+        const char* namePtr = (const char*)pgm_read_ptr(&bandTableConst[i].bandName);
+        if (strcmp_P(bandName, namePtr) == 0) {
             return i;  // Megtaláltuk az indexet
         }
     }
@@ -183,8 +150,9 @@ const char** Band::getBandNames(uint8_t& count, bool isHamFilter) {
     count = 0;                                          // Kezdőérték
 
     for (size_t i = 0; i < BANDTABLE_COUNT; i++) {
-        if (bandTableConst[i].isHam == isHamFilter) {             // HAM sáv szűrés
-            filteredNames[count++] = bandTableConst[i].bandName;  // Hozzáadás a listához
+        if (bandTableConst[i].isHam == isHamFilter) {  // HAM sáv szűrés
+            // Olvassuk ki a pointert a PROGMEM-ből
+            filteredNames[count++] = (const char*)pgm_read_ptr(&bandTableConst[i].bandName);  // Hozzáadás a listához
         }
     }
 
