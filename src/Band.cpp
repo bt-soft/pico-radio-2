@@ -393,16 +393,20 @@ void Band::bandInit(bool sysStart) {
         si4735.setup(PIN_SI4735_RESET, FM_BAND_TYPE);
         si4735.setFM();
 
-        si4735.setSeekFmSpacing(10);
+        // Seek beállítások
+        si4735.setSeekFmRssiThreshold(2);  // 2dB RSSI threshold
+        si4735.setSeekFmSrnThreshold(2);   // 2dB SNR threshold
+        si4735.setSeekFmSpacing(10);       // 10kHz seek lépésköz
+                                           // 87.5MHz - 108MHz között
         si4735.setSeekFmLimits(curretBand.pConstData->minimumFreq, curretBand.pConstData->maximumFreq);
-        si4735.setSeekAmRssiThreshold(50);
-        si4735.setSeekAmSrnThreshold(20);
-        si4735.setSeekFmRssiThreshold(5);
-        si4735.setSeekFmSrnThreshold(5);
 
     } else {
         si4735.setup(PIN_SI4735_RESET, MW_BAND_TYPE);
         si4735.setAM();
+
+        // Seek beállítások
+        si4735.setSeekAmRssiThreshold(50);  // 50dB RSSI threshold
+        si4735.setSeekAmSrnThreshold(20);   // 20dB SNR threshold
     }
 
     // Rendszer indítás van?

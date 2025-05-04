@@ -105,7 +105,7 @@ static bool checkStopSeekingCallback() {
     bool touched = pSeekTft->getTouch(&tx, &ty);                     // Érintés ellenőrzése
     RotaryEncoder::EncoderState rotaryState = rotaryEncoder.read();  // Közvetlen olvasás a globális objektumból
 
-    seekStoppedByUser = touched || (rotaryState.direction != RotaryEncoder::Direction::None) || (rotaryState.buttonState != RotaryEncoder::ButtonState::Open);
+    seekStoppedByUser = touched or (rotaryState.direction != RotaryEncoder::Direction::None) or (rotaryState.buttonState != RotaryEncoder::ButtonState::Open);
 
     return seekStoppedByUser;
 }
@@ -152,8 +152,6 @@ void FmDisplay::drawScreen() {
  */
 void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event) {
 
-    DEBUG("FmDisplay::processScreenButtonTouchEvent() -> id: %d, label: %s, state: %s\n", event.id, event.label, TftButton::decodeState(event.state));
-
     if (STREQ("RDS", event.label)) {
         // Radio Data System
         config.data.rdsEnabled = event.state == TftButton::ButtonState::On;
@@ -164,6 +162,9 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
         }
 
     } else if (STREQ("SeekD", event.label) or STREQ("SeekU", event.label)) {
+
+        // RDS adatok törlése
+        pRds->clearRds();
 
         // Állomáskeresés irányának meghatározása
         bool seekUp = STREQ("SeekU", event.label);
@@ -185,8 +186,7 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
         seekStoppedByUser = false;
 
         // Keresés indítása a megfelelő callbackekkel
-        // A setSeekFmSpacing és setSeekFmLimits beállítását feltételezzük,
-        // hogy a bandSet() vagy a rádió inicializálása során megtörtént.
+        // A setSeekFmSpacing és setSeekFmLimits beállítása a Band.bandInit() során megtörtént.
         si4735.seekStationProgress(seekFreqCallback, checkStopSeekingCallback, seekUp ? SEEK_UP : SEEK_DOWN);
 
         // Pontosan a szöveg helyét töröljük a kiszámított koordinátákkal
@@ -198,9 +198,6 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
             // Új frekvencia lekérdezése és beállítása
             uint16_t newFreq = si4735.getFrequency();
             band.getCurrentBand().varData.currFreq = newFreq;
-
-            // RDS törlése az új frekvencián
-            pRds->clearRds();
 
             // Kijelző frissítésének jelzése
             DisplayBase::frequencyChanged = true;
