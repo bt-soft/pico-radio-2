@@ -1,5 +1,6 @@
 #include "SetupDisplay.h"
 
+#include "InfoDialog.h"
 #include "MultiButtonDialog.h"
 #include "ValueChangeDialog.h"
 
@@ -11,7 +12,8 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
     // Horizontális képernyőgombok definiálása
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"Bright", TftButton::ButtonType::Pushable},                             //
-        {"Squelch", TftButton::ButtonType::Pushable},                            //
+        {"Info", TftButton::ButtonType::Pushable},                               //
+        {"Squel", TftButton::ButtonType::Pushable},                              //
         {"Exit", TftButton::ButtonType::Pushable, TftButton::ButtonState::Off},  //
     };
 
@@ -64,6 +66,10 @@ void SetupDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &ev
             new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("TFT Brightness"), F("Value:"),                                                                         //
                                   &config.data.tftBackgroundBrightness, (uint8_t)TFT_BACKGROUND_LED_MIN_BRIGHTNESS, (uint8_t)TFT_BACKGROUND_LED_MAX_BRIGHTNESS, (uint8_t)10,  //
                                   [this](uint8_t newBrightness) { analogWrite(PIN_TFT_BACKGROUND_LED, newBrightness); });
+    }
+    // --- ÚJ RÉSZ KEZDETE: Info gomb kezelése ---
+    else if (STREQ("Info", event.label)) {
+        pDialog = new InfoDialog(this, tft, si4735);  // Létrehozzuk az Info dialógust
     }
     // --- ÚJ RÉSZ KEZDETE ---
     else if (STREQ("Squelch", event.label)) {

@@ -55,6 +55,7 @@ class DialogBase : public IGuiEvents {
      */
     DialogBase(IDialogParent *pParent, TFT_eSPI &tft, uint16_t w, uint16_t h, const __FlashStringHelper *title, const __FlashStringHelper *message = nullptr)
         : pParent(pParent), tft(tft), w(w), h(h), title(title), message(message) {
+
         // Dialóg bal felső sarkának kiszámítása a képernyő középre igzaításához
         x = (tft.width() - w) / 2;
         y = ((tft.height() - h) / 2) - DLG_Y_POS_OFFSET;  // Kicsit feljebb húzzuk a tetejét
