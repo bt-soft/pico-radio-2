@@ -232,7 +232,6 @@ void Rds::displayRds(bool forceDisplay) {
             Utils::trimTrailingSpaces(rdsInfo);             // Trailing szóközök eltávolítása
 
             rdsInfoChanged = true;  // Flag a szöveg megváltozásának jelzésére
-            DEBUG("RDS info: '%s'\n", rdsInfo);
         }
     }
 
@@ -284,8 +283,6 @@ void Rds::checkRds() {
  *  RDS adatok törlése (csak FM módban hívható...nyílván....)
  */
 void Rds::clearRds() {
-
-    DEBUG("Rds::clearRds()\n");
 
     // clear RDS rdsStationName
     tft.fillRect(stationX, stationY, font2Width * MAX_STATION_NAME_LENGTH, font2Height, TFT_BLACK);

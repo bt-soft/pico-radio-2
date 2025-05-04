@@ -66,13 +66,11 @@ void SetupDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &ev
             new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("TFT Brightness"), F("Value:"),                                                                         //
                                   &config.data.tftBackgroundBrightness, (uint8_t)TFT_BACKGROUND_LED_MIN_BRIGHTNESS, (uint8_t)TFT_BACKGROUND_LED_MAX_BRIGHTNESS, (uint8_t)10,  //
                                   [this](uint8_t newBrightness) { analogWrite(PIN_TFT_BACKGROUND_LED, newBrightness); });
-    }
-    // --- ÚJ RÉSZ KEZDETE: Info gomb kezelése ---
-    else if (STREQ("Info", event.label)) {
+
+    } else if (STREQ("Info", event.label)) {
         pDialog = new InfoDialog(this, tft, si4735);  // Létrehozzuk az Info dialógust
-    }
-    // --- ÚJ RÉSZ KEZDETE ---
-    else if (STREQ("Squelch", event.label)) {
+
+    } else if (STREQ("Squelch", event.label)) {
         // Squelch alapjának kiválasztása (SNR vagy RSSI)
         const char *options[] = {"SNR", "RSSI"};
         uint8_t optionCount = ARRAY_ITEM_COUNT(options);
