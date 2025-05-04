@@ -1,5 +1,6 @@
 #include "StationStore.h"
 
+#include "Band.h"           // Szükséges az LSB, USB, CW konstansokhoz
 #include "EepromManager.h"  // Szükséges a save/load hívásokhoz
 
 // Alapértelmezett (üres) listák definíciója

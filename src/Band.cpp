@@ -56,7 +56,7 @@ const BandTableConst bandTableConst[] PROGMEM = {
     {bandNames[12], SW_BAND_TYPE, LSB, 7000, 7500, 7074, 1, true},     // Ham   40M   12
     {bandNames[13], SW_BAND_TYPE, AM, 7200, 9000, 7210, 5, false},     //       41M   13
     {bandNames[14], SW_BAND_TYPE, AM, 9000, 10000, 9600, 5, false},    //       31M   14
-    {bandNames[15], SW_BAND_TYPE, USB, 10000, 10100, 10099, 1, true},  // Ham   30M   15
+    {bandNames[15], SW_BAND_TYPE, USB, 10000, 10100, 10100, 1, true},  // Ham   30M   15
     {bandNames[16], SW_BAND_TYPE, AM, 10200, 13500, 11700, 5, false},  //       25M   16
     {bandNames[17], SW_BAND_TYPE, AM, 13500, 14000, 13700, 5, false},  //       22M   17
     {bandNames[18], SW_BAND_TYPE, USB, 14000, 14500, 14074, 1, true},  // Ham   20M   18
@@ -112,7 +112,7 @@ const FrequencyStep Band::stepSizeBFO[] = {
 /**
  * Konstruktor
  */
-Band::Band(SI4735& si4735) : si4735(si4735) {
+Band::Band(SI4735& si4735, Config& configRef) : si4735(si4735), configRef(configRef) {
 
     // A BandTable inicializálása
     for (uint8_t i = 0; i < BANDTABLE_COUNT; i++) {
@@ -503,7 +503,7 @@ void Band::tuneMemoryStation(uint16_t frequency, int16_t bfoOffset, uint8_t band
     // 2. Demodulátor beállítása a chipen.  Ha CW módra váltunk, akkor nullázzuk a finomhangolási BFO-t
     uint8_t savedMod = demodModIndex;  // A demodulációs mód kiemelése
     if (savedMod != CW and rtv::CWShift == true) {
-        currentBand.varData.lastBFO = 0;  
+        currentBand.varData.lastBFO = 0;
         config.data.currentBFO = currentBand.varData.lastBFO;
         rtv::CWShift = false;
     }

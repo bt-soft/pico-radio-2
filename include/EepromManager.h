@@ -6,6 +6,9 @@
 #include <CRC.h>
 #include <EEPROM.h>
 
+#include <type_traits>
+
+// #include "DebugDataInspector.h" // Ezt eltávolítjuk
 #include "defines.h"
 #include "utils.h"
 
@@ -56,7 +59,7 @@ class EepromManager {
      * @return adatok CRC16 ellenőrző összege
      */
     inline static uint16_t getIfValid(T &dataRef, bool &valid, const uint16_t address = 0, const char *className = "Unknown") {
-        EepromManager<T> storage(dataRef);  // Ez csak a CRC számításhoz kell itt
+        // EepromManager<T> storage(dataRef); // Erre itt nincs szükség
         T tempData;                         // Ideiglenes hely a beolvasáshoz
         uint16_t readCrc;
 
@@ -96,16 +99,12 @@ class EepromManager {
         uint16_t loadedCrc = getIfValid(dataRef, valid, address, className);
 
         if (!valid) {
-            // A hibaüzenetet már a getIfValid kiírta.
-            // Itt hívjuk a loadDefaults()-t, de azt a StoreBase-nek kellene, nem az EepromManagernek.
-            // A StoreBase::load() hívja ezt, és annak kell kezelnie a loadDefaults()-t.
-            // Viszont a default adatok mentését itt kell elindítani.
             DEBUG("[%s] EEPROM content invalid at address %d, saving defaults!\n", className, address);
-            // A dataRef már tartalmazza a default értékeket (a StoreBase konstruktora vagy loadDefaults miatt)
-            return save(dataRef, address, className);  // Elmentjük a defaultot és visszaadjuk az új CRC-t
+            return save(dataRef, address, className);
         } else {
             DEBUG("[%s] EEPROM load OK from address %d\n", className, address);
-            return loadedCrc;  // Visszaadjuk az érvényes, beolvasott CRC-t
+
+            return loadedCrc;
         }
     }
 
@@ -118,21 +117,19 @@ class EepromManager {
      * @return adatok CRC16 ellenőrző összege
      */
     inline static uint16_t save(const T &dataRef, const uint16_t address = 0, const char *className = "Unknown") {
-        // Létrehozunk egy példányt a CRC számításhoz
-        EepromManager<T> storage(dataRef);  // Ez kiszámolja a storage.crc-t
+        EepromManager<T> storage(dataRef);
 
-        DEBUG("[%s] Saving data to EEPROM at address %d (Size: %d B)...", className, address, sizeof(storage));
+        DEBUG("[%s] Saving data to EEPROM at address %d (Size: %d B)...", className, address, sizeof(T));
 
-        // Lementjük az adatokat ÉS a crc-t az EEPROM-ba
         EEPROM.put(address, storage.data);
-        EEPROM.put(address + sizeof(T), storage.crc);  // CRC mentése az adatok után
+        EEPROM.put(address + sizeof(T), storage.crc);
 
         if (EEPROM.commit()) {
             DEBUG(" OK (CRC: %d)\n", storage.crc);
-            return storage.crc;  // Visszaadjuk a CRC-t siker esetén
+            return storage.crc;
         } else {
             DEBUG(" FAILED!\n");
-            return 0;  // Hibát jelzünk 0-val
+            return 0;
         }
     }
 };

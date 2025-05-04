@@ -1,6 +1,7 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#include "DebugDataInspector.h" // Szükséges a debug kiíratáshoz
 #include "StoreBase.h"
 
 // TFT háttérvilágítás max érték
@@ -73,6 +74,22 @@ class Config : public StoreBase<Config_t> {
      */
     Config_t& r() override { return data; };
 
+    // Felülírjuk a mentést/betöltést a debug kiíratás hozzáadásához
+    uint16_t performSave() override {
+        uint16_t savedCrc = EepromManager<Config_t>::save(r(), 0, getClassName());
+#ifdef __DEBUG
+        if (savedCrc != 0) DebugDataInspector::printConfigData(r());
+#endif
+        return savedCrc;
+    }
+
+    uint16_t performLoad() override {
+        uint16_t loadedCrc = EepromManager<Config_t>::load(r(), 0, getClassName());
+#ifdef __DEBUG
+        DebugDataInspector::printConfigData(r()); // Akkor is kiírjuk, ha defaultot töltött
+#endif
+        return loadedCrc;
+    }
    public:
     /**
      * Konstruktor

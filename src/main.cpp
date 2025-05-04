@@ -31,7 +31,7 @@ SI4735 si4735;
 
 //------------------- Band
 #include "Band.h"
-Band band(si4735);
+Band band(si4735, config);
 
 //------------------- Memória információk megjelenítése
 #ifdef SHOW_MEMORY_INFO

@@ -71,6 +71,9 @@ class Band {
     // Si4735 referencia
     SI4735 &si4735;
 
+    // Config referencia
+    Config &configRef;
+
     // SSB betöltve?
     bool ssbLoaded = false;
 
@@ -92,7 +95,7 @@ class Band {
 
     static const FrequencyStep stepSizeBFO[4];
 
-    Band(SI4735 &si4735);
+    Band(SI4735 &si4735, Config &configRef);
     virtual ~Band() = default;
 
     /**
@@ -141,7 +144,7 @@ class Band {
     /**
      *
      */
-    inline BandTable &getCurrentBand() { return getBandByIdx(config.data.bandIdx); }
+    inline BandTable &getCurrentBand() { return getBandByIdx(configRef.data.bandIdx); }
 
     /**
      * A Band indexének elkérése a bandName alapján
@@ -178,9 +181,9 @@ class Band {
     const char *getCurrentBandWidthLabel() {
         const char *p;
         uint8_t currMod = getCurrentBand().varData.currMod;
-        if (currMod == AM) p = getCurrentBandWidthLabelByIndex(bandWidthAM, config.data.bwIdxAM);
-        if (currMod == LSB or currMod == USB or currMod == CW) p = getCurrentBandWidthLabelByIndex(bandWidthSSB, config.data.bwIdxSSB);
-        if (currMod == FM) p = getCurrentBandWidthLabelByIndex(bandWidthFM, config.data.bwIdxFM);
+        if (currMod == AM) p = getCurrentBandWidthLabelByIndex(bandWidthAM, configRef.data.bwIdxAM);
+        if (currMod == LSB or currMod == USB or currMod == CW) p = getCurrentBandWidthLabelByIndex(bandWidthSSB, configRef.data.bwIdxSSB);
+        if (currMod == FM) p = getCurrentBandWidthLabelByIndex(bandWidthFM, configRef.data.bwIdxFM);
 
         return p;
     }
@@ -290,7 +293,7 @@ class Band {
 
         // BFO esetén az érték az érték :')
         if (rtv::bfoOn) {
-            snprintf(formattedStepStr, sizeof(formattedStepStr), "%dHz", config.data.currentBFOStep);
+            snprintf(formattedStepStr, sizeof(formattedStepStr), "%dHz", configRef.data.currentBFOStep);
             return formattedStepStr;  // Visszaadjuk a buffer pointerét
         }
 
@@ -299,7 +302,7 @@ class Band {
         uint8_t currentBandType = currentBand.pConstData->bandType;  // Kikeressük az aktuális Band típust
         
         if (currentBandType == FM_BAND_TYPE) {
-            currentStepStr = getStepSizeLabelByIndex(Band::stepSizeFM, config.data.ssIdxFM);
+            currentStepStr = getStepSizeLabelByIndex(Band::stepSizeFM, configRef.data.ssIdxFM);
 
         } else {  // Nem FM
 
@@ -320,7 +323,7 @@ class Band {
 
             } else {  // AM/LW/MW
 
-                uint8_t index = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? config.data.ssIdxMW : config.data.ssIdxAM;
+                uint8_t index = (currentBandType == MW_BAND_TYPE or currentBandType == LW_BAND_TYPE) ? configRef.data.ssIdxMW : configRef.data.ssIdxAM;
                 currentStepStr = getStepSizeLabelByIndex(Band::stepSizeAM, index);
             }
         }

@@ -1,8 +1,10 @@
 #ifndef __STATIONSTORE_H
 #define __STATIONSTORE_H
 
-#include "Band.h"  // Szükséges a BandTable eléréséhez
+// Először a típusdefiníciók kellenek
 #include "StationData.h"
+// Utána jöhet az ősosztály
+#include "DebugDataInspector.h" // Szükséges a debug kiíratáshoz
 #include "StoreBase.h"
 
 // Üres alapértelmezett listák deklarációja (definíció a .cpp fájlban)
@@ -20,10 +22,19 @@ class FmStationStore : public StoreBase<FmStationList_t> {
     const char* getClassName() const override { return "FM_Store"; }  // Rövidebb név
 
     // Felülírjuk a mentést/betöltést a helyes címmel és névvel
-    uint16_t performSave() override { return EepromManager<FmStationList_t>::save(r(), EEPROM_FM_STATIONS_ADDR, getClassName()); }
+    uint16_t performSave() override {
+        uint16_t savedCrc = EepromManager<FmStationList_t>::save(r(), EEPROM_FM_STATIONS_ADDR, getClassName());
+#ifdef __DEBUG
+        if (savedCrc != 0) DebugDataInspector::printFmStationData(r());
+#endif
+        return savedCrc;
+    }
 
     uint16_t performLoad() override {
         uint16_t loadedCrc = EepromManager<FmStationList_t>::load(r(), EEPROM_FM_STATIONS_ADDR, getClassName());
+#ifdef __DEBUG
+        DebugDataInspector::printFmStationData(r()); // Akkor is kiírjuk, ha defaultot töltött
+#endif
         // Count ellenőrzés marad itt
         if (data.count > MAX_FM_STATIONS) {
             DEBUG("[%s] Warning: FM station count corrected from %d to %d.\n", getClassName(), data.count, MAX_FM_STATIONS);
@@ -68,10 +79,19 @@ class AmStationStore : public StoreBase<AmStationList_t> {
     const char* getClassName() const override { return "AM_Store"; }  // Rövidebb név
 
     // Felülírjuk a mentést/betöltést a helyes címmel és névvel
-    uint16_t performSave() override { return EepromManager<AmStationList_t>::save(r(), EEPROM_AM_STATIONS_ADDR, getClassName()); }
+    uint16_t performSave() override {
+        uint16_t savedCrc = EepromManager<AmStationList_t>::save(r(), EEPROM_AM_STATIONS_ADDR, getClassName());
+#ifdef __DEBUG
+        if (savedCrc != 0) DebugDataInspector::printAmStationData(r());
+#endif
+        return savedCrc;
+    }
 
     uint16_t performLoad() override {
         uint16_t loadedCrc = EepromManager<AmStationList_t>::load(r(), EEPROM_AM_STATIONS_ADDR, getClassName());
+#ifdef __DEBUG
+        DebugDataInspector::printAmStationData(r()); // Akkor is kiírjuk, ha defaultot töltött
+#endif
         // Count ellenőrzés marad itt
         if (data.count > MAX_AM_STATIONS) {
             DEBUG("[%s] Warning: AM station count corrected from %d to %d.\n", getClassName(), data.count, MAX_AM_STATIONS);
