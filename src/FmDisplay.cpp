@@ -297,7 +297,7 @@ void FmDisplay::displayLoop() {
         uint8_t snr = si4735.getCurrentSNR();
         pSMeter->showRSSI(rssi, snr, currentBand.varData.currMod == FM);
 
-        // RDS
+        // RDS adatok megszerzése és megjelenítése
         if (config.data.rdsEnabled) {
             pRds->showRDS(snr);
         }
@@ -313,6 +313,15 @@ void FmDisplay::displayLoop() {
 
         // Frissítjük az időbélyeget
         elapsedTimedValues = millis();
+    }
+
+    // Az RDS szöveg görgetése nagyobb sebességgel történik
+    static uint32_t rdsScrollTime = 0;  // Kezdőérték nulla
+    if (config.data.rdsEnabled) {
+        if ((millis() - rdsScrollTime) >= 200) {  // 200ms
+            pRds->scrollRdsText();
+            rdsScrollTime = millis();  // Frissítjük az időbélyeget
+        }
     }
 
     // A Frekvenciát azonnal frissítjuk, de csak ha változott

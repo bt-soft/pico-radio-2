@@ -12,6 +12,8 @@
         "span": "c",
         "text_encoding": "c",
         "regex": "c",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "compare": "cpp",
+        "cstdint": "cpp"
     }
 }

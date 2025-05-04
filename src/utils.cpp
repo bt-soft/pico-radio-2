@@ -143,4 +143,52 @@ bool isRemainingOnlySpaces(const char *str, uint16_t offset) {
     return true;
 }
 
+/**
+ * @brief Összehasonlít két C stringet max n karakterig, de a második string végén lévő szóközöket figyelmen kívül hagyja.
+ *
+ * @param s1 Az első C string.
+ * @param s2 A második C string (ennek a végéről hagyjuk el a szóközöket).
+ * @param n A maximálisan összehasonlítandó karakterek száma.
+ * @return 0, ha a stringek (a szóközök elhagyásával) megegyeznek n karakterig,
+ *         negatív érték, ha s1 kisebb, mint s2, pozitív érték, ha s1 nagyobb, mint s2.
+ */
+int strncmpIgnoringTrailingSpaces(const char *s1, const char *s2, size_t n) {
+    if (n == 0) {
+        return 0;  // Nincs mit összehasonlítani
+    }
+
+    // s2 effektív hosszának megkeresése (szóközök nélkül a végén)
+    size_t len2 = strlen(s2);
+    size_t effective_len2 = len2;
+    while (effective_len2 > 0 && s2[effective_len2 - 1] == ' ') {
+        effective_len2--;
+    }
+
+    size_t i = 0;
+    while (i < n) {
+        bool end1 = (s1[i] == '\0');
+        bool end2_effective = (i >= effective_len2);
+
+        if (end1 && end2_effective) return 0;                                    // Mindkettő véget ért (effektíven) n karakteren belül
+        if (end1 || end2_effective) return (end1) ? -1 : 1;                      // Csak az egyik ért véget
+        if (s1[i] != s2[i]) return (unsigned char)s1[i] - (unsigned char)s2[i];  // Különbség
+        i++;
+    }
+    return 0;  // n karakterig nem volt különbség
+}
+
+/**
+ * @brief Eltávolítja a C string végéről a szóközöket (in-place).
+ *
+ * @param str A módosítandó C string.
+ */
+void trimTrailingSpaces(char *str) {
+    if (str == nullptr) return;  // Null pointer ellenőrzés
+
+    int len = strlen(str);
+    while (len > 0 && str[len - 1] == ' ') {
+        str[len - 1] = '\0';  // Szóköz helyére null terminátor
+        len--;                // Hossz csökkentése
+    }
+}
 }  // namespace Utils

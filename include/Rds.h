@@ -6,6 +6,8 @@
 
 #include "utils.h"
 
+#define DEFAULT_MAX_SCROLL_WIDTH 16  // Maximális görgetési szélesség (karakterekben)
+
 /**
  *
  */
@@ -21,6 +23,7 @@ class Rds {
 
 #define MAX_MESSAGE_LENGTH 64
     char rdsInfo[MAX_MESSAGE_LENGTH];
+    bool rdsInfoChanged = false;  // Flag a szöveg megváltozásának jelzésére
 
 #define MAX_TIME_LENGTH 5
 
@@ -54,14 +57,12 @@ class Rds {
      */
     void checkRds();
 
-    void scrollRdsText();
-
    public:
     /**
      * Konstruktor
      */
     Rds(TFT_eSPI &Tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, uint16_t msgX, uint16_t msgY, uint16_t timeX, uint16_t timeY, uint16_t ptyX, uint16_t ptyY,
-        uint8_t maxScrollWidth = 32);
+        uint8_t maxScrollWidth = DEFAULT_MAX_SCROLL_WIDTH);
 
     /**
      *  RDS adatok törlése (csak FM módban)
@@ -78,6 +79,11 @@ class Rds {
      * (Az esetleges dialóg eltűnése után a teljes képernyőt újra rajzolásakor kellhet)
      */
     void displayRds(bool force = false);
+
+    /**
+     * RDS info felirat megjelenítése/görgetése
+     */
+    void scrollRdsText();
 };
 
 #endif

@@ -102,39 +102,78 @@ Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, ui
 }
 
 /**
- * Görgetés megvalósítása
+ * RDS info felirat megjelenítése/görgetése
  */
 void Rds::scrollRdsText() {
 
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    // Ha nincs mit scrollozni akkor kilépünk
+    if (rdsInfo[0] == '\0') {
+        return;
+    }
 
-    // Ellenőrizzük, hogy a szöveg hosszabb-e, mint a megadott szélesség
+    // 1. Szövegjellemzők beállítása
+    tft.setTextSize(1);                      // Betűméret a görgetett szöveghez
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);  // Fehér szöveg fekete háttéren
+    tft.setTextDatum(TL_DATUM);              // Top-Left datum a drawString-hoz
+
+    // 2. Szélességek kiszámítása
+    // Lekérdezzük a teljes rdsInfo szöveg pixelben mért szélességét
     uint16_t textWidth = tft.textWidth(rdsInfo);
-    uint16_t maxWidth = font1Width * maxScrollWidth;
+    // A maximális megjelenítési szélesség pixelben (a konstruktorban megadott karakter * font szélesség)
+    uint16_t displayWidth = font1Width * maxScrollWidth;
 
-    tft.setCursor(msgX, msgY);
-    if (textWidth > maxWidth) {
-        // Görgetés megvalósítása
-        static uint16_t scrollOffset = 0;
-        tft.fillRect(msgX, msgY, maxWidth, font1Height, TFT_BLACK);  // Töröljük a régi szöveget
-        tft.print(&rdsInfo[scrollOffset]);                           // Csak a scrollOffset-től kezdődő részt írjuk ki
+    // 3. Statikus változók a görgetés állapotának kezeléséhez
+    static int currentPixelOffset = 0;          // Aktuális pixel eltolás balra
+    const int PIXEL_STEP = 3;                   // Hány pixelt görgessen egy lépésben - sebesség
+    const int SLIDE_IN_GAP_PIXELS = textWidth;  // Szóköz a szöveg vége és az újra megjelenés között
 
-        DEBUG("RDS -> Gorgetes: '%s'\n", &rdsInfo[scrollOffset]);
+    // 4. Görgetési logika végrehajtása (minden híváskor)
+    if (textWidth <= displayWidth) {
+        // Szöveg elfér, nincs szükség görgetésre ->  Nincs szükség viewportra
+        if (rdsInfoChanged) {
+            tft.fillRect(msgX, msgY, displayWidth, font1Height, TFT_BLACK);  // Terület törlése
+            tft.setCursor(msgX, msgY);
+            tft.setTextDatum(TL_DATUM);  // Visszaállítás a printhez
+            tft.print(rdsInfo);
+            currentPixelOffset = 0;  // Eltolás nullázása
 
-        // Növeljük az offsetet, és ha elérjük a végét, visszaállítjuk
-        if (++scrollOffset >= strlen(rdsInfo)) {
-            scrollOffset = 0;
-        }
-
-        // Ha a görgetés után csak üres karakterek maradtak, akkor visszaállítjuk az offsetet
-        if (Utils::isRemainingOnlySpaces(rdsInfo, scrollOffset)) {
-            scrollOffset = 0;
+            rdsInfoChanged = false;  // Flag reset
         }
 
     } else {
-        // Ha nem kell görgetni, egyszerűen kiírjuk
-        tft.print(rdsInfo);
+        // Szöveg túl hosszú -> görgetés
+        // Viewport beállítása és rajzolás relatív koordinátákkal
+        tft.fillRect(msgX, msgY, displayWidth, font1Height, TFT_BLACK);  // Terület törlése
+        tft.setViewport(msgX, msgY, displayWidth, font1Height);          // Viewport beállítása
+
+        // 1. Fő szöveg rajzolása (ami balra kiúszik)
+        // A '-currentPixelOffset' miatt a szöveg balra mozog, ahogy currentPixelOffset nő.
+        // A viewport levágja a bal oldalon kilógó részt.
+        tft.drawString(rdsInfo, -currentPixelOffset, 0);  // Relatív X, Y=0
+
+        // 2. Az "újra beúszó" rész rajzolása
+        // Kiszámoljuk a második szöveg kezdő X pozícióját a viewporton belül.
+        // Ez az első szöveg vége után van 'SLIDE_IN_GAP_PIXELS' távolságra.
+        int slideInRelativeX = -currentPixelOffset + textWidth + SLIDE_IN_GAP_PIXELS;
+
+        // Csak akkor rajzoljuk ki a második szöveget, ha a kezdő X pozíciója
+        // már a látható területen belülre (< displayWidth) kerülne.
+        if (slideInRelativeX < displayWidth) {             // Ellenőrzés a viewport szélességéhez képest
+            tft.drawString(rdsInfo, slideInRelativeX, 0);  // Relatív X, Y=0
+        }
+
+        // Eltolás növelése a következő lépéshez
+        currentPixelOffset += PIXEL_STEP;
+
+        // 3. Ciklus újraindítása
+        // Amikor az első szöveg (plusz a szóköz) teljesen kiúszott balra...
+        if (currentPixelOffset >= textWidth + SLIDE_IN_GAP_PIXELS) {
+            // ...akkor a második szöveg eleje pont a viewport bal szélére (X=0) ért.
+            // Nullázzuk az eltolást, így az első szöveg újra a viewport elejéről indul,
+            // és a ciklus kezdődik elölről.
+            currentPixelOffset = 0;  // Kezdjük elölről
+        }
+        tft.resetViewport();  // Viewport eltávolítása
     }
 }
 
@@ -160,9 +199,15 @@ void Rds::displayRds(bool forceDisplay) {
     char *rdsMsg = si4735.getRdsText2A();
     // Van RDS üzenet?
     if (rdsMsg != nullptr and strlen(rdsMsg) > 0) {
-        // Csak ha eltérő a tartalma, akkor másolunk
-        if (strncmp(rdsInfo, rdsMsg, sizeof(rdsInfo)) != 0) {
-            strncpy(rdsInfo, rdsMsg, sizeof(rdsInfo) - 1);
+
+        // Csak ha eltérő a tartalma, akkor másolunk (az rdsMsg végén a space-eket figyelmen kívül hagyva)
+        if (Utils::strncmpIgnoringTrailingSpaces(rdsInfo, rdsMsg, sizeof(rdsInfo)) != 0) {
+            memset(rdsInfo, 0, sizeof(rdsInfo));            // Töröljük a régi szöveget
+            strncpy(rdsInfo, rdsMsg, sizeof(rdsInfo) - 1);  // Átmásoljuk az új szöveget
+            Utils::trimTrailingSpaces(rdsInfo);             // Trailing szóközök eltávolítása
+
+            rdsInfoChanged = true;  // Flag a szöveg megváltozásának jelzésére
+            DEBUG("RDS info: '%s'\n", rdsInfo);
         }
     }
 
@@ -244,10 +289,5 @@ void Rds::showRDS(uint8_t snr) {
         checkRds();
     } else if (rdsStationName != NULL or rdsInfo[0] != '\0') {
         clearRds();  // töröljük az esetleges korábbi RDS adatokat
-    }
-
-    // Ha van mit scrollozni akkor scrollozunk
-    if (rdsInfo[0] != '\0' > 0) {
-        scrollRdsText();
     }
 }

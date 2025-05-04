@@ -91,6 +91,24 @@ void mergeArrays(const T *source1, uint8_t length1, const T *source2, uint8_t le
  */
 bool isRemainingOnlySpaces(const char *str, uint16_t offset);
 
+/**
+ * @brief Összehasonlít két C stringet max n karakterig, de a második string végén lévő szóközöket figyelmen kívül hagyja.
+ *
+ * @param s1 Az első C string.
+ * @param s2 A második C string (ennek a végéről hagyjuk el a szóközöket).
+ * @param n A maximálisan összehasonlítandó karakterek száma.
+ * @return 0, ha a stringek (a szóközök elhagyásával) megegyeznek n karakterig,
+ *         negatív érték, ha s1 kisebb, mint s2, pozitív érték, ha s1 nagyobb, mint s2.
+ */
+int strncmpIgnoringTrailingSpaces(const char *s1, const char *s2, size_t n);
+
+/**
+ * @brief Eltávolítja a C string végéről a szóközöket (in-place).
+ *
+ * @param str A módosítandó C string.
+ */
+void trimTrailingSpaces(char *str);
+
 }  // namespace Utils
 
 #endif  // __UTILS_H
