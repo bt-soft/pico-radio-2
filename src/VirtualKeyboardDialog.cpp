@@ -4,15 +4,26 @@
 #include "defines.h"      // Szükséges a TFT színekhez
 #include "utils.h"        // Szükséges a Utils::beepError()-hez
 
-// --- Konstansok az elrendezéshez ---
-#define KEY_WIDTH 40
-#define KEY_HEIGHT 30
-#define KEY_GAP_X 3
-#define KEY_GAP_Y 3
-#define INPUT_DISPLAY_HEIGHT 40
-#define INPUT_DISPLAY_MARGIN_Y 5
-#define KEYBOARD_START_Y_OFFSET (INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y * 2)  // Billentyűzet kezdő Y pozíciója a dialógus tetejétől
+namespace VirtualKeyboardConstants {
+    // Dialógus méretei
+    constexpr uint16_t DIALOG_WIDTH = 456;
+    constexpr uint16_t DIALOG_HEIGHT = 260;
 
+    // Billentyűzet elrendezés
+    constexpr uint16_t KEY_WIDTH = 40;
+    constexpr uint16_t KEY_HEIGHT = 30;
+    constexpr uint16_t KEY_GAP_X = 3;
+    constexpr uint16_t KEY_GAP_Y = 3;
+    constexpr uint16_t INPUT_DISPLAY_HEIGHT = 40;
+    constexpr uint16_t INPUT_DISPLAY_MARGIN_X = 10;
+    constexpr uint16_t INPUT_DISPLAY_MARGIN_Y = 5;
+    constexpr uint16_t INPUT_BORDER_WIDTH = 1;
+    constexpr uint16_t INPUT_TEXT_PADDING_X = 5;
+    constexpr uint16_t KEYBOARD_START_Y_OFFSET = INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y * 2;
+    constexpr uint16_t CURSOR_Y_OFFSET = 6; // Felső/alsó margó a kurzornak a beviteli mezőn belül
+    constexpr uint16_t CURSOR_HEIGHT_REDUCTION = CURSOR_Y_OFFSET * 2; // Mennyivel rövidebb a kurzor, mint a mező
+
+} // namespace VirtualKeyboardConstants
 #define MAX_INPUT_LEN STATION_NAME_BUFFER_SIZE - 1  // Maximális bemeneti hossz (a StationData.h-ból)
 #define SPACE_BTN_WIDTH 120                         // Space gomb szélessége (ha szükséges)
 
@@ -20,8 +31,9 @@
  * Konstruktor
  */
 VirtualKeyboardDialog::VirtualKeyboardDialog(IDialogParent* pParent, TFT_eSPI& tft, const __FlashStringHelper* title, String& target)
-    : DialogBase(pParent, tft, 456, 260, title),  // Méretet ellenőrizd/állítsd be!
+    : DialogBase(pParent, tft, VirtualKeyboardConstants::DIALOG_WIDTH, VirtualKeyboardConstants::DIALOG_HEIGHT, title),
       targetString(target),
+      // originalString(target), // Ezt nem használjuk jelenleg, törölhető?
       originalString(target),  // Eredeti string mentése
       currentInput(target),    // Kezdetben a szerkesztendő stringgel inicializáljuk
       shiftActive(false)       // Shift kezdetben inaktív
@@ -64,14 +76,15 @@ VirtualKeyboardDialog::~VirtualKeyboardDialog() {
  * Billentyűzet gombjainak és elrendezésének felépítése
  */
 void VirtualKeyboardDialog::buildKeyboard() {
+    using namespace VirtualKeyboardConstants;
     // Bemeneti mező koordinátái
-    inputDisplayX = x + 10;
+    inputDisplayX = x + INPUT_DISPLAY_MARGIN_X;
     inputDisplayY = y + DLG_HEADER_H + INPUT_DISPLAY_MARGIN_Y;
-    inputDisplayW = w - 20;  // Teljes szélesség - margók
+    inputDisplayW = w - (INPUT_DISPLAY_MARGIN_X * 2);  // Teljes szélesség - margók
     inputDisplayH = INPUT_DISPLAY_HEIGHT;
 
     // Billentyűzet kezdő pozíciója
-    uint16_t keyboardStartY = y + DLG_HEADER_H + KEYBOARD_START_Y_OFFSET;
+    uint16_t keyboardStartY = inputDisplayY + INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y; // Közvetlenül az input mező alá
 
     // Karakter gombok létrehozása a keyLayout alapján
     uint16_t currentY = keyboardStartY;
@@ -165,7 +178,8 @@ void VirtualKeyboardDialog::drawDialog() {
  * @param redrawCursorOnly Csak a kurzort kell újrarajzolni?
  */
 void VirtualKeyboardDialog::updateInputDisplay(bool redrawCursorOnly) {
-    if (!redrawCursorOnly) {  // Csak akkor rajzoljuk újra a szöveget, ha nem csak a kurzor változott
+    using namespace VirtualKeyboardConstants;
+    if (!redrawCursorOnly) { // Csak akkor rajzoljuk újra a szöveget, ha nem csak a kurzor változott
         // Terület törlése
         tft.fillRect(inputDisplayX + 1, inputDisplayY + 1, inputDisplayW - 2, inputDisplayH - 2, TFT_BLACK);
 
@@ -181,7 +195,7 @@ void VirtualKeyboardDialog::updateInputDisplay(bool redrawCursorOnly) {
             displayString = displayString.substring(0, MAX_INPUT_LEN);
         }
         // TODO: Szélesség alapján történő levágás vagy görgetés implementálása, ha szükséges
-        tft.drawString(displayString, inputDisplayX + 5, inputDisplayY + inputDisplayH / 2);
+        tft.drawString(displayString, inputDisplayX + INPUT_TEXT_PADDING_X, inputDisplayY + inputDisplayH / 2);
 
         // OK gomb állapotának frissítése az input hossza alapján
         TftButton::ButtonState newState = (currentInput.length() > 0) ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled;
@@ -199,6 +213,7 @@ void VirtualKeyboardDialog::updateInputDisplay(bool redrawCursorOnly) {
  * Csak a kurzort rajzolja vagy törli az aktuális `cursorVisible` állapot alapján.
  */
 void VirtualKeyboardDialog::drawCursor() {
+    using namespace VirtualKeyboardConstants;
     // Kurzor pozíciójának kiszámítása
     tft.setFreeFont();   // Font beállítása a textWidth-hoz
     tft.setTextSize(2);  // Ugyanaz a méret, mint a szövegnél
@@ -206,14 +221,14 @@ void VirtualKeyboardDialog::drawCursor() {
     if (displayString.length() > MAX_INPUT_LEN) {
         displayString = displayString.substring(0, MAX_INPUT_LEN);
     }
-    int cursorX = inputDisplayX + 5 + tft.textWidth(displayString);
+    int cursorX = inputDisplayX + INPUT_TEXT_PADDING_X + tft.textWidth(displayString);
 
     // Rajzolás vagy törlés (háttérszínnel rajzolás)
     uint16_t cursorColor = cursorVisible ? TFT_WHITE : TFT_BLACK;  // Fehér vagy háttérszín
 
     // Igazítsd ezeket az értékeket, ha kell
-    uint16_t cursorTopY = inputDisplayY + 6;     // Pl. kicsit lejjebb
-    uint16_t cursorHeight = inputDisplayH - 12;  // Pl. kicsit rövidebb/hosszabb
+    uint16_t cursorTopY = inputDisplayY + CURSOR_Y_OFFSET;
+    uint16_t cursorHeight = inputDisplayH - CURSOR_HEIGHT_REDUCTION;
     tft.drawFastVLine(cursorX, cursorTopY, cursorHeight, cursorColor);
 }
 
