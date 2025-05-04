@@ -132,20 +132,20 @@ void Rds::displayRds(bool forceDisplay) {
 
         tft.setCursor(msgX, msgY);
         if (textWidth > maxWidth) {
-            DEBUG("RDS -> Gorgetes\n");
-
             // Görgetés megvalósítása
             static uint16_t scrollOffset = 0;
             tft.fillRect(msgX, msgY, maxWidth, font1Height, TFT_BLACK);  // Töröljük a régi szöveget
             tft.print(&rdsMsg[scrollOffset]);                            // Csak a scrollOffset-től kezdődő részt írjuk ki
+
+            DEBUG("RDS -> Gorgetes: '%s'\n", &rdsMsg[scrollOffset]);
 
             // Növeljük az offsetet, és ha elérjük a végét, visszaállítjuk
             scrollOffset++;
             if (scrollOffset >= strlen(rdsMsg)) {
                 scrollOffset = 0;
             }
+
         } else {
-            DEBUG("RDS -> Sima Kiiras\n");
             // Ha nem kell görgetni, egyszerűen kiírjuk
             tft.print(rdsMsg);
         }

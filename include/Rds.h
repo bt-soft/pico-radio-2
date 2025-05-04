@@ -61,7 +61,7 @@ class Rds {
      * Konstruktor
      */
     Rds(TFT_eSPI &Tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, uint16_t msgX, uint16_t msgY, uint16_t timeX, uint16_t timeY, uint16_t ptyX, uint16_t ptyY,
-        uint8_t maxScrollWidth = 16);
+        uint8_t maxScrollWidth = 32);
 
     /**
      *  RDS adatok törlése (csak FM módban)
