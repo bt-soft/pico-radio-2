@@ -31,7 +31,7 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
 
     // RDS példányosítása
     pRds = new Rds(tft, si4735, 80, 62,  // Station x,y
-                   0, 80,                // Message x,y
+                   0, 82,                // Message x,y
                    2, 42,                // Time x,y
                    0, 105                // program type x,y
     );
@@ -315,13 +315,9 @@ void FmDisplay::displayLoop() {
         elapsedTimedValues = millis();
     }
 
-    // Az RDS szöveg görgetése nagyobb sebességgel történik
-    static uint32_t rdsScrollTime = 0;  // Kezdőérték nulla
+    // Az RDS szöveg görgetése 
     if (config.data.rdsEnabled) {
-        if ((millis() - rdsScrollTime) >= 100) {  // 200ms
-            pRds->scrollRdsText();
-            rdsScrollTime = millis();  // Frissítjük az időbélyeget
-        }
+        pRds->scrollRdsText();
     }
 
     // A Frekvenciát azonnal frissítjuk, de csak ha változott

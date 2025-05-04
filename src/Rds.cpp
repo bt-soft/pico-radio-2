@@ -2,7 +2,8 @@
 
 #include "defines.h"
 
-#define RDS_GOOD_SNR 3  // Az RDS-re 'jó' vétel SNR értéke
+#define RDS_GOOD_SNR 3              // Az RDS-re 'jó' vétel SNR értéke
+#define RDS_SCROLL_INTERVAL_MS 100  // Az RDS scroll lépések közötti idő (ms)
 
 //-----------------------------------------------------------------------------------------------------------------
 /**
@@ -93,6 +94,7 @@ Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, ui
       ptyX(ptyX),
       ptyY(ptyY),
       maxScrollWidth(maxScrollWidth),
+      scrollPixelOffset(0),
       scrollSprite(&tft)  // Sprite inicializálása a TFT pointerrel
 {
 
@@ -126,15 +128,14 @@ Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, ui
  */
 void Rds::scrollRdsText() {
 
-    // Ha nincs mit scrollozni akkor kilépünk
-    if (rdsInfo[0] == '\0') {
-        return;
+    // Időzítés a görgetéshez
+    static uint32_t lastScrollTime = 0;
+    if (rdsInfo[0] == '\0' or millis() - lastScrollTime < RDS_SCROLL_INTERVAL_MS) {
+        return;  // Vagy nincs mit görgetni, vagy még nem telt le az idő, így nem csinálunk semmit
     }
+    lastScrollTime = millis();  // Időbélyeg frissítése
 
-    // 1. Szövegjellemzők beállítása (már a sprite-on be van állítva a konstruktorban)
-    // tft.setTextSize(2);
-    // tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    // tft.setTextDatum(TL_DATUM);
+    // 1. A szövegjellemzők beállítása már a sprite-on be van állítva a konstruktorban
 
     // 2. Szélességek kiszámítása
     // A sprite már ismeri a saját méreteit, de a textWidth kell
@@ -145,7 +146,6 @@ void Rds::scrollRdsText() {
     uint16_t scrollDisplayWidth = font2Width * maxScrollWidth;  // Ezt a sprite is tudja: scrollSprite.width()
 
     // 3. Statikus változók a görgetés állapotának kezeléséhez
-    static int currentPixelOffset = 0;                   // Aktuális pixel eltolás balra
     const int PIXEL_STEP = 2;                            // Hány pixelt görgessen egy lépésben - sebesség
     const int SLIDE_IN_GAP_PIXELS = scrollDisplayWidth;  // Szóköz a szöveg vége és az újra megjelenés között
 
@@ -156,7 +156,7 @@ void Rds::scrollRdsText() {
             scrollSprite.fillScreen(TFT_BLACK);  // Sprite törlése
             // A print nem működik sprite-on, drawString-et használunk
             scrollSprite.drawString(rdsInfo, 0, 0);  // Rajzolás a sprite bal felső sarkába
-            currentPixelOffset = 0;                  // Eltolás nullázása
+            scrollPixelOffset = 0;                   // Eltolás nullázása
             rdsInfoChanged = false;                  // Flag reset
             scrollSprite.pushSprite(msgX, msgY);     // Sprite kirakása a képernyőre
         }
@@ -164,7 +164,7 @@ void Rds::scrollRdsText() {
     } else {
         // Szöveg túl hosszú -> görgetés
         if (rdsInfoChanged) {
-            currentPixelOffset = 0;  // Eltolás nullázása, ha új szöveg jött
+            scrollPixelOffset = 0;   // Eltolás nullázása, ha új szöveg jött
             rdsInfoChanged = false;  // Flag reset
         }
 
@@ -172,14 +172,14 @@ void Rds::scrollRdsText() {
         scrollSprite.fillScreen(TFT_BLACK);  // Sprite törlése
 
         // 1. Fő szöveg rajzolása (ami balra kiúszik)
-        // A '-currentPixelOffset' miatt a szöveg balra mozog, ahogy currentPixelOffset nő.
+        // A '-scrollPixelOffset' miatt a szöveg balra mozog, ahogy scrollPixelOffset nő.
         // A sprite levágja a kilógó részt.
-        scrollSprite.drawString(rdsInfo, -currentPixelOffset, 0);  // Rajzolás a sprite-ra
+        scrollSprite.drawString(rdsInfo, -scrollPixelOffset, 0);  // Rajzolás a sprite-ra
 
         // 2. Az "újra beúszó" rész rajzolása
         // Kiszámoljuk a második szöveg kezdő X pozícióját a sprite-on belül.
         // Ez az első szöveg vége után van 'SLIDE_IN_GAP_PIXELS' távolságra.
-        int slideInRelativeX = -currentPixelOffset + textWidth + SLIDE_IN_GAP_PIXELS;
+        int slideInRelativeX = -scrollPixelOffset + textWidth + SLIDE_IN_GAP_PIXELS;
 
         // Csak akkor rajzoljuk ki a második szöveget, ha a kezdő X pozíciója
         // már a látható területen belülre (< scrollDisplayWidth) kerülne.
@@ -188,15 +188,15 @@ void Rds::scrollRdsText() {
         }
 
         // Eltolás növelése a következő lépéshez
-        currentPixelOffset += PIXEL_STEP;
+        scrollPixelOffset += PIXEL_STEP;
 
         // 3. Ciklus újraindítása
         // Amikor az első szöveg (plusz a szóköz) teljesen kiúszott balra...
-        if (currentPixelOffset >= textWidth + SLIDE_IN_GAP_PIXELS) {
+        if (scrollPixelOffset >= textWidth + SLIDE_IN_GAP_PIXELS) {
             // ...akkor a második szöveg eleje pont a sprite bal szélére (X=0) ért.
             // Nullázzuk az eltolást, így az első szöveg újra a sprite elejéről indul,
             // és a ciklus kezdődik elölről.
-            currentPixelOffset = 0;  // Kezdjük elölről
+            scrollPixelOffset = 0;  // Kezdjük elölről
         }
         scrollSprite.pushSprite(msgX, msgY);  // Sprite kirakása a képernyőre
     }

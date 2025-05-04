@@ -55,6 +55,9 @@ class Rds {
     // Görgetés szélessége (karakterekben)
     uint8_t maxScrollWidth;
 
+    // Görgetés aktuális pixel eltolása
+    int scrollPixelOffset;
+
     /**
      * RDS adatok megszerzése és megjelenítése
      */
