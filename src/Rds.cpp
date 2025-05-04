@@ -102,6 +102,43 @@ Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, ui
 }
 
 /**
+ * Görgetés megvalósítása
+ */
+void Rds::scrollRdsText() {
+
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+    // Ellenőrizzük, hogy a szöveg hosszabb-e, mint a megadott szélesség
+    uint16_t textWidth = tft.textWidth(rdsInfo);
+    uint16_t maxWidth = font1Width * maxScrollWidth;
+
+    tft.setCursor(msgX, msgY);
+    if (textWidth > maxWidth) {
+        // Görgetés megvalósítása
+        static uint16_t scrollOffset = 0;
+        tft.fillRect(msgX, msgY, maxWidth, font1Height, TFT_BLACK);  // Töröljük a régi szöveget
+        tft.print(&rdsInfo[scrollOffset]);                           // Csak a scrollOffset-től kezdődő részt írjuk ki
+
+        DEBUG("RDS -> Gorgetes: '%s'\n", &rdsInfo[scrollOffset]);
+
+        // Növeljük az offsetet, és ha elérjük a végét, visszaállítjuk
+        if (++scrollOffset >= strlen(rdsInfo)) {
+            scrollOffset = 0;
+        }
+
+        // Ha a görgetés után csak üres karakterek maradtak, akkor visszaállítjuk az offsetet
+        if (Utils::isRemainingOnlySpaces(rdsInfo, scrollOffset)) {
+            scrollOffset = 0;
+        }
+
+    } else {
+        // Ha nem kell görgetni, egyszerűen kiírjuk
+        tft.print(rdsInfo);
+    }
+}
+
+/**
  * RDS adatok megjelenítése
  * (Az esetleges dialóg eltünése után a teljes képernyőt újra rajzolásakor kellhet -> forceDisplay = true)
  * @param forceDisplay erőből, ne csak a változáskor jelenítsen meg adatokat
@@ -120,34 +157,12 @@ void Rds::displayRds(bool forceDisplay) {
     }
 
     // Info
-    rdsMsg = si4735.getRdsText2A();
+    char *rdsMsg = si4735.getRdsText2A();
+    // Van RDS üzenet?
     if (rdsMsg != nullptr and strlen(rdsMsg) > 0) {
-        DEBUG("RDS: '%s'\n", rdsMsg);
-        tft.setTextSize(1);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-
-        // Ellenőrizzük, hogy a szöveg hosszabb-e, mint a megadott szélesség
-        uint16_t textWidth = tft.textWidth(rdsMsg);
-        uint16_t maxWidth = font1Width * maxScrollWidth;
-
-        tft.setCursor(msgX, msgY);
-        if (textWidth > maxWidth) {
-            // Görgetés megvalósítása
-            static uint16_t scrollOffset = 0;
-            tft.fillRect(msgX, msgY, maxWidth, font1Height, TFT_BLACK);  // Töröljük a régi szöveget
-            tft.print(&rdsMsg[scrollOffset]);                            // Csak a scrollOffset-től kezdődő részt írjuk ki
-
-            DEBUG("RDS -> Gorgetes: '%s'\n", &rdsMsg[scrollOffset]);
-
-            // Növeljük az offsetet, és ha elérjük a végét, visszaállítjuk
-            scrollOffset++;
-            if (scrollOffset >= strlen(rdsMsg)) {
-                scrollOffset = 0;
-            }
-
-        } else {
-            // Ha nem kell görgetni, egyszerűen kiírjuk
-            tft.print(rdsMsg);
+        // Csak ha eltérő a tartalma, akkor másolunk
+        if (strncmp(rdsInfo, rdsMsg, sizeof(rdsInfo)) != 0) {
+            strncpy(rdsInfo, rdsMsg, sizeof(rdsInfo) - 1);
         }
     }
 
@@ -201,13 +216,15 @@ void Rds::checkRds() {
  */
 void Rds::clearRds() {
 
+    DEBUG("Rds::clearRds()\n");
+
     // clear RDS rdsStationName
     tft.fillRect(stationX, stationY, font2Width * MAX_STATION_NAME_LENGTH, font2Height, TFT_BLACK);
     rdsStationName = NULL;
 
     // clear RDS rdsMsg
     tft.fillRect(msgX, msgY, font1Width * MAX_MESSAGE_LENGTH, font1Height, TFT_BLACK);
-    rdsMsg = NULL;
+    rdsInfo[0] = '\0';
 
     // clear RDS rdsTime
     tft.fillRect(timeX, timeY, font1Width * MAX_TIME_LENGTH, font1Height, TFT_BLACK);
@@ -225,7 +242,12 @@ void Rds::showRDS(uint8_t snr) {
     // Ha 'jó' a vétel akkor rámozdulunk az RDS-re
     if (snr >= RDS_GOOD_SNR) {
         checkRds();
-    } else if (rdsStationName != NULL or rdsMsg != NULL) {
+    } else if (rdsStationName != NULL or rdsInfo[0] != '\0') {
         clearRds();  // töröljük az esetleges korábbi RDS adatokat
+    }
+
+    // Ha van mit scrollozni akkor scrollozunk
+    if (rdsInfo[0] != '\0' > 0) {
+        scrollRdsText();
     }
 }

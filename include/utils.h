@@ -82,6 +82,15 @@ void mergeArrays(const T *source1, uint8_t length1, const T *source2, uint8_t le
     }
 }
 
+/**
+ * @brief Ellenőrzi, hogy egy C string egy adott indextől kezdve csak szóközöket tartalmaz-e.
+ *
+ * @param str A vizsgálandó C string.
+ * @param offset Az index, ahonnan a vizsgálatot kezdeni kell.
+ * @return true, ha az offsettől kezdve csak szóközök vannak (vagy a string vége van), egyébként false.
+ */
+bool isRemainingOnlySpaces(const char *str, uint16_t offset);
+
 }  // namespace Utils
 
 #endif  // __UTILS_H

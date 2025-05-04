@@ -115,4 +115,32 @@ void beepError() {
     noTone(PIN_BEEPER);
 }
 
+/**
+ * @brief Ellenőrzi, hogy egy C string egy adott indextől kezdve csak szóközöket tartalmaz-e.
+ *
+ * @param str A vizsgálandó C string.
+ * @param offset Az index, ahonnan a vizsgálatot kezdeni kell.
+ * @return true, ha az offsettől kezdve csak szóközök vannak (vagy a string vége van), egyébként false.
+ */
+bool isRemainingOnlySpaces(const char *str, uint16_t offset) {
+    // Ellenőrizzük, hogy a string és az offset érvényes-e
+    if (str == nullptr) {
+        return true;  // Null pointert tekinthetjük "csak szóköznek" vagy hibának, itt true-t adunk
+    }
+    size_t len = strlen(str);
+    if (offset >= len) {
+        return true;  // Ha az offset a stringen túl mutat, akkor nincs hátra karakter, tehát "csak szóköz"
+    }
+
+    // Ciklus az offsettől a string végéig
+    for (size_t i = offset; i < len; ++i) {
+        if (str[i] != ' ') {
+            return false;  // Találtunk egy nem szóköz karaktert
+        }
+    }
+
+    // Ha a ciklus végigfutott, csak szóközök voltak
+    return true;
+}
+
 }  // namespace Utils

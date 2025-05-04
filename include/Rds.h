@@ -20,9 +20,7 @@ class Rds {
     char *rdsStationName = NULL;
 
 #define MAX_MESSAGE_LENGTH 64
-    // Az SI4735 bufferét használjuk,
-    // ez csak ez jelző pointer a képernyő törlésének szükségességének jelzésére
-    char *rdsMsg = NULL;
+    char rdsInfo[MAX_MESSAGE_LENGTH];
 
 #define MAX_TIME_LENGTH 5
 
@@ -55,6 +53,8 @@ class Rds {
      * RDS adatok megszerzése és megjelenítése
      */
     void checkRds();
+
+    void scrollRdsText();
 
    public:
     /**
