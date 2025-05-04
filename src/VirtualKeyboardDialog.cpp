@@ -96,33 +96,37 @@ void VirtualKeyboardDialog::buildKeyboard() {
         currentY += KEY_HEIGHT + KEY_GAP_Y;
     }
 
-    // Speciális gombok létrehozása (OK, Cancel, Bksp, Clear)
+    // Speciális gombok létrehozása (OK, Cancel, <--, Clear)
     // Ezeket a karakter gombok alá helyezzük el
-    uint16_t specialBtnY = currentY + KEY_GAP_Y;  // Egy kis extra rés
-    uint16_t btnWidthSpecial = 60;                // Speciális gombok szélessége
-    // Teljes szélesség: Shift + Clear + Bksp + Space + Cancel + OK + 5 rés
-    uint16_t totalSpecialWidth = (btnWidthSpecial * 5) + SPACE_BTN_WIDTH + (KEY_GAP_X * 5);
-    uint16_t startXSpecial = x + (w - totalSpecialWidth) / 2;
+    uint16_t specialBtnY = currentY + KEY_GAP_Y;           // Egy kis extra rés
+    uint16_t btnWidthSpecialBase = 60;                     // Alap speciális gomb szélesség
+    uint16_t backspaceBtnWidth = btnWidthSpecialBase - 15;  // <-- gomb keskenyebb
+    uint16_t cancelBtnWidth = btnWidthSpecialBase + 15;     // Cancel gomb szélesebb
+    // Teljes szélesség: Shift + Clear + <-- + Space + Cancel + OK + 5 rés
+    uint16_t totalSpecialWidth = (btnWidthSpecialBase * 3) + backspaceBtnWidth + cancelBtnWidth + SPACE_BTN_WIDTH + (KEY_GAP_X * 5);  // Újraszámolt teljes szélesség
+    uint16_t startXSpecial = x + (w - totalSpecialWidth) / 2;                                                                         // Újraszámolt kezdő X
 
     // Gombok létrehozása sorban
     uint16_t currentXSpecial = startXSpecial;
 
-    shiftButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Shift", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off);
-    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
+    shiftButton =
+        new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecialBase, KEY_HEIGHT, "Shift", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off);
+    currentXSpecial += btnWidthSpecialBase + KEY_GAP_X;
 
-    clearButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Clear", TftButton::ButtonType::Pushable);
-    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
+    clearButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecialBase, KEY_HEIGHT, "Clear", TftButton::ButtonType::Pushable);
+    currentXSpecial += btnWidthSpecialBase + KEY_GAP_X;
 
-    backspaceButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Bksp", TftButton::ButtonType::Pushable);
-    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
+    backspaceButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, backspaceBtnWidth, KEY_HEIGHT, "<--", TftButton::ButtonType::Pushable);  // Keskenyebb <--
+    currentXSpecial += backspaceBtnWidth + KEY_GAP_X;
 
     spaceButton = new TftButton(btnId++, tft, currentXSpecial, specialBtnY, SPACE_BTN_WIDTH, KEY_HEIGHT, "Space", TftButton::ButtonType::Pushable);
     currentXSpecial += SPACE_BTN_WIDTH + KEY_GAP_X;
 
-    cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "Cancel", TftButton::ButtonType::Pushable);
-    currentXSpecial += btnWidthSpecial + KEY_GAP_X;
+    cancelButton =
+        new TftButton(DLG_CANCEL_BUTTON_ID, tft, currentXSpecial, specialBtnY, cancelBtnWidth, KEY_HEIGHT, "Cancel", TftButton::ButtonType::Pushable);  // Szélesebb Cancel
+    currentXSpecial += cancelBtnWidth + KEY_GAP_X;
 
-    okButton = new TftButton(DLG_OK_BUTTON_ID, tft, currentXSpecial, specialBtnY, btnWidthSpecial, KEY_HEIGHT, "OK", TftButton::ButtonType::Pushable);
+    okButton = new TftButton(DLG_OK_BUTTON_ID, tft, currentXSpecial, specialBtnY, btnWidthSpecialBase, KEY_HEIGHT, "OK", TftButton::ButtonType::Pushable);
 
     // OK gomb kezdetben tiltva, ha az input érvénytelen (pl. üres)
     okButton->setState(currentInput.length() > 0 ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled);
@@ -254,7 +258,7 @@ void VirtualKeyboardDialog::handleKeyPress(const char* key) {
         }
     } else if (strcmp(key, "Cancel") == 0) {
         pParent->setDialogResponse(cancelButton->buildButtonTouchEvent());
-    } else if (strcmp(key, "Bksp") == 0) {
+    } else if (strcmp(key, "<--") == 0) {
         if (currentInput.length() > 0) {
             currentInput.remove(currentInput.length() - 1);
             inputChanged = true;
@@ -286,7 +290,7 @@ void VirtualKeyboardDialog::handleKeyPress(const char* key) {
         }
 
         if (currentInput.length() < MAX_INPUT_LEN) {
-            currentInput += pressedChar; // Javítás: a módosított karaktert fűzzük hozzá
+            currentInput += pressedChar;  // Javítás: a módosított karaktert fűzzük hozzá
             inputChanged = true;
         } else {
             Utils::beepError();
@@ -318,8 +322,8 @@ bool VirtualKeyboardDialog::handleTouch(bool touched, uint16_t tx, uint16_t ty) 
         handleKeyPress("Cancel");
         return true;
     }
-    if (backspaceButton->handleTouch(touched, tx, ty)) {
-        handleKeyPress("Bksp");
+    if (backspaceButton->handleTouch(touched, tx, ty)) {  // <-- Javítva itt is
+        handleKeyPress("<--");
         return true;
     }
     if (clearButton->handleTouch(touched, tx, ty)) {

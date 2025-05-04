@@ -8,8 +8,8 @@
 #include "TftButton.h"
 
 // A dialóg méretei
-#define FREQUENCY_INPUT_DIALOG_H 240
-#define FREQUENCY_INPUT_DIALOG_W 220
+#define FREQUENCY_INPUT_DIALOG_H 250  // Kicsit magasabb
+#define FREQUENCY_INPUT_DIALOG_W 230  // Kicsit szélesebb
 
 /**
  * @brief Frekvencia bevitel dialógus
@@ -90,32 +90,31 @@ class FrequencyInputDialog : public DialogBase {
      */
     void updateFrequencyDisplay() {
         // Kijelző terület törlése (háttérszínnel)
-        tft.fillRect(inputDisplayX, inputDisplayY, inputDisplayW, inputDisplayH, FREQ_INPUT_BACKGROUND_COLOR);
+        tft.fillRect(inputDisplayX - 1, inputDisplayY - 1, inputDisplayW + 2, inputDisplayH + 2, DLG_BACKGROUND_COLOR);  // Törlés a keret körül is
+        tft.fillRect(inputDisplayX, inputDisplayY, inputDisplayW, inputDisplayH, FREQ_INPUT_BACKGROUND_COLOR);           // Belső fekete
         // Keret rajzolása a kijelző terület köré
         tft.drawRect(inputDisplayX, inputDisplayY, inputDisplayW, inputDisplayH, TFT_WHITE);
-        // Mértékegység terület törlése (legyen elég széles)
-        tft.fillRect(unitDisplayX, inputDisplayY, 40, inputDisplayH, DLG_BACKGROUND_COLOR);
 
         // Szöveg tulajdonságok beállítása a frekvenciához
-        tft.setFreeFont(&FreeSansBold18pt7b);  // Használjunk egy jól olvasható fontot
+        tft.setFreeFont(&FreeMono24pt7b);  // Használjunk egy jól olvasható fontot
         tft.setTextSize(1);
-        tft.setTextPadding(0);
-        tft.setTextDatum(MC_DATUM);  // Középre igazítás (vertikálisan és horizontálisan)
+        tft.setTextPadding(5);       // Kis padding bal oldalon
+        tft.setTextDatum(MR_DATUM);  // Középre-jobbra igazítás
 
         // Szín meghatározása érvényesség alapján (piros, ha érvénytelen)
         // Az üres stringet is érvényesnek tekintjük a kezdeti állapotban (nem piros)
         bool currentlyValid = isFrequencyValid() || currentInputString.length() == 0;
-        tft.setTextColor(currentlyValid ? TFT_WHITE : TFT_RED, FREQ_INPUT_BACKGROUND_COLOR);
+        tft.setTextColor(currentlyValid ? TFT_WHITE : TFT_RED, FREQ_INPUT_BACKGROUND_COLOR);  // Háttérszín a kitöltéshez
 
         // Bevitt string kirajzolása
-        tft.drawString(currentInputString, inputDisplayX + inputDisplayW / 2, inputDisplayY + inputDisplayH / 2);
+        tft.drawString(currentInputString, inputDisplayX + inputDisplayW - 5, inputDisplayY + inputDisplayH / 2 - 1);  // -1 pixel korrekció felfelé
 
         // Mértékegység kirajzolása (kisebb, normál fonttal)
-        tft.setFreeFont();           // Vissza alapértelmezett fontra
-        tft.setTextSize(2);          // Kisebb méret
-        tft.setTextDatum(ML_DATUM);  // Középre-balra igazítás
+        tft.setFreeFont(&FreeSans9pt7b);  // Kicsit kisebb, de olvasható font
+        tft.setTextSize(1);
+        tft.setTextDatum(BL_DATUM);  // Alulra-balra igazítás
         tft.setTextColor(TFT_YELLOW, DLG_BACKGROUND_COLOR);
-        // A unitDisplayY-t igazítsuk a frekvencia közepéhez
+        // A unitDisplayY-t igazítsuk a frekvencia aljához
         tft.drawString(unitStr, unitDisplayX, inputDisplayY + inputDisplayH / 2);
 
         // OK gomb állapotának frissítése
@@ -260,14 +259,14 @@ class FrequencyInputDialog : public DialogBase {
 
         // Kijelző területének koordinátái
         inputDisplayX = x + 10;
-        inputDisplayY = y + DLG_HEADER_H + 5;
-        inputDisplayW = w - 100;  // Szélesség
-        inputDisplayH = 45;       // Magasság
-        unitDisplayX = inputDisplayX + inputDisplayW + 5;
+        inputDisplayY = y + DLG_HEADER_H + 10;             // Kicsit lejjebb
+        inputDisplayW = w - 60;                            // Szélesebb mező, kevesebb hely az egységnek
+        inputDisplayH = 50;                                // Magasabb input mező
+        unitDisplayX = inputDisplayX + inputDisplayW + 8;  // Jobbra az egység
         unitDisplayY = inputDisplayY;
 
-        // --- ÚJ GOMB ELRENDEZÉS (3. JAVASLAT) ---
-        uint16_t btnW = 40;         // Gomb szélesség
+        // --- ÚJ GOMB ELRENDEZÉS (Numpad stílus) ---
+        uint16_t btnW = 45;         // Gomb szélesség
         uint16_t btnH = 30;         // Gomb magasság
         uint16_t gapX = 5;          // Vízszintes rés
         uint16_t gapY = 5;          // Függőleges rés
@@ -275,42 +274,42 @@ class FrequencyInputDialog : public DialogBase {
 
         // Teljes szélesség kiszámítása a 4 gombos sorokhoz
         uint16_t totalRowWidth = (btnW * buttonsPerRow) + (gapX * (buttonsPerRow - 1));
-        // Kezdő X pozíció középre igazításhoz
+        // Kezdő X pozíció középre igazításhoz (az egész dialógushoz képest)
         uint16_t startX = x + (w - totalRowWidth) / 2;
         // Kezdő Y pozíció a frekvencia kijelző alatt
-        uint16_t startY = inputDisplayY + inputDisplayH + 10;  // Kisebb rés itt elég
+        uint16_t startY = inputDisplayY + inputDisplayH + 15;  // Nagyobb rés a gombok előtt
 
         uint8_t id = DLG_MULTI_BTN_ID_START;
 
-        // 1. sor: 1, 2, 3, CLR
-        digitButtons[1] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), startY, btnW, btnH, "1", TftButton::ButtonType::Pushable);
-        digitButtons[2] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), startY, btnW, btnH, "2", TftButton::ButtonType::Pushable);
-        digitButtons[3] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), startY, btnW, btnH, "3", TftButton::ButtonType::Pushable);
-        clearButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), startY, btnW, btnH, "CLR", TftButton::ButtonType::Pushable);
+        // 1. sor: 7, 8, 9, <--
+        digitButtons[7] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), startY, btnW, btnH, "7", TftButton::ButtonType::Pushable);
+        digitButtons[8] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), startY, btnW, btnH, "8", TftButton::ButtonType::Pushable);
+        digitButtons[9] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), startY, btnW, btnH, "9", TftButton::ButtonType::Pushable);
+        backspaceButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), startY, btnW, btnH, "<--", TftButton::ButtonType::Pushable);
 
-        // 2. sor: 4, 5, 6, <--
+        // 2. sor: 4, 5, 6, CLR
         uint16_t row2Y = startY + btnH + gapY;
         digitButtons[4] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), row2Y, btnW, btnH, "4", TftButton::ButtonType::Pushable);
         digitButtons[5] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), row2Y, btnW, btnH, "5", TftButton::ButtonType::Pushable);
         digitButtons[6] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), row2Y, btnW, btnH, "6", TftButton::ButtonType::Pushable);
-        backspaceButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), row2Y, btnW, btnH, "<--", TftButton::ButtonType::Pushable);
+        clearButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), row2Y, btnW, btnH, "CLR", TftButton::ButtonType::Pushable);
 
-        // 3. sor: 7, 8, 9, .
+        // 3. sor: 1, 2, 3, .
         uint16_t row3Y = row2Y + btnH + gapY;
-        digitButtons[7] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), row3Y, btnW, btnH, "7", TftButton::ButtonType::Pushable);
-        digitButtons[8] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), row3Y, btnW, btnH, "8", TftButton::ButtonType::Pushable);
-        digitButtons[9] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), row3Y, btnW, btnH, "9", TftButton::ButtonType::Pushable);
+        digitButtons[1] = new TftButton(id++, tft, startX + 0 * (btnW + gapX), row3Y, btnW, btnH, "1", TftButton::ButtonType::Pushable);
+        digitButtons[2] = new TftButton(id++, tft, startX + 1 * (btnW + gapX), row3Y, btnW, btnH, "2", TftButton::ButtonType::Pushable);
+        digitButtons[3] = new TftButton(id++, tft, startX + 2 * (btnW + gapX), row3Y, btnW, btnH, "3", TftButton::ButtonType::Pushable);
         dotButton = new TftButton(id++, tft, startX + 3 * (btnW + gapX), row3Y, btnW, btnH, ".", TftButton::ButtonType::Pushable);
 
-        // 4. sor: OK, 0, Cancel
+        // 4. sor: Canc, 0, OK
         uint16_t row4Y = row3Y + btnH + gapY;
-        uint16_t okCancelW = 62;  // OK és Cancel gomb szélessége
-        uint16_t zeroW = btnW;    // 0 gomb szélessége (legyen mint a számoké)
+        uint16_t okCancelW = 68;  // OK és Cancel gomb szélessége (kicsit nagyobb)
+        uint16_t zeroW = btnW;    // 0 gomb szélessége (maradjon mint a számoké)
         uint16_t totalRow4Width = okCancelW + gapX + zeroW + gapX + okCancelW;
         uint16_t startX_R4 = x + (w - totalRow4Width) / 2;  // Kezdő X a 4. sorhoz (középre)
 
         // Először a Cancel gomb jön
-        cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, startX_R4, row4Y, okCancelW, btnH, "Canc", TftButton::ButtonType::Pushable);
+        cancelButton = new TftButton(DLG_CANCEL_BUTTON_ID, tft, startX_R4, row4Y, okCancelW, btnH, "Cancel", TftButton::ButtonType::Pushable);  // Teljes név
         // Utána a 0 gomb
         digitButtons[0] = new TftButton(id++, tft, startX_R4 + okCancelW + gapX, row4Y, zeroW, btnH, "0", TftButton::ButtonType::Pushable);
         // Végül az OK gomb
