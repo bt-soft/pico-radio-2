@@ -146,8 +146,8 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
     void drawAgcAttStatus(bool initFont = false);
     void drawStepStatus(bool initFont = false);
     void drawAntCapStatus(bool initFont = false);
-    void drawTemperatureStatus(bool initFont = false);
-    void drawVbusStatus(bool initFont = false);
+    void drawTemperatureStatus(bool initFont = false, bool forceRedraw  = false);
+    void drawVbusStatus(bool initFont = false, bool forceRedraw  = false);
 
     void dawStatusLine();
 

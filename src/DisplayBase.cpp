@@ -180,8 +180,9 @@ void DisplayBase::drawAntCapStatus(bool initFont) {
 /**
  * Hőmérséklet Status kirajzolása
  * @param initFont Ha true, akkor a betűtípus inicializálása történik
+ * @param forceRedraw Ha true, akkor mindig újrarajzoljuk a hőmérsékletet
  */
-void DisplayBase::drawTemperatureStatus(bool initFont) {
+void DisplayBase::drawTemperatureStatus(bool initFont, bool forceRedraw) {
     using namespace DisplayConstants;
 
     if (initFont) {
@@ -190,23 +191,25 @@ void DisplayBase::drawTemperatureStatus(bool initFont) {
         tft.setTextDatum(BC_DATUM);
     }
 
-    // Töröljük a területet
     int rectX = StatusLineTempX - (StatusLineRectWidth / 2);
-    tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+    if (forceRedraw) {
+        // Töröljük a területet
+        tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+        // Keret
+        tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, StatusLineTempColor);
+    }
 
     tft.setTextColor(StatusLineTempColor, TFT_BLACK);
     String tempStr = isnan(lastTemperature) ? "---" : String(lastTemperature, 1);  // 1 tizedesjegy
     tft.drawString(tempStr + "C", StatusLineTempX, 15);
-
-    // Keret
-    tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, StatusLineTempColor);
 }
 
 /**
  * Vbus Status kirajzolása
  * @param initFont Ha true, akkor a betűtípus inicializálása történik
+ * @param forceRedraw Ha true, akkor mindig újrarajzoljuk a Vbus-t
  */
-void DisplayBase::drawVbusStatus(bool initFont) {
+void DisplayBase::drawVbusStatus(bool initFont, bool forceRedraw) {
     using namespace DisplayConstants;
 
     if (initFont) {
@@ -215,16 +218,17 @@ void DisplayBase::drawVbusStatus(bool initFont) {
         tft.setTextDatum(BC_DATUM);
     }
 
-    // Töröljük a területet
     int rectX = StatusLineVbusX - (StatusLineRectWidth / 2);
-    tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+    if (forceRedraw) {
+        // Töröljük a területet
+        tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+        // Keret
+        tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, StatusLineVbusColor);
+    }
 
     tft.setTextColor(StatusLineVbusColor, TFT_BLACK);
     String vbusStr = isnan(lastVbus) ? "---" : String(lastVbus, 2);  // 2 tizedesjegy
     tft.drawString(vbusStr + "V", StatusLineVbusX, 15);
-
-    // Keret
-    tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, StatusLineVbusColor);
 }
 
 /**
@@ -272,10 +276,10 @@ void DisplayBase::dawStatusLine() {
     drawAntCapStatus();
 
     // Hőmérséklet
-    drawTemperatureStatus();
+    drawTemperatureStatus(false, true);  // Force redraw, hogy a keret is megjelenjen
 
     // Vbus
-    drawVbusStatus();
+    drawVbusStatus(false, true);  // Force redraw, hogy a keret is megjelenjen
 }
 
 /**
@@ -574,11 +578,11 @@ void DisplayBase::buildHorizontalScreenButtons(BuildButtonData screenHButtonsDat
 
     // Kötelező horizontális Képernyőgombok definiálása
     DisplayBase::BuildButtonData mandatoryHButtons[] = {
-        {"Ham", TftButton::ButtonType::Pushable},                                 //
-        {"Band", TftButton::ButtonType::Pushable},                                //
-        {"DeMod", TftButton::ButtonType::Pushable},                               //
-        {"Scan", TftButton::ButtonType::Pushable},                                //
-        {"Step", TftButton::ButtonType::Pushable},                                //
+        {"Ham", TftButton::ButtonType::Pushable},    //
+        {"Band", TftButton::ButtonType::Pushable},   //
+        {"DeMod", TftButton::ButtonType::Pushable},  //
+        {"Scan", TftButton::ButtonType::Pushable},   //
+        {"Step", TftButton::ButtonType::Pushable},   //
     };
     uint8_t mandatoryHButtonsLength = ARRAY_ITEM_COUNT(mandatoryHButtons);
 
@@ -628,11 +632,11 @@ void DisplayBase::updateButtonStatus() {
         btnSquelch->setState(squelchActive ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
     }
 
-    TftButton *btnBndW = findButtonByLabel("BndW");
-    if (btnBndW != nullptr) {
+    TftButton *btnAFWdt = findButtonByLabel("AFWdt");
+    if (btnAFWdt != nullptr) {
         // FM módban a BandWidth gomb tiltva van
-        bool bndwDisabled = (currMod == FM);
-        btnBndW->setState(bndwDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
+        bool afWdtDisabled = (currMod == FM);
+        btnAFWdt->setState(afWdtDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
     }
 
     // BFO gomb állapotának frissítése
@@ -872,7 +876,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
 
         // Multi button Dialog
         DisplayBase::pDialog = new MultiButtonDialog(
-            this, DisplayBase::tft, 270, 150, F("Demodulation Mode"), demodModes, demodCount,  //
+            this, DisplayBase::tft, 250, 130, F("Demodulation Mode"), demodModes, demodCount,  //
             [this](TftButton::ButtonTouchEvent event) {
                 // Kikeressük az aktuális band-ot
                 BandTable &currentBand = band.getCurrentBand();
@@ -898,7 +902,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             band.getCurrentBandModeDesc());
         processed = true;
 
-    } else if (STREQ("BndW", event.label)) {
+    } else if (STREQ("AFWdt", event.label)) {
 
         uint8_t currMod = band.getCurrentBand().varData.currMod;  // Demodulációs mód
 
@@ -1114,9 +1118,9 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
     // Az ős loop hívása a squelch kezelésére
     Si4735Utils::loop();
 
-    // Csak rádió módban (AM/FM) mérjük a szenzorokat
+    // Csak rádió módban (AM/FM) mérjük a szenzorokat és ha nincs aktív dialóg
     DisplayType displayType = this->getDisplayType();
-    if (displayType == DisplayBase::DisplayType::fm || displayType == DisplayBase::DisplayType::am) {
+    if (!pDialog and (displayType == DisplayBase::DisplayType::fm or displayType == DisplayBase::DisplayType::am)) {
         // Szenzor adatok frissítése
         updateSensorReadings();
     }
