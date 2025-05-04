@@ -80,8 +80,9 @@ int getLongestPtyStrLength() {
 /**
  * Konstruktor
  */
-Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, uint16_t msgX, uint16_t msgY, uint16_t timeX, uint16_t timeY, uint16_t ptyX, uint16_t ptyY)
-    : tft(tft), si4735(si4735), stationX(stationX), stationY(stationY), msgX(msgX), msgY(msgY), timeX(timeX), timeY(timeY), ptyX(ptyX), ptyY(ptyY) {
+Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, uint16_t msgX, uint16_t msgY, uint16_t timeX, uint16_t timeY, uint16_t ptyX, uint16_t ptyY,
+         uint8_t maxScrollWidth)
+    : tft(tft), si4735(si4735), stationX(stationX), stationY(stationY), msgX(msgX), msgY(msgY), timeX(timeX), timeY(timeY), ptyX(ptyX), ptyY(ptyY), maxScrollWidth(maxScrollWidth) {
 
     // Lekérjük a fontok méreteit (Fontos előtte beállítani a fontot!!)
     tft.setFreeFont();
@@ -106,7 +107,6 @@ Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, ui
  * @param forceDisplay erőből, ne csak a változáskor jelenítsen meg adatokat
  */
 void Rds::displayRds(bool forceDisplay) {
-
     tft.setFreeFont();
     tft.setTextDatum(BC_DATUM);
 
@@ -121,11 +121,34 @@ void Rds::displayRds(bool forceDisplay) {
 
     // Info
     rdsMsg = si4735.getRdsText2A();
-    if (rdsMsg != NULL) {
+    if (rdsMsg != nullptr and strlen(rdsMsg) > 0) {
+        DEBUG("RDS: '%s'\n", rdsMsg);
         tft.setTextSize(1);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+        // Ellenőrizzük, hogy a szöveg hosszabb-e, mint a megadott szélesség
+        uint16_t textWidth = tft.textWidth(rdsMsg);
+        uint16_t maxWidth = font1Width * maxScrollWidth;
+
         tft.setCursor(msgX, msgY);
-        tft.print(rdsMsg);
+        if (textWidth > maxWidth) {
+            DEBUG("RDS -> Gorgetes\n");
+
+            // Görgetés megvalósítása
+            static uint16_t scrollOffset = 0;
+            tft.fillRect(msgX, msgY, maxWidth, font1Height, TFT_BLACK);  // Töröljük a régi szöveget
+            tft.print(&rdsMsg[scrollOffset]);                            // Csak a scrollOffset-től kezdődő részt írjuk ki
+
+            // Növeljük az offsetet, és ha elérjük a végét, visszaállítjuk
+            scrollOffset++;
+            if (scrollOffset >= strlen(rdsMsg)) {
+                scrollOffset = 0;
+            }
+        } else {
+            DEBUG("RDS -> Sima Kiiras\n");
+            // Ha nem kell görgetni, egyszerűen kiírjuk
+            tft.print(rdsMsg);
+        }
     }
 
     // Idő
@@ -133,34 +156,23 @@ void Rds::displayRds(bool forceDisplay) {
     uint16_t year, month, day, hour, minute;
 
     bool rdsDateTimeSuccess = si4735.getRdsDateTime(&year, &month, &day, &hour, &minute);
-    // Ha izomból kell megjeleníteni vagy érvényes idő jött
     if (forceDisplay or rdsDateTimeSuccess) {
-        // sprintf(dateTime, "%04d-%02d-%02d %02d:%02d", year, month, day, hour, minute);
-        //  DEBUG("RDS full datetime : %s  ", dateTime);
-
         tft.setTextSize(1);
         tft.setTextDatum(BC_DATUM);
         tft.setTextColor(TFT_YELLOW, TFT_BLACK);
         tft.setCursor(timeX, timeY);
         sprintf(dateTime, "%02d:%02d", hour, minute);
-        // DEBUG("RDS time : %s\n", dateTime);
         tft.print(dateTime);
     }
 
     // RDS program type (PTY)
     uint8_t rdsPty = si4735.getRdsProgramType();
     if (rdsPty < RDS_PTY_COUNT) {
-        const char *p = getPtyStrPointer(rdsPty);  
+        const char *p = getPtyStrPointer(rdsPty);
 
-        // Ha izomból kell megjeleníteni vagy változás van
         if (forceDisplay or rdsProgramType != p) {
-            // clear RDS programType
             tft.fillRect(ptyX, ptyY, font2Width * ptyArrayMaxLength, font2Height, TFT_BLACK);
-
-            // Elmentjük az új pointert
             rdsProgramType = p;
-
-            // Kiírjuk a String-et a PROGMEM-ből
             tft.setTextSize(2);
             tft.setTextDatum(BC_DATUM);
             tft.setTextColor(TFT_YELLOW, TFT_BLACK);
@@ -191,22 +203,17 @@ void Rds::clearRds() {
 
     // clear RDS rdsStationName
     tft.fillRect(stationX, stationY, font2Width * MAX_STATION_NAME_LENGTH, font2Height, TFT_BLACK);
-    // tft.drawRect(stationX, stationY, font2Width * MAX_STATION_NAME_LENGTH, font2Height, TFT_YELLOW);
     rdsStationName = NULL;
 
     // clear RDS rdsMsg
     tft.fillRect(msgX, msgY, font1Width * MAX_MESSAGE_LENGTH, font1Height, TFT_BLACK);
-    // tft.drawRect(msgX, msgY, font1Width * MAX_MESSAGE_LENGTH, font1Height, TFT_YELLOW);
     rdsMsg = NULL;
 
     // clear RDS rdsTime
     tft.fillRect(timeX, timeY, font1Width * MAX_TIME_LENGTH, font1Height, TFT_BLACK);
-    // tft.drawRect(timeX, timeY, font1Width * MAX_TIME_LENGTH, font1Height, TFT_YELLOW);
-    // this->rdsTime = NULL;
 
     // clear RDS programType
     tft.fillRect(ptyX, ptyY, font2Width * ptyArrayMaxLength, font2Height, TFT_BLACK);
-    // tft.drawRect(ptyX, ptyY, font2Width * ptyArrayMaxLength, font2Height, TFT_YELLOW);
     rdsProgramType = NULL;
 }
 
