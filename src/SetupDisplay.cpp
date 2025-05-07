@@ -142,9 +142,9 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
     // tft.setTextSize(ITEM_TEXT_SIZE); // FreeFont esetén a setTextSize általában 1
     tft.setTextColor(textColor, bgColor);
     tft.setTextDatum(ML_DATUM);  // Középre balra
-
     // 3. A címke (label) kirajzolása
     tft.drawString(settingItems[itemIndex].label, LIST_AREA_X_START + ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
+
 
     // 4. Az aktuális érték stringjének előkészítése és kirajzolása
     String valueStr = "";
@@ -170,9 +170,15 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
     }
 
     if (hasValue) {
+        // Kisebb betűméret beállítása az értékhez
+        tft.setFreeFont();   // Visszaváltás alapértelmezett vagy számozott fontra
+        tft.setTextSize(1);  // Kisebb betűméret
+        // A textColor és bgColor már be van állítva a `isSelected` alapján
+        // tft.setTextColor(textColor, bgColor); // Ezt nem kell újra, mert a labelnél már beállt
         tft.setTextDatum(MR_DATUM); // Középre jobbra igazítás az értékhez
         // Az érték kirajzolása a sor jobb szélére, belső paddinggel
         tft.drawString(valueStr, LIST_AREA_X_START + listAreaW - ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
+        // A következő elem rajzolásakor a setTextDatum újra be lesz állítva ML_DATUM-ra a labelhez.
     }
 }
 
