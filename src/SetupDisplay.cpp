@@ -7,14 +7,16 @@
 
 // Lista megjelenítési konstansok
 namespace SetupListConstants {
-constexpr int LIST_START_Y = 45; // Lejjebb toltuk a listát
-constexpr int ITEM_HEIGHT = 30;  // Egy listaelem magassága
-constexpr int ITEM_PADDING_X = 10;
+constexpr int LIST_START_Y = 45;  // Lejjebb toltuk a listát
+constexpr int LIST_AREA_X_START = 5; // Bal oldali margó a lista területének
+constexpr int ITEM_HEIGHT = 30;   // Egy listaelem magassága
+constexpr int ITEM_PADDING_X = 10; // Belső padding a szövegnek a lista területén belül
 constexpr int ITEM_TEXT_SIZE = 2;
 constexpr uint16_t ITEM_TEXT_COLOR = TFT_WHITE;
 constexpr uint16_t ITEM_BG_COLOR = TFT_BLACK;
 constexpr uint16_t SELECTED_ITEM_TEXT_COLOR = TFT_BLACK;
-constexpr uint16_t SELECTED_ITEM_BG_COLOR = TFT_LIGHTGREY; // Világosszürke háttér
+constexpr uint16_t SELECTED_ITEM_BG_COLOR = TFT_LIGHTGREY;  // Világosszürke háttér
+constexpr uint16_t LIST_BORDER_COLOR = TFT_DARKGREY; // Keret színe
 constexpr uint16_t TITLE_COLOR = TFT_YELLOW;
 }  // namespace SetupListConstants
 
@@ -65,11 +67,19 @@ void SetupDisplay::drawScreen() {
     tft.fillScreen(TFT_BLACK);
 
     // Cím kiírása
-    tft.setTextFont(2);  // Nagyobb font a címhez
-    tft.setTextSize(2);  // Nagyobb méret a "Settings" címhez
+    tft.setFreeFont(&FreeSansBold12pt7b);  // Új bold font a címhez
     tft.setTextColor(TITLE_COLOR, TFT_BLACK);
-    tft.setTextDatum(TC_DATUM);  // Felül középre
-    tft.drawString("Settings", tft.width() / 2, 5);
+    tft.setTextSize(1);                              // Alapértelmezett szövegméret
+    tft.setTextDatum(TC_DATUM);                      // Felül középre igazítás
+    tft.drawString("Settings", tft.width() / 2, 5);  // Fő cím, már bold fonttal
+
+    // Lista keretének kirajzolása
+    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
+    int screenHeight = tft.height();
+    int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
+    uint16_t listAreaH = screenHeight - LIST_START_Y - bottomMargin;
+    // A keretet a lista tényleges tartalma köré rajzoljuk
+    tft.drawRect(LIST_AREA_X_START -1 , LIST_START_Y -1 , listAreaW + 2, listAreaH + 2, LIST_BORDER_COLOR);
 
     // Beállítási lista kirajzolása
     drawSettingsList();
@@ -85,6 +95,8 @@ void SetupDisplay::drawSettingsList() {
     using namespace SetupListConstants;
     int yPos = LIST_START_Y;
     int screenHeight = tft.height();
+    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
+
     // Az alsó gombok helyének kihagyása a lista magasságából
     int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;  // 5px extra hely
 
@@ -97,13 +109,13 @@ void SetupDisplay::drawSettingsList() {
             yPos += ITEM_HEIGHT;
         } else {
             // Ha nincs több elem, üres területet rajzolunk
-            tft.fillRect(0, yPos, tft.width(), ITEM_HEIGHT, ITEM_BG_COLOR);
+            tft.fillRect(LIST_AREA_X_START, yPos, listAreaW, ITEM_HEIGHT, ITEM_BG_COLOR);
             yPos += ITEM_HEIGHT;
         }
     }
     // Ha kevesebb elem van, mint a látható hely, a maradékot is töröljük
     if (itemCount < visibleItems) {
-        tft.fillRect(0, LIST_START_Y + itemCount * ITEM_HEIGHT, tft.width(), screenHeight - (LIST_START_Y + itemCount * ITEM_HEIGHT) - bottomMargin, ITEM_BG_COLOR);
+        tft.fillRect(LIST_AREA_X_START, LIST_START_Y + itemCount * ITEM_HEIGHT, listAreaW, screenHeight - (LIST_START_Y + itemCount * ITEM_HEIGHT) - bottomMargin, ITEM_BG_COLOR);
     }
 }
 
@@ -114,27 +126,25 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
     using namespace SetupListConstants;
     uint16_t bgColor = isSelected ? SELECTED_ITEM_BG_COLOR : ITEM_BG_COLOR;
     uint16_t textColor = isSelected ? SELECTED_ITEM_TEXT_COLOR : ITEM_TEXT_COLOR;
+    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
 
     // 1. Terület törlése a háttérszínnel
-    tft.fillRect(0, yPos, tft.width(), ITEM_HEIGHT, bgColor);
+    tft.fillRect(LIST_AREA_X_START, yPos, listAreaW, ITEM_HEIGHT, bgColor);
 
     // 2. Szöveg tulajdonságainak beállítása
-    tft.setFreeFont();  // Vagy a kívánt font
-    tft.setTextSize(ITEM_TEXT_SIZE);
+    if (isSelected) {
+        tft.setFreeFont(&FreeSansBold9pt7b);  // Bold font a kiválasztott elemhez
+        tft.setTextSize(1);  // Normál szövegméret
+    } else {
+        tft.setFreeFont();  // Vagy egy normál vastagságú FreeSans9pt7b, ha van
+        tft.setTextSize(2);  // Normál szövegméret
+    }
+    // tft.setTextSize(ITEM_TEXT_SIZE); // FreeFont esetén a setTextSize általában 1
     tft.setTextColor(textColor, bgColor);
     tft.setTextDatum(ML_DATUM);  // Középre balra
 
-    // 3. Fő szöveg kirajzolása
-    tft.drawString(settingItems[itemIndex].label, ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
-
-    // 4. Ha ki van választva, rajzoljuk újra a szöveget kicsit eltolva a "bold" hatáshoz
-    if (isSelected) {
-        // Biztosítjuk, hogy a szövegszín és háttér helyes legyen a "bold" réteghez
-        tft.setTextColor(textColor, bgColor);
-        tft.drawString(settingItems[itemIndex].label, ITEM_PADDING_X + 1, yPos + ITEM_HEIGHT / 2); // X irányban 1 pixellel eltolva
-        // Opcionálisan Y irányban is eltolható, vagy többször is kirajzolható a vastagabb hatáshoz:
-        // tft.drawString(settingItems[itemIndex].label, ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2 + 1); // Y irányban 1 pixellel eltolva
-    }
+    // 3. A szöveg kirajzolása
+    tft.drawString(settingItems[itemIndex].label, LIST_AREA_X_START + ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
 }
 
 /**
@@ -142,19 +152,20 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
  */
 void SetupDisplay::updateSelection(int newIndex, bool fromRotary) {
     using namespace SetupListConstants;
+
     // Korai kilépés, ha az index érvénytelen, vagy érintésnél nem változott a kiválasztás
     if (newIndex < 0 || newIndex >= itemCount) return;
     if (!fromRotary && newIndex == selectedItemIndex) return;
 
     int oldSelectedItemIndex = selectedItemIndex;
-    int oldTopItemIndex = topItemIndex; // Mentsük el a régi topItemIndexet is
+    int oldTopItemIndex = topItemIndex;  // Mentsük el a régi topItemIndexet is
     selectedItemIndex = newIndex;
 
     // Görgetés kezelése
     int screenHeight = tft.height();
     int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
     int visibleItems = (screenHeight - LIST_START_Y - bottomMargin) / ITEM_HEIGHT;
-    if (visibleItems <= 0) visibleItems = 1; // Biztosítjuk, hogy legalább 1 elem látható legyen
+    if (visibleItems <= 0) visibleItems = 1;  // Biztosítjuk, hogy legalább 1 elem látható legyen
 
     if (selectedItemIndex < topItemIndex) {
         topItemIndex = selectedItemIndex;
@@ -168,12 +179,12 @@ void SetupDisplay::updateSelection(int newIndex, bool fromRotary) {
     if (oldTopItemIndex != topItemIndex) {
         // akkor a teljes látható listát újra kell rajzolni.
         drawSettingsList();
+
     } else if (oldSelectedItemIndex != selectedItemIndex) {
         // Ha csak a kiválasztás változott, de a lista nem görgetődött,
         // akkor csak a régi és az új kiválasztott elemet rajzoljuk újra.
         // Biztosítjuk, hogy a régi kiválasztott index érvényes és látható volt
-        if (oldSelectedItemIndex >= 0 && oldSelectedItemIndex < itemCount &&
-            oldSelectedItemIndex >= oldTopItemIndex && oldSelectedItemIndex < oldTopItemIndex + visibleItems) {
+        if (oldSelectedItemIndex >= 0 && oldSelectedItemIndex < itemCount && oldSelectedItemIndex >= oldTopItemIndex && oldSelectedItemIndex < oldTopItemIndex + visibleItems) {
             drawSettingItem(oldSelectedItemIndex, LIST_START_Y + (oldSelectedItemIndex - topItemIndex) * ITEM_HEIGHT, false);
         }
         if (selectedItemIndex >= topItemIndex && selectedItemIndex < topItemIndex + visibleItems) {
@@ -196,14 +207,17 @@ void SetupDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &ev
  */
 void SetupDisplay::activateSetting(SetupList::ItemAction action) {
     switch (action) {
+
         case SetupList::ItemAction::BRIGHTNESS:
             DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("TFT Brightness"), F("Value:"), &config.data.tftBackgroundBrightness,
                                                          (uint8_t)TFT_BACKGROUND_LED_MIN_BRIGHTNESS, (uint8_t)TFT_BACKGROUND_LED_MAX_BRIGHTNESS, (uint8_t)10,
                                                          [this](uint8_t newBrightness) { analogWrite(PIN_TFT_BACKGROUND_LED, newBrightness); });
             break;
+
         case SetupList::ItemAction::INFO:
             pDialog = new InfoDialog(this, tft, si4735);
             break;
+
         case SetupList::ItemAction::SQUELCH_BASIS: {
             const char *options[] = {"SNR", "RSSI"};
             uint8_t optionCount = ARRAY_ITEM_COUNT(options);
@@ -219,14 +233,17 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
                 },
                 currentValue);
         } break;
+
         case SetupList::ItemAction::SAVER_TIMEOUT:
             DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Screen Saver Timeout"), F("Minutes (1-30):"), &config.data.screenSaverTimeoutMinutes,
                                                          (uint8_t)1, (uint8_t)30, (uint8_t)1, [this](uint8_t newTimeout) {});
             break;
+
         case SetupList::ItemAction::DIGIT_LIGHT:
             DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Inactive Digit Segments"), F("State:"), &config.data.tftDigitLigth, false, true, true,
                                                          [this](bool newValue) {});
             break;
+
         case SetupList::ItemAction::NONE:
             break;
     }
@@ -277,13 +294,14 @@ bool SetupDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
 bool SetupDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
     using namespace SetupListConstants;
     if (pDialog || !touched) return false;  // Ha dialógus aktív vagy nincs érintés
+    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
 
     // Lista területének ellenőrzése
     int screenHeight = tft.height();
     int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
     int listHeight = screenHeight - LIST_START_Y - bottomMargin;
 
-    if (tx >= 0 && tx < tft.width() && ty >= LIST_START_Y && ty < (LIST_START_Y + listHeight)) {
+    if (tx >= LIST_AREA_X_START && tx < (LIST_AREA_X_START + listAreaW) && ty >= LIST_START_Y && ty < (LIST_START_Y + listHeight)) {
         int touchedItemRelative = (ty - LIST_START_Y) / ITEM_HEIGHT;
         int touchedItemAbsolute = topItemIndex + touchedItemRelative;
 
