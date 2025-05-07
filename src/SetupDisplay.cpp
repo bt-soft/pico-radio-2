@@ -67,18 +67,18 @@ void SetupDisplay::drawScreen() {
     tft.fillScreen(TFT_BLACK);
 
     // Cím kiírása
-    tft.setFreeFont(&FreeSansBold12pt7b);  // Új bold font a címhez
+    tft.setFreeFont(&FreeSansBold12pt7b);  // Bold font a címhez
     tft.setTextColor(TITLE_COLOR, TFT_BLACK);
     tft.setTextSize(1);                              // Alapértelmezett szövegméret
     tft.setTextDatum(TC_DATUM);                      // Felül középre igazítás
     tft.drawString("Settings", tft.width() / 2, 5);  // Fő cím, már bold fonttal
 
     // Lista keretének kirajzolása
-    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
-    int screenHeight = tft.height();
-    int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
-    uint16_t listAreaH = screenHeight - LIST_START_Y - bottomMargin;
+
     // A keretet a lista tényleges tartalma köré rajzoljuk
+    int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
+    uint16_t listAreaH = tft.height() - LIST_START_Y - bottomMargin;
+    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
     tft.drawRect(LIST_AREA_X_START - 1, LIST_START_Y - 1, listAreaW + 2, listAreaH + 2, LIST_BORDER_COLOR);
 
     // Beállítási lista kirajzolása
@@ -132,13 +132,14 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
     tft.fillRect(LIST_AREA_X_START, yPos, listAreaW, ITEM_HEIGHT, bgColor);
 
     // 2. Szöveg tulajdonságainak beállítása
-    if (isSelected) {
-        tft.setFreeFont(&FreeSansBold9pt7b);  // Bold font a kiválasztott elemhez
-        tft.setTextSize(1);                   // Normál szövegméret
-    } else {
-        tft.setFreeFont();   // Normál font a nem kiválasztott elemhez
-        tft.setTextSize(2);  // Normál szövegméret
-    }
+    // if (isSelected) {
+    //     tft.setFreeFont(&FreeSansBold9pt7b);  // Bold font a kiválasztott elemhez
+    //     tft.setTextSize(1);                   // Normál szövegméret
+    // } else {
+    //     tft.setFreeFont();   // Normál font a nem kiválasztott elemhez
+    //     tft.setTextSize(2);  // Normál szövegméret
+    // }
+    tft.setFreeFont(&FreeSansBold9pt7b);
 
     tft.setTextColor(textColor, bgColor);
     tft.setTextDatum(ML_DATUM);  // Középre balra
