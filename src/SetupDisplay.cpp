@@ -7,16 +7,16 @@
 
 // Lista megjelenítési konstansok
 namespace SetupListConstants {
-constexpr int LIST_START_Y = 45;  // Lejjebb toltuk a listát
-constexpr int LIST_AREA_X_START = 5; // Bal oldali margó a lista területének
-constexpr int ITEM_HEIGHT = 30;   // Egy listaelem magassága
-constexpr int ITEM_PADDING_X = 10; // Belső padding a szövegnek a lista területén belül
+constexpr int LIST_START_Y = 45;      // Lejjebb toltuk a listát
+constexpr int LIST_AREA_X_START = 5;  // Bal oldali margó a lista területének
+constexpr int ITEM_HEIGHT = 30;       // Egy listaelem magassága
+constexpr int ITEM_PADDING_X = 10;    // Belső padding a szövegnek a lista területén belül
 constexpr int ITEM_TEXT_SIZE = 2;
 constexpr uint16_t ITEM_TEXT_COLOR = TFT_WHITE;
 constexpr uint16_t ITEM_BG_COLOR = TFT_BLACK;
 constexpr uint16_t SELECTED_ITEM_TEXT_COLOR = TFT_BLACK;
 constexpr uint16_t SELECTED_ITEM_BG_COLOR = TFT_LIGHTGREY;  // Világosszürke háttér
-constexpr uint16_t LIST_BORDER_COLOR = TFT_DARKGREY; // Keret színe
+constexpr uint16_t LIST_BORDER_COLOR = TFT_DARKGREY;        // Keret színe
 constexpr uint16_t TITLE_COLOR = TFT_YELLOW;
 }  // namespace SetupListConstants
 
@@ -27,11 +27,11 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
     using namespace SetupList;
 
     // Beállítási lista elemeinek definiálása
-    settingItems[0] = {"Brightness", ItemAction::BRIGHTNESS};     // Fényerő
-    settingItems[1] = {"Squelch Basis", ItemAction::SQUELCH_BASIS}; // Squelch alapja
-    settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};  // Képernyővédő idő
-    settingItems[3] = {"Digit Segments", ItemAction::DIGIT_LIGHT};  // Inaktív szegmensek
-    settingItems[4] = {"Info", ItemAction::INFO};                   // Információ (most az utolsó)
+    settingItems[0] = {"Brightness", ItemAction::BRIGHTNESS};        // Fényerő
+    settingItems[1] = {"Squelch Basis", ItemAction::SQUELCH_BASIS};  // Squelch alapja
+    settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};   // Képernyővédő idő
+    settingItems[3] = {"Digit Segments", ItemAction::DIGIT_LIGHT};   // Inaktív szegmensek
+    settingItems[4] = {"Info", ItemAction::INFO};                    // Információ (most az utolsó)
     itemCount = MAX_SETTINGS;
 
     selectedItemIndex = 0;
@@ -79,7 +79,7 @@ void SetupDisplay::drawScreen() {
     int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
     uint16_t listAreaH = screenHeight - LIST_START_Y - bottomMargin;
     // A keretet a lista tényleges tartalma köré rajzoljuk
-    tft.drawRect(LIST_AREA_X_START -1 , LIST_START_Y -1 , listAreaW + 2, listAreaH + 2, LIST_BORDER_COLOR);
+    tft.drawRect(LIST_AREA_X_START - 1, LIST_START_Y - 1, listAreaW + 2, listAreaH + 2, LIST_BORDER_COLOR);
 
     // Beállítási lista kirajzolása
     drawSettingsList();
@@ -134,17 +134,17 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
     // 2. Szöveg tulajdonságainak beállítása
     if (isSelected) {
         tft.setFreeFont(&FreeSansBold9pt7b);  // Bold font a kiválasztott elemhez
-        tft.setTextSize(1);  // Normál szövegméret
+        tft.setTextSize(1);                   // Normál szövegméret
     } else {
-        tft.setFreeFont();  // Vagy egy normál vastagságú FreeSans9pt7b, ha van
+        tft.setFreeFont();   // Normál font a nem kiválasztott elemhez
         tft.setTextSize(2);  // Normál szövegméret
     }
-    // tft.setTextSize(ITEM_TEXT_SIZE); // FreeFont esetén a setTextSize általában 1
+
     tft.setTextColor(textColor, bgColor);
     tft.setTextDatum(ML_DATUM);  // Középre balra
+
     // 3. A címke (label) kirajzolása
     tft.drawString(settingItems[itemIndex].label, LIST_AREA_X_START + ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
-
 
     // 4. Az aktuális érték stringjének előkészítése és kirajzolása
     String valueStr = "";
@@ -165,7 +165,7 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
         case SetupList::ItemAction::INFO:
         case SetupList::ItemAction::NONE:
         default:
-            hasValue = false; // Az Info-nak és a None-nak nincs megjelenítendő értéke
+            hasValue = false;  // Az Info-nak és a None-nak nincs megjelenítendő értéke
             break;
     }
 
@@ -173,9 +173,10 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
         // Kisebb betűméret beállítása az értékhez
         tft.setFreeFont();   // Visszaváltás alapértelmezett vagy számozott fontra
         tft.setTextSize(1);  // Kisebb betűméret
+
         // A textColor és bgColor már be van állítva a `isSelected` alapján
-        // tft.setTextColor(textColor, bgColor); // Ezt nem kell újra, mert a labelnél már beállt
-        tft.setTextDatum(MR_DATUM); // Középre jobbra igazítás az értékhez
+        tft.setTextDatum(MR_DATUM);  // Középre jobbra igazítás az értékhez
+
         // Az érték kirajzolása a sor jobb szélére, belső paddinggel
         tft.drawString(valueStr, LIST_AREA_X_START + listAreaW - ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
         // A következő elem rajzolásakor a setTextDatum újra be lesz állítva ML_DATUM-ra a labelhez.
