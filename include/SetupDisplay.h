@@ -3,9 +3,26 @@
 
 #include "DisplayBase.h"
 
+namespace SetupList {
+enum class ItemAction { BRIGHTNESS, INFO, SQUELCH_BASIS, SAVER_TIMEOUT, DIGIT_LIGHT, NONE };
+
+struct SettingItem {
+    const char *label;
+    ItemAction action;
+};
+}  // namespace SetupList
+
 class SetupDisplay : public DisplayBase {
+
    private:
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;
+
+    // Lista alapú menühöz
+    static const int MAX_SETTINGS = 5;  // Maximális beállítási elemek száma
+    SetupList::SettingItem settingItems[MAX_SETTINGS];
+    int itemCount = 0;
+    int selectedItemIndex = 0;
+    int topItemIndex = 0;  // A lista tetején lévő elem indexe (görgetéshez)
 
    protected:
     /**
@@ -15,6 +32,7 @@ class SetupDisplay : public DisplayBase {
 
     /**
      * Touch (nem képrnyő button) esemény lekezelése
+     * A további gui elemek vezérléséhez
      */
     bool handleTouch(bool touched, uint16_t tx, uint16_t ty) override;
 
@@ -23,37 +41,21 @@ class SetupDisplay : public DisplayBase {
      */
     void processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event) override;
 
-    /**
-     * Esemény nélküli display loop
-     */
+   public:
+    SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band);
+    ~SetupDisplay();
+    void drawScreen() override;
     void displayLoop() override;
 
-   public:
-    /**
-     * Konstruktor
-     */
-    SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band);
-
-    /**
-     * Destruktor
-     */
-    ~SetupDisplay();
-
-    /**
-     * Képernyő kirajzolása
-     */
-    void drawScreen() override;
-
-    /**
-     * Az előző képernyőtípus beállítása
-     * A SetupDisplay esetén használjuk, itt adjuk át, hogy hova kell visszatérnie a képrnyő bezárása után
-     */
-    void setPrevDisplayType(DisplayBase::DisplayType prevDisplay) override { this->prevDisplay = prevDisplay; };
-
-    /**
-     * Aktuális képernyő típusának lekérdezése
-     */
     inline DisplayBase::DisplayType getDisplayType() override { return DisplayBase::DisplayType::setup; };
+
+    void setPrevDisplayType(DisplayType prev) { prevDisplay = prev; }
+
+   private:
+    void drawSettingsList();
+    void drawSettingItem(int itemIndex, int yPos, bool isSelected);
+    void activateSetting(SetupList::ItemAction action);
+    void updateSelection(int newIndex, bool fromRotary);
 };
 
-#endif  //__SETUPDISPLAY_H
+#endif  // __SETUPDISPLAY_H
