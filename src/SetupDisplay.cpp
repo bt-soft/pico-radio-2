@@ -31,7 +31,7 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
     settingItems[1] = {"Squelch Basis", ItemAction::SQUELCH_BASIS};  // Squelch alapja
     settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};   // Képernyővédő idő
     settingItems[3] = {"Digit Segments", ItemAction::DIGIT_LIGHT};   // Inaktív szegmensek
-    settingItems[4] = {"Info", ItemAction::INFO};                    // Információ (most az utolsó)
+    settingItems[4] = {"Info", ItemAction::INFO};                    // Információ
     itemCount = MAX_SETTINGS;
 
     selectedItemIndex = 0;
