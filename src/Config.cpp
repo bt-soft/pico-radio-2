@@ -9,9 +9,6 @@ const Config_t DEFAULT_CONFIG = {
 
     //-- Band
     .bandIdx = 0,  // Default band, FM
-    // .currentFreq = 9390,  // Petőfi 93.9MHz
-    // .currentStep = 100,   // Default step, 100kHz
-    // .currentMode = 0,     // FM-ben infulunk először
 
     // BandWidht
     .bwIdxAM = 0,   // BandWidth AM - Band::bandWidthAM index szerint -> "6.0" kHz
@@ -25,12 +22,12 @@ const Config_t DEFAULT_CONFIG = {
     .ssIdxFM = 1,  // Band::stepSizeFM[] index szerint -> 100kHz
 
     // BFO
-    .currentBFO = 0, 
+    .currentBFO = 0,
     .currentBFOStep = 25,  // BFO lépésköz (pl. 1, 10, 25 Hz)
     .currentBFOmanu = 0,   // Manuális BFO eltolás (pl. -999 ... +999 Hz)
 
     // Squelch
-    .currentSquelch = 0, // Squelch szint (0...50)
+    .currentSquelch = 0,      // Squelch szint (0...50)
     .squelchUsesRSSI = true,  // A squlech RSSI alapú legyen?
 
     // FM RDS
@@ -48,4 +45,5 @@ const Config_t DEFAULT_CONFIG = {
     .tftCalibrateData = {213, 3717, 234, 3613, 7},
     .tftBackgroundBrightness = TFT_BACKGROUND_LED_MAX_BRIGHTNESS,  // TFT Háttérvilágítás
     .tftDigitLigth = true,                                         // Inaktív szegmens látszódjon?
+    .screenSaverTimeoutMinutes = SCREEN_SAVER_TIMEOUT,             // Képernyővédő alapértelmezetten 5 perc
 };

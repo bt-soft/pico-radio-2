@@ -14,6 +14,8 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
         {"Bright", TftButton::ButtonType::Pushable},                             //
         {"Info", TftButton::ButtonType::Pushable},                               //
         {"Squel", TftButton::ButtonType::Pushable},                              //
+        {"SaverT", TftButton::ButtonType::Pushable},                             // Képernyővédő időzítő
+        {"DigitL", TftButton::ButtonType::Pushable},                             // Digit Light
         {"Exit", TftButton::ButtonType::Pushable, TftButton::ButtonState::Off},  //
     };
 
@@ -93,6 +95,22 @@ void SetupDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &ev
             },
             currentValue  // Az aktuálisan kiválasztott érték átadása a dialógusnak
         );
+    } else if (STREQ("SaverT", event.label)) {
+        // Képernyővédő időzítőjének beállítása
+        DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Screen Saver Timeout"), F("Minutes (1-30):"),  //
+                                                     &config.data.screenSaverTimeoutMinutes, (uint8_t)1, (uint8_t)30, (uint8_t)1,        //
+                                                     [this](uint8_t newTimeout) {
+                                                         // A ValueChangeDialog közvetlenül frissíti a config.data.screenSaverTimeoutMinutes értéket a pointeren keresztül.
+                                                         // Itt nincs szükség további teendőre, a config mentése később automatikusan megtörténik.
+                                                     });
+    } else if (STREQ("DigitL", event.label)) {
+        // TFT Digit Light beállítása (ON/OFF)
+        DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Inactive Digit Segments"), F("State:"),  //
+                                                     &config.data.tftDigitLigth, false, true, true,  // bool* valuePtr, min, max, step (bool esetén a step nem számít)
+                                                     [this](bool newValue) {
+                                                         // A ValueChangeDialog közvetlenül frissíti a config.data.tftDigitLigth értékét.
+                                                         // Nincs szükség további teendőre itt.
+                                                     });
     }
 }
 

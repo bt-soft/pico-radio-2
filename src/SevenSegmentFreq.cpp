@@ -1,7 +1,6 @@
 #include "SevenSegmentFreq.h"
 
 #include "DSEG7_Classic_Mini_Regular_34.h"
-// #include "rtVars.h" // Már include-olva a SevenSegmentFreq.h-ban
 #include "utils.h"  // Beep miatt
 
 namespace SevenSegmentConstants {

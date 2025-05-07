@@ -20,7 +20,7 @@ RPI_PICO_Timer ITimer1(1);
 #include "RotaryEncoder.h"
 RotaryEncoder rotaryEncoder = RotaryEncoder(PIN_ENCODER_CLK, PIN_ENCODER_DT, PIN_ENCODER_SW, ROTARY_ENCODER_STEPS_PER_NOTCH);
 #define ROTARY_ENCODER_SERVICE_INTERVAL_IN_MSEC 1  // 1msec
-
+// #define SCREEN_SAVER_TIME 1000 * 60 * 5 // 5 perc - Ezt most már a configból vesszük
 //------------------- EEPROM Config
 #include "Config.h"
 Config config;
@@ -326,7 +326,7 @@ void loop() {
     } else {
 
         // Ha nincs user interakció, megnézzük, hogy lejárt-e a timeout
-        if (millis() - lastScreenSaver >= SCREEN_SAVER_TIME) {
+        if (millis() - lastScreenSaver >= (unsigned long)config.data.screenSaverTimeoutMinutes * 60 * 1000) {
 
             // Ha letelt a timeout és nem a képernyővédőn vagyunk, elindítjuk a képernyővédőt
             if (::currentDisplay != DisplayBase::DisplayType::screenSaver) {

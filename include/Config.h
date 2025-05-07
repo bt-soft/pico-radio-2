@@ -1,7 +1,7 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
-#include "DebugDataInspector.h" // Szükséges a debug kiíratáshoz
+#include "DebugDataInspector.h"  // Szükséges a debug kiíratáshoz
 #include "StoreBase.h"
 
 // TFT háttérvilágítás max érték
@@ -48,9 +48,10 @@ struct Config_t {
     uint8_t currentAGCgain;
 
     //--- TFT
-    uint16_t tftCalibrateData[5];     // TFT touch kalibrációs adatok
-    uint8_t tftBackgroundBrightness;  // TFT Háttérvilágítás
-    bool tftDigitLigth;               // Inaktív szegmens látszódjon?
+    uint16_t tftCalibrateData[5];       // TFT touch kalibrációs adatok
+    uint8_t tftBackgroundBrightness;    // TFT Háttérvilágítás
+    bool tftDigitLigth;                 // Inaktív szegmens látszódjon?
+    uint8_t screenSaverTimeoutMinutes;  // Képernyővédő ideje percekben (1-30)
 };
 
 // Alapértelmezett konfigurációs adatok (readonly, const)
@@ -86,10 +87,17 @@ class Config : public StoreBase<Config_t> {
     uint16_t performLoad() override {
         uint16_t loadedCrc = EepromManager<Config_t>::load(r(), 0, getClassName());
 #ifdef __DEBUG
-        DebugDataInspector::printConfigData(r()); // Akkor is kiírjuk, ha defaultot töltött
+        DebugDataInspector::printConfigData(r());  // Akkor is kiírjuk, ha defaultot töltött
 #endif
+        uint8_t currentTimeout = data.screenSaverTimeoutMinutes;
+        if (currentTimeout < SCREEN_SAVER_TIMEOUT_MIN || currentTimeout > SCREEN_SAVER_TIMEOUT_MAX) {
+            data.screenSaverTimeoutMinutes = SCREEN_SAVER_TIMEOUT;
+            // A 'data' módosítása miatt a checkSave() később észlelni fogja az eltérést
+            // a lastCRC-hez képest (amit a loadedCrc alapján állít be a StoreBase), és menteni fogja a javított adatot.
+        }
         return loadedCrc;
     }
+
    public:
     /**
      * Konstruktor

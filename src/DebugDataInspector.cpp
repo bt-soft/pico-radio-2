@@ -61,6 +61,7 @@ void DebugDataInspector::printConfigData(const Config_t& configData) {
           configData.tftCalibrateData[3], configData.tftCalibrateData[4]);
     DEBUG("  tftBackgroundBrightness: %u\n", configData.tftBackgroundBrightness);
     DEBUG("  tftDigitLigth: %s\n", configData.tftDigitLigth ? "true" : "false");
+    DEBUG("  screenSaverTimeoutMinutes: %u\n", configData.screenSaverTimeoutMinutes);
     DEBUG("====================\n");
 #endif
 }
