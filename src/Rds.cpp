@@ -121,6 +121,9 @@ Rds::Rds(TFT_eSPI &tft, SI4735 &si4735, uint16_t stationX, uint16_t stationY, ui
     scrollSprite.setTextSize(2);  // A görgetéshez használt méret
     scrollSprite.setTextColor(TFT_WHITE, TFT_BLACK);
     scrollSprite.setTextDatum(TL_DATUM);
+
+    // RDS info törlése
+    memset(rdsInfo, 0, sizeof(rdsInfo));
 }
 
 /**

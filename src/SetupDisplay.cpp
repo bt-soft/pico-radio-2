@@ -46,10 +46,10 @@ void SetupDisplay::drawScreen() {
     // Gombok kirajzolása
     DisplayBase::drawScreenButtons();
 
-    tft.setTextSize(2);
-    tft.setTextDatum(MC_DATUM);  // Középre igazítás
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString("Setup display", tft.width() / 2, tft.height() / 2);
+    // tft.setTextSize(2);
+    // tft.setTextDatum(MC_DATUM);  // Középre igazítás
+    // tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    // tft.drawString("Setup display", tft.width() / 2, tft.height() / 2);
 }
 
 /**
@@ -57,10 +57,9 @@ void SetupDisplay::drawScreen() {
  */
 void SetupDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event) {
 
-    DEBUG("SetupDisplay::processScreenButtonTouchEvent() -> id: %d, label: %s, state: %s\n", event.id, event.label, TftButton::decodeState(event.state));
-
     if (STREQ("Exit", event.label)) {
         ::newDisplay = prevDisplay;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
+
     } else if (STREQ("Bright", event.label)) {
         DisplayBase::pDialog =
             new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("TFT Brightness"), F("Value:"),                                                                         //
