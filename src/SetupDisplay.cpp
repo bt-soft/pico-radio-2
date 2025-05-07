@@ -27,11 +27,11 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
     using namespace SetupList;
 
     // Beállítási lista elemeinek definiálása
-    settingItems[0] = {"Brightness", ItemAction::BRIGHTNESS};
-    settingItems[1] = {"Info", ItemAction::INFO};
-    settingItems[2] = {"Squelch Basis", ItemAction::SQUELCH_BASIS};
-    settingItems[3] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};
-    settingItems[4] = {"Digit Segments", ItemAction::DIGIT_LIGHT};
+    settingItems[0] = {"Brightness", ItemAction::BRIGHTNESS};     // Fényerő
+    settingItems[1] = {"Squelch Basis", ItemAction::SQUELCH_BASIS}; // Squelch alapja
+    settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};  // Képernyővédő idő
+    settingItems[3] = {"Digit Segments", ItemAction::DIGIT_LIGHT};  // Inaktív szegmensek
+    settingItems[4] = {"Info", ItemAction::INFO};                   // Információ (most az utolsó)
     itemCount = MAX_SETTINGS;
 
     selectedItemIndex = 0;
@@ -143,8 +143,37 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
     tft.setTextColor(textColor, bgColor);
     tft.setTextDatum(ML_DATUM);  // Középre balra
 
-    // 3. A szöveg kirajzolása
+    // 3. A címke (label) kirajzolása
     tft.drawString(settingItems[itemIndex].label, LIST_AREA_X_START + ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
+
+    // 4. Az aktuális érték stringjének előkészítése és kirajzolása
+    String valueStr = "";
+    bool hasValue = true;
+    switch (settingItems[itemIndex].action) {
+        case SetupList::ItemAction::BRIGHTNESS:
+            valueStr = String(config.data.tftBackgroundBrightness);
+            break;
+        case SetupList::ItemAction::SQUELCH_BASIS:
+            valueStr = config.data.squelchUsesRSSI ? "RSSI" : "SNR";
+            break;
+        case SetupList::ItemAction::SAVER_TIMEOUT:
+            valueStr = String(config.data.screenSaverTimeoutMinutes) + " min";
+            break;
+        case SetupList::ItemAction::DIGIT_LIGHT:
+            valueStr = config.data.tftDigitLigth ? "ON" : "OFF";
+            break;
+        case SetupList::ItemAction::INFO:
+        case SetupList::ItemAction::NONE:
+        default:
+            hasValue = false; // Az Info-nak és a None-nak nincs megjelenítendő értéke
+            break;
+    }
+
+    if (hasValue) {
+        tft.setTextDatum(MR_DATUM); // Középre jobbra igazítás az értékhez
+        // Az érték kirajzolása a sor jobb szélére, belső paddinggel
+        tft.drawString(valueStr, LIST_AREA_X_START + listAreaW - ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
+    }
 }
 
 /**
