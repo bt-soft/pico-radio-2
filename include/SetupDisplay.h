@@ -4,7 +4,7 @@
 #include "DisplayBase.h"
 
 namespace SetupList {
-enum class ItemAction { BRIGHTNESS, INFO, SQUELCH_BASIS, SAVER_TIMEOUT, DIGIT_LIGHT, NONE };
+enum class ItemAction { BRIGHTNESS, INFO, SQUELCH_BASIS, SAVER_TIMEOUT, INACTIVE_DIGIT_LIGHT, NONE };
 
 struct SettingItem {
     const char *label;

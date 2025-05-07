@@ -27,11 +27,11 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
     using namespace SetupList;
 
     // Beállítási lista elemeinek definiálása
-    settingItems[0] = {"Brightness", ItemAction::BRIGHTNESS};        // Fényerő
-    settingItems[1] = {"Squelch Basis", ItemAction::SQUELCH_BASIS};  // Squelch alapja
-    settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};   // Képernyővédő idő
-    settingItems[3] = {"Inactive Digit Segments", ItemAction::DIGIT_LIGHT};   // Inaktív szegmensek
-    settingItems[4] = {"Info", ItemAction::INFO};                    // Információ
+    settingItems[0] = {"Brightness", ItemAction::BRIGHTNESS};                         // Fényerő
+    settingItems[1] = {"Squelch Basis", ItemAction::SQUELCH_BASIS};                   // Squelch alapja
+    settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};                    // Képernyővédő idő
+    settingItems[3] = {"Inactive Digit Segments", ItemAction::INACTIVE_DIGIT_LIGHT};  // Inaktív szegmensek
+    settingItems[4] = {"Info", ItemAction::INFO};                                     // Információ
     itemCount = MAX_SETTINGS;
 
     selectedItemIndex = 0;
@@ -160,7 +160,7 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
         case SetupList::ItemAction::SAVER_TIMEOUT:
             valueStr = String(config.data.screenSaverTimeoutMinutes) + " min";
             break;
-        case SetupList::ItemAction::DIGIT_LIGHT:
+        case SetupList::ItemAction::INACTIVE_DIGIT_LIGHT:
             valueStr = config.data.tftDigitLigth ? "ON" : "OFF";
             break;
         case SetupList::ItemAction::INFO:
@@ -276,7 +276,7 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
                                                          (uint8_t)1, (uint8_t)30, (uint8_t)1, [this](uint8_t newTimeout) {});
             break;
 
-        case SetupList::ItemAction::DIGIT_LIGHT:
+        case SetupList::ItemAction::INACTIVE_DIGIT_LIGHT:
             DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Inactive Digit Segments"), F("State:"), &config.data.tftDigitLigth, false, true, true,
                                                          [this](bool newValue) {});
             break;
