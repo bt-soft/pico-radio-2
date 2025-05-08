@@ -774,7 +774,28 @@ void MemoryDisplay::saveCurrentStation() {
         pendingStationData.bandwidthIndex = config.data.bwIdxSSB;
     }
 
-    stationNameBuffer = "";
+    // Kezdetben töröljük a buffert
+    stationNameBuffer = ""; 
+
+    // Ha FM módban vagyunk, próbáljuk meg lekérni az RDS állomásnevet
+    if (isFmMode) {
+        si4735.getRdsStatus(); // Frissítsük az RDS állapotát
+        if (si4735.getRdsReceived() && si4735.getRdsSync()) { // Csak ha van érvényes RDS jel
+            char* rdsPsName = si4735.getRdsText0A(); // Program Service Name (állomásnév)
+            if (rdsPsName != nullptr && strlen(rdsPsName) > 0) {
+                // Másoljuk át egy ideiglenes bufferbe a biztonságos feldolgozáshoz
+                char tempRdsName[STATION_NAME_BUFFER_SIZE];
+                strncpy(tempRdsName, rdsPsName, STATION_NAME_BUFFER_SIZE - 1);
+                tempRdsName[STATION_NAME_BUFFER_SIZE - 1] = '\0'; // Biztos null-terminálás
+                Utils::trimTrailingSpaces(tempRdsName); // Esetleges felesleges szóközök eltávolítása a végéről
+
+                if (strlen(tempRdsName) > 0) { // Csak ha maradt valami a trimmelés után
+                    stationNameBuffer = tempRdsName; // Beállítjuk a billentyűzet bufferébe
+                }
+            }
+        }
+    }
+
     currentDialogMode = DialogMode::SAVE_NEW_STATION;
     pDialog = new VirtualKeyboardDialog(this, tft, F("Enter Station Name"), stationNameBuffer);
 }
