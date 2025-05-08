@@ -121,11 +121,10 @@ void DisplayBase::drawAgcAttStatus(bool initFont /*= false*/) {  // initFont má
 void DisplayBase::drawStepStatus(bool initFont) {
     using namespace DisplayConstants;
 
-    // Fontot kell váltani?
-    if (initFont) {
-        tft.setFreeFont();
-        tft.setTextSize(1);
-    }
+    // Mindig beállítjuk a fontot és a méretet a biztonság kedvéért
+    tft.setFreeFont();
+    tft.setTextSize(1);
+
     constexpr uint32_t rectX = 200;  // A téglalap kezdő X koordinátája
     tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
     tft.setTextDatum(BC_DATUM);  // Bottom-Center igazítás
