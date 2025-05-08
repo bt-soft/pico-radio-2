@@ -12,19 +12,19 @@
 namespace MemoryListConstants {
 constexpr int LIST_X_MARGIN = 5;
 constexpr int LIST_Y_MARGIN = 5;
-constexpr int ITEM_PADDING_Y = 5;         // MEGNÖVELVE A PADDING, HOGY A LINEHEIGHT BIZTOSAN ELÉG LEGYEN
-constexpr int ITEM_TEXT_SIZE_NORMAL = 2;  // Nem kiválasztott elem betűmérete
-constexpr uint16_t ITEM_TEXT_COLOR = TFT_WHITE;
+constexpr int ITEM_PADDING_Y = 5;                           // Elem függőleges margója
+constexpr int ITEM_TEXT_SIZE_NORMAL = 2;                    // Nem kiválasztott elem betűmérete
+constexpr uint16_t ITEM_TEXT_COLOR = TFT_WHITE;             // Nem kiválasztott elem szövegszíne
 constexpr uint16_t ITEM_BG_COLOR = TFT_BLACK;               // Vagy TFT_COLOR_BACKGROUND
 constexpr uint16_t SELECTED_ITEM_TEXT_COLOR = TFT_BLACK;    // SetupDisplay-hez hasonlóan
 constexpr uint16_t SELECTED_ITEM_BG_COLOR = TFT_LIGHTGREY;  // SetupDisplay-hez hasonlóan
 constexpr uint16_t LIST_BORDER_COLOR = TFT_DARKGREY;        // SetupDisplay-hez hasonlóan
-constexpr uint16_t TITLE_TEXT_COLOR = TFT_YELLOW;
-constexpr uint16_t TUNED_ICON_COLOR = TFT_ORANGE;  // Legyen narancs a jobb láthatóságért
-constexpr int ICON_PADDING_RIGHT = 5;
-constexpr int MOD_FREQ_GAP = 10;            // Rés a moduláció és a frekvencia között
-constexpr int NAME_MOD_GAP = 10;            // Rés a név és a moduláció között
-constexpr char CURRENT_TUNED_ICON[] = ">";  // Ikon a behangolt állomás jelzésére
+constexpr uint16_t TITLE_TEXT_COLOR = TFT_YELLOW;           // Cím színe
+constexpr uint16_t TUNED_ICON_COLOR = TFT_MAGENTA;      // Behangolt ikon színe
+constexpr int ICON_PADDING_RIGHT = 5;                       // Rés a frekvencia és az ikon között
+constexpr int MOD_FREQ_GAP = 10;                            // Rés a moduláció és a frekvencia között
+constexpr int NAME_MOD_GAP = 10;                            // Rés a név és a moduláció között
+constexpr char CURRENT_TUNED_ICON[] = ">";                  // Ikon a behangolt állomás jelzésére
 }  // namespace MemoryListConstants
 
 /**
@@ -216,15 +216,10 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
 
     tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
 
-    // 1. Fő betűtípus beállítása a listaelemhez (név, ikon, moduláció)
-    //    a kiválasztottság alapján.
-    if (isSelected) {
-        tft.setFreeFont(&FreeSansBold9pt7b);
-        tft.setTextSize(1);
-    } else {
-        tft.setFreeFont(); // Alapértelmezett/számozott font
-        tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
-    }
+    // Fő betűtípus beállítása a listaelemhez (név, ikon, moduláció).
+    // Mindig FreeSansBold9pt7b, méret 1. A szín változik a kiválasztottság alapján.
+    tft.setFreeFont(&FreeSansBold9pt7b);
+    tft.setTextSize(1);
     tft.setTextPadding(0);
     // A textColor-t közvetlenül a név/moduláció rajzolása előtt állítjuk be.
 
@@ -234,7 +229,7 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     int iconStartX = listX + ICON_PADDING_RIGHT;
     if (isTuned) {
         tft.setTextColor(TUNED_ICON_COLOR, bgColor);
-        tft.setTextDatum(ML_DATUM); // Középre-balra igazítás
+        tft.setTextDatum(ML_DATUM);  // Középre-balra igazítás
         tft.drawString(CURRENT_TUNED_ICON, iconStartX, textCenterY);
     }
 
@@ -260,26 +255,20 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
         freqStr = String(station.frequency) + " kHz";
     }
 
-    // 2. Frekvencia szélességének mérése a dedikált kicsi fonttal
-    tft.setFreeFont(); // Alapértelmezett/számozott font
-    tft.setTextSize(1); // Kis betű a frekvenciához
+    // Frekvencia szélességének mérése a dedikált kicsi (alapértelmezett) fonttal
+    tft.setFreeFont();   // Alapértelmezett/számozott font
+    tft.setTextSize(1);  // Kis betű a frekvenciához
     int freqWidth = tft.textWidth(freqStr);
     // A freqX-et később számoljuk, ez a jobb oldali igazítási pont (MR_DATUM)
 
-    // 3. Visszaállítjuk/újra beállítjuk a fő fontot a név/moduláció méréséhez és rajzolásához.
-    //    Ez biztosítja, hogy a frekvenciaméréshez használt font ne maradjon aktív.
-    if (isSelected) {
-        tft.setFreeFont(&FreeSansBold9pt7b);
-        tft.setTextSize(1);
-    } else {
-        tft.setFreeFont(); // Alapértelmezett/számozott font
-        tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
-    }
+    // Visszaállítjuk a fő fontot (FreeSansBold9pt7b) a moduláció méréséhez és a név/moduláció rajzolásához.
+    tft.setFreeFont(&FreeSansBold9pt7b);
+    tft.setTextSize(1);
 
     // --- Moduláció String és Szélesség (feltételes a layout számításhoz) ---
     int modWidthForLayout = 0;
     int nameModGapForLayout = 0;
-    const char* modStrToDisplay = nullptr; // Ezt fogja tartalmazni a kiírandó string, ha van
+    const char* modStrToDisplay = nullptr;  // Ezt fogja tartalmazni a kiírandó string, ha van
 
     if (station.modulation != FM) {
         modStrToDisplay = band.getBandModeDescByIndex(station.modulation);
@@ -290,11 +279,11 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
 
     // --- Elérhető névhossz számítása (az eredeti képletet használva, feltételes szélességekkel/résekkel) ---
     int availableNameWidth = (listX + listW - ICON_PADDING_RIGHT) /* teljes elérhető szélesség a szöveges elemeknek */
-                             - textStartX                          /* kivonjuk a név előtti helyet */
-                             - modWidthForLayout                   /* kivonjuk a modulációs string helyét (0, ha FM) */
-                             - freqWidth                           /* kivonjuk a frekvencia string helyét */
-                             - nameModGapForLayout                 /* kivonjuk a név-moduláció közötti rést (0, ha FM) */
-                             - MOD_FREQ_GAP;                       /* kivonjuk a moduláció-frekvencia (vagy név-frekvencia, ha FM) közötti rést */
+                             - textStartX                         /* kivonjuk a név előtti helyet */
+                             - modWidthForLayout                  /* kivonjuk a modulációs string helyét (0, ha FM) */
+                             - freqWidth                          /* kivonjuk a frekvencia string helyét */
+                             - nameModGapForLayout                /* kivonjuk a név-moduláció közötti rést (0, ha FM) */
+                             - MOD_FREQ_GAP;                      /* kivonjuk a moduláció-frekvencia (vagy név-frekvencia, ha FM) közötti rést */
     // Biztosítjuk, hogy az availableNameWidth ne legyen negatív
     if (availableNameWidth < 0) availableNameWidth = 0;
 
@@ -311,15 +300,15 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     while (tft.textWidth(displayName) > availableNameWidth && strlen(displayName) > 0) {
         displayName[strlen(displayName) - 1] = '\0';
     }
-    int actualNameWidth = tft.textWidth(displayName); // A (potenciálisan csonkolt) név tényleges szélessége
+    int actualNameWidth = tft.textWidth(displayName);  // A (potenciálisan csonkolt) név tényleges szélessége
 
     // --- Rajzolás ---
     int nameX = textStartX;
     // A modX és freqX pozíciókat közvetlenül a rajzolás előtt határozzuk meg
-    int freqX = listX + listW - ICON_PADDING_RIGHT; // Jobbra igazított frekvencia
+    int freqX = listX + listW - ICON_PADDING_RIGHT;  // Jobbra igazított frekvencia
 
     // Név kirajzolása
-    tft.setTextColor(textColor, bgColor); // Fő szövegszín beállítása
+    tft.setTextColor(textColor, bgColor);  // Fő szövegszín beállítása
     tft.setTextDatum(ML_DATUM);
     tft.drawString(displayName, nameX, textCenterY);
 
@@ -334,9 +323,9 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     }
 
     // Frekvencia kirajzolása (jobbra igazítva)
-    tft.setFreeFont(); // Alapértelmezett/számozott font
-    tft.setTextSize(1); // Mindig kis betűvel
-    tft.setTextColor(textColor, bgColor); // Fő szövegszín beállítása
+    tft.setFreeFont();                     // Alapértelmezett/számozott font
+    tft.setTextSize(1);                    // Mindig kis betűvel
+    tft.setTextColor(textColor, bgColor);  // Fő szövegszín beállítása
     tft.setTextDatum(MR_DATUM);
     tft.drawString(freqStr, freqX, textCenterY);
 
@@ -345,7 +334,6 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     tft.setFreeFont();
     tft.setTextSize(1);
 }
-
 
 /**
  * Állomáslista kirajzolása
@@ -403,10 +391,8 @@ void MemoryDisplay::updateListAfterTuning(uint8_t previouslyTunedSortedIdx) {
     // Ezért a feltételnek helyesnek kell lennie. Ha -1-et akarunk jelezni, akkor int típust kellene használni.
     // Jelenlegi implementációban a 255-ös indexet is érvényesnek veheti, ha a lista olyan nagy.
     // De mivel a MAX_FM/AM_STATIONS < 255, ez nem okozhat problémát, a 255. index sosem lesz valid.
-    if (previouslyTunedSortedIdx != (uint8_t)-1 && // Explicit kasztolás a -1 összehasonlításhoz, ha uint8_t a paraméter
-        previouslyTunedSortedIdx != selectedListIndex &&
-        previouslyTunedSortedIdx >= listScrollOffset &&
-        previouslyTunedSortedIdx < listScrollOffset + visibleLines) {
+    if (previouslyTunedSortedIdx != (uint8_t)-1 &&  // Explicit kasztolás a -1 összehasonlításhoz, ha uint8_t a paraméter
+        previouslyTunedSortedIdx != selectedListIndex && previouslyTunedSortedIdx >= listScrollOffset && previouslyTunedSortedIdx < listScrollOffset + visibleLines) {
         drawListItem(previouslyTunedSortedIdx);
     }
 
@@ -442,7 +428,7 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
         if (selectedListIndex != -1 && selectedListIndex < count) {
             uint16_t freqBeforeTune = band.getCurrentBand().varData.currFreq;
             uint8_t bandIdxBeforeTune = config.data.bandIdx;
-            int previouslyTunedSortedIndex = -1; // int, mert -1 lehet
+            int previouslyTunedSortedIndex = -1;  // int, mert -1 lehet
             for (int i = 0; i < count; ++i) {
                 if (sortedStations[i].frequency == freqBeforeTune && sortedStations[i].bandIndex == bandIdxBeforeTune) {
                     previouslyTunedSortedIndex = i;
@@ -450,7 +436,7 @@ bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
                 }
             }
             tuneToSelectedStation();
-            updateListAfterTuning(static_cast<uint8_t>(previouslyTunedSortedIndex)); // Kasztolás uint8_t-ra
+            updateListAfterTuning(static_cast<uint8_t>(previouslyTunedSortedIndex));  // Kasztolás uint8_t-ra
             return true;
         }
     } else if (encoderState.buttonState == RotaryEncoder::ButtonState::DoubleClicked) {
@@ -520,7 +506,7 @@ bool MemoryDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
             } else {
                 static unsigned long lastTouchTime = 0;
                 static int lastTouchedIndex = -1;
-                if (selectedListIndex == lastTouchedIndex && millis() - lastTouchTime < 500) { // Double tap
+                if (selectedListIndex == lastTouchedIndex && millis() - lastTouchTime < 500) {  // Double tap
                     uint16_t freqBeforeTune = band.getCurrentBand().varData.currFreq;
                     uint8_t bandIdxBeforeTune = config.data.bandIdx;
                     int previouslyTunedSortedIndex = -1;
@@ -638,8 +624,7 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                                 bool foundEdited = false;
                                 for (size_t i = 0; i < sortedStations.size(); ++i) {
                                     if (sortedStations[i].frequency == updatedStation.frequency && sortedStations[i].bandIndex == updatedStation.bandIndex &&
-                                        sortedStations[i].bfoOffset == updatedStation.bfoOffset &&
-                                        strcmp(sortedStations[i].name, updatedStation.name) == 0) {
+                                        sortedStations[i].bfoOffset == updatedStation.bfoOffset && strcmp(sortedStations[i].name, updatedStation.name) == 0) {
                                         selectedListIndex = i;
                                         foundEdited = true;
                                         break;
@@ -745,8 +730,7 @@ void MemoryDisplay::saveCurrentStation() {
     uint8_t storeCount = isFmMode ? pFmStore->getStationCount() : pAmStore->getStationCount();
     for (uint8_t i = 0; i < storeCount; ++i) {
         const StationData* s = isFmMode ? pFmStore->getStationByIndex(i) : pAmStore->getStationByIndex(i);
-        if (s && s->frequency == pendingStationData.frequency && s->bandIndex == pendingStationData.bandIndex &&
-            s->modulation == pendingStationData.modulation) {
+        if (s && s->frequency == pendingStationData.frequency && s->bandIndex == pendingStationData.bandIndex && s->modulation == pendingStationData.modulation) {
             if (pendingStationData.modulation == LSB || pendingStationData.modulation == USB || pendingStationData.modulation == CW) {
                 if (s->bfoOffset == pendingStationData.bfoOffset) {
                     alreadyExists = true;
@@ -775,13 +759,13 @@ void MemoryDisplay::saveCurrentStation() {
     }
 
     // Kezdetben töröljük a buffert
-    stationNameBuffer = ""; 
+    stationNameBuffer = "";
 
     // Ha FM módban vagyunk, próbáljuk meg lekérni az RDS állomásnevet az Si4735Utils segítségével
     if (isFmMode) {
-        String rdsName = getCurrentRdsProgramService(); // Az Si4735Utils metódus hívása
+        String rdsName = getCurrentRdsProgramService();  // Az Si4735Utils metódus hívása
         if (rdsName.length() > 0) {
-            stationNameBuffer = rdsName; // Beállítjuk a billentyűzet bufferébe
+            stationNameBuffer = rdsName;  // Beállítjuk a billentyűzet bufferébe
         }
     }
 
@@ -817,9 +801,7 @@ void MemoryDisplay::tuneToSelectedStation() {
     DisplayBase::frequencyChanged = true;
 }
 
-uint8_t MemoryDisplay::getCurrentStationCount() const {
-    return isFmMode ? (pFmStore ? pFmStore->getStationCount() : 0) : (pAmStore ? pAmStore->getStationCount() : 0);
-}
+uint8_t MemoryDisplay::getCurrentStationCount() const { return isFmMode ? (pFmStore ? pFmStore->getStationCount() : 0) : (pAmStore ? pAmStore->getStationCount() : 0); }
 
 const StationData* MemoryDisplay::getStationData(uint8_t index) const {
     return isFmMode ? (pFmStore ? pFmStore->getStationByIndex(index) : nullptr) : (pAmStore ? pAmStore->getStationByIndex(index) : nullptr);
