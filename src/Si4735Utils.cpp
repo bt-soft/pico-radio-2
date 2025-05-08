@@ -1,7 +1,8 @@
 #include "Si4735Utils.h"
 
 #include "Config.h"
-#include "rtVars.h"
+#include "rtVars.h" // Szükséges a band objektumhoz a getCurrentRdsProgramService-ben
+#include "utils.h" // Szükséges a Utils::trimTrailingSpaces-hez
 
 int8_t Si4735Utils::currentBandIdx = -1;  // Induláskor nincs kiválasztvba band
 
@@ -183,4 +184,28 @@ void Si4735Utils::manageHardwareAudioMute() {
         hardwareAudioMuteState = false;
         si4735.setHardwareAudioMute(false);
     }
+}
+
+/**
+ * @brief Lekérdezi az aktuális RDS Program Service (PS) nevet.
+ * @return String Az állomásnév, vagy üres String, ha nem elérhető.
+ */
+String Si4735Utils::getCurrentRdsProgramService() {
+    // Csak FM módban van értelme RDS-t keresni
+    if (band.getCurrentBandType() != FM_BAND_TYPE) {
+        return "";
+    }
+
+    si4735.getRdsStatus(); // Frissítsük az RDS állapotát
+    if (si4735.getRdsReceived() && si4735.getRdsSync()) { // Csak ha van érvényes RDS jel
+        char* rdsPsName = si4735.getRdsText0A(); // Program Service Name (állomásnév)
+        if (rdsPsName != nullptr && strlen(rdsPsName) > 0) {
+            char tempRdsName[STATION_NAME_BUFFER_SIZE]; // STATION_NAME_BUFFER_SIZE a StationData.h-ból
+            strncpy(tempRdsName, rdsPsName, STATION_NAME_BUFFER_SIZE - 1);
+            tempRdsName[STATION_NAME_BUFFER_SIZE - 1] = '\0'; // Biztos null-terminálás
+            Utils::trimSpaces(tempRdsName); // Esetleges felesleges szóközök eltávolítása mindkét oldalról
+            return String(tempRdsName);
+        }
+    }
+    return ""; // Nincs érvényes RDS PS név
 }

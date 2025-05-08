@@ -48,6 +48,12 @@ class Si4735Utils {
      */
     void loop();
 
+    /**
+     * @brief Lekérdezi az aktuális RDS Program Service (PS) nevet.
+     * @return String Az állomásnév, vagy üres String, ha nem elérhető.
+     */
+    String getCurrentRdsProgramService();
+
    public:
     // AGC beállítási lehetőségek
     enum class AgcGainMode : uint8_t {

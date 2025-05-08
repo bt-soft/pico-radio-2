@@ -109,6 +109,20 @@ int strncmpIgnoringTrailingSpaces(const char *s1, const char *s2, size_t n);
  */
 void trimTrailingSpaces(char *str);
 
+/**
+ * @brief Eltávolítja a C string elejéről a szóközöket (in-place).
+ *
+ * @param str A módosítandó C string.
+ */
+void trimLeadingSpaces(char *str);
+
+/**
+ * @brief Eltávolítja a C string elejéről és végéről a szóközöket (in-place).
+ *
+ * @param str A módosítandó C string.
+ */
+void trimSpaces(char *str);
+
 }  // namespace Utils
 
 #endif  // __UTILS_H

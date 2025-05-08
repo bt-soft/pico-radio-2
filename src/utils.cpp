@@ -191,4 +191,37 @@ void trimTrailingSpaces(char *str) {
         len--;                // Hossz csökkentése
     }
 }
+
+/**
+ * @brief Eltávolítja a C string elejéről a szóközöket (in-place).
+ *
+ * @param str A módosítandó C string.
+ */
+void trimLeadingSpaces(char *str) {
+    if (str == nullptr) return;
+
+    int i = 0;
+    while (str[i] != '\0' && str[i] == ' ') {
+        i++;
+    }
+
+    if (i > 0) {
+        // Karakterek eltolása balra
+        int j = 0;
+        while (str[i + j] != '\0') {
+            str[j] = str[i + j];
+            j++;
+        }
+        str[j] = '\0'; // Új null terminátor
+    }
+}
+
+/**
+ * @brief Eltávolítja a C string elejéről és végéről a szóközöket (in-place).
+ * @param str A módosítandó C string.
+ */
+void trimSpaces(char *str) {
+    trimLeadingSpaces(str);
+    trimTrailingSpaces(str);
+}
 }  // namespace Utils

@@ -777,22 +777,11 @@ void MemoryDisplay::saveCurrentStation() {
     // Kezdetben töröljük a buffert
     stationNameBuffer = ""; 
 
-    // Ha FM módban vagyunk, próbáljuk meg lekérni az RDS állomásnevet
+    // Ha FM módban vagyunk, próbáljuk meg lekérni az RDS állomásnevet az Si4735Utils segítségével
     if (isFmMode) {
-        si4735.getRdsStatus(); // Frissítsük az RDS állapotát
-        if (si4735.getRdsReceived() && si4735.getRdsSync()) { // Csak ha van érvényes RDS jel
-            char* rdsPsName = si4735.getRdsText0A(); // Program Service Name (állomásnév)
-            if (rdsPsName != nullptr && strlen(rdsPsName) > 0) {
-                // Másoljuk át egy ideiglenes bufferbe a biztonságos feldolgozáshoz
-                char tempRdsName[STATION_NAME_BUFFER_SIZE];
-                strncpy(tempRdsName, rdsPsName, STATION_NAME_BUFFER_SIZE - 1);
-                tempRdsName[STATION_NAME_BUFFER_SIZE - 1] = '\0'; // Biztos null-terminálás
-                Utils::trimTrailingSpaces(tempRdsName); // Esetleges felesleges szóközök eltávolítása a végéről
-
-                if (strlen(tempRdsName) > 0) { // Csak ha maradt valami a trimmelés után
-                    stationNameBuffer = tempRdsName; // Beállítjuk a billentyűzet bufferébe
-                }
-            }
+        String rdsName = getCurrentRdsProgramService(); // Az Si4735Utils metódus hívása
+        if (rdsName.length() > 0) {
+            stationNameBuffer = rdsName; // Beállítjuk a billentyűzet bufferébe
         }
     }
 
