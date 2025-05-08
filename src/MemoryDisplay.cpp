@@ -216,7 +216,8 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
 
     tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
 
-    // Betűtípus és méret beállítása a kiválasztottság alapján (a névhez és modulációhoz)
+    // 1. Fő betűtípus beállítása a listaelemhez (név, ikon, moduláció)
+    //    a kiválasztottság alapján.
     if (isSelected) {
         tft.setFreeFont(&FreeSansBold9pt7b);
         tft.setTextSize(1);
@@ -225,7 +226,7 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
         tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
     }
     tft.setTextPadding(0);
-    tft.setTextColor(textColor, bgColor);
+    // A textColor-t közvetlenül a név/moduláció rajzolása előtt állítjuk be.
 
     int textCenterY = yPos + lineHeight / 2;
 
@@ -233,14 +234,14 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     int iconStartX = listX + ICON_PADDING_RIGHT;
     if (isTuned) {
         tft.setTextColor(TUNED_ICON_COLOR, bgColor);
-        tft.setTextDatum(ML_DATUM);
+        tft.setTextDatum(ML_DATUM); // Középre-balra igazítás
         tft.drawString(CURRENT_TUNED_ICON, iconStartX, textCenterY);
     }
-    // Visszaállítjuk a normál szövegszínt
-    tft.setTextColor(textColor, bgColor);
 
-    // Helyfoglalás az ikonnak (mindig)
+    // Helyfoglalás az ikonnak (mindig), a fent beállított fonttal mérve.
     int iconWidth = tft.textWidth(CURRENT_TUNED_ICON);
+    // Biztosítjuk, hogy a textColor legyen aktív a további mérésekhez, ha nem volt ikon.
+    // Erre itt nincs közvetlen szükség, mert a név/moduláció előtt újra beállítjuk.
     int iconSpaceWidth = iconWidth + ICON_PADDING_RIGHT;
     int textStartX = iconStartX + iconSpaceWidth;
 
@@ -259,11 +260,21 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
         freqStr = String(station.frequency) + " kHz";
     }
 
-    // A frekvencia kiírásához mindig ugyanazt a kis betűtípust használjuk
+    // 2. Frekvencia szélességének mérése a dedikált kicsi fonttal
     tft.setFreeFont(); // Alapértelmezett/számozott font
     tft.setTextSize(1); // Kis betű a frekvenciához
     int freqWidth = tft.textWidth(freqStr);
     // A freqX-et később számoljuk, ez a jobb oldali igazítási pont (MR_DATUM)
+
+    // 3. Visszaállítjuk/újra beállítjuk a fő fontot a név/moduláció méréséhez és rajzolásához.
+    //    Ez biztosítja, hogy a frekvenciaméréshez használt font ne maradjon aktív.
+    if (isSelected) {
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        tft.setTextSize(1);
+    } else {
+        tft.setFreeFont(); // Alapértelmezett/számozott font
+        tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
+    }
 
     // --- Moduláció String és Szélesség (feltételes a layout számításhoz) ---
     int modWidthForLayout = 0;
@@ -271,15 +282,6 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     const char* modStrToDisplay = nullptr; // Ezt fogja tartalmazni a kiírandó string, ha van
 
     if (station.modulation != FM) {
-        // Nem FM mód esetén lekérjük a tényleges modulációs stringet és annak szélességét
-        // Betűtípus beállítása a modStr méréséhez (normál vagy vastag)
-        if (isSelected) {
-            tft.setFreeFont(&FreeSansBold9pt7b);
-            tft.setTextSize(1);
-        } else {
-            tft.setFreeFont(); // Alapértelmezett/számozott font
-            tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
-        }
         modStrToDisplay = band.getBandModeDescByIndex(station.modulation);
         modWidthForLayout = tft.textWidth(modStrToDisplay);
         nameModGapForLayout = NAME_MOD_GAP;
@@ -296,16 +298,7 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     // Biztosítjuk, hogy az availableNameWidth ne legyen negatív
     if (availableNameWidth < 0) availableNameWidth = 0;
 
-
     // --- Megjelenítendő név előkészítése és csonkolása ---
-    // Betűtípus beállítása a megjelenítendő névhez (normál vagy vastag)
-    if (isSelected) {
-        tft.setFreeFont(&FreeSansBold9pt7b);
-        tft.setTextSize(1);
-    } else {
-        tft.setFreeFont(); // Alapértelmezett/számozott font
-        tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
-    }
 
     char displayName[STATION_NAME_BUFFER_SIZE];
     strncpy(displayName, station.name, STATION_NAME_BUFFER_SIZE - 1);
@@ -326,21 +319,14 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     int freqX = listX + listW - ICON_PADDING_RIGHT; // Jobbra igazított frekvencia
 
     // Név kirajzolása
-    // A textColor, bgColor és a font már be van állítva a kiválasztottság alapján
+    tft.setTextColor(textColor, bgColor); // Fő szövegszín beállítása
     tft.setTextDatum(ML_DATUM);
     tft.drawString(displayName, nameX, textCenterY);
 
     // Moduláció kirajzolása (ha nem FM és a string be van állítva)
     if (station.modulation != FM && modStrToDisplay != nullptr) {
-        // Betűtípus beállítása újra a modulációs stringhez (ha a névhez más volt beállítva)
-        if (isSelected) {
-            tft.setFreeFont(&FreeSansBold9pt7b);
-            tft.setTextSize(1);
-        } else {
-            tft.setFreeFont(); // Alapértelmezett/számozott font
-            tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
-        }
-        // A textColor és bgColor már be van állítva
+        // A textColor (fő szövegszín) és bgColor már be van állítva
+        // A font (normál/vastag) már be van állítva
         tft.setTextDatum(ML_DATUM);
         // A moduláció X pozíciója a név és a név-moduláció rés után
         int modDisplayX = nameX + actualNameWidth + nameModGapForLayout;
@@ -350,7 +336,7 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     // Frekvencia kirajzolása (jobbra igazítva)
     tft.setFreeFont(); // Alapértelmezett/számozott font
     tft.setTextSize(1); // Mindig kis betűvel
-    // A textColor és bgColor már be van állítva
+    tft.setTextColor(textColor, bgColor); // Fő szövegszín beállítása
     tft.setTextDatum(MR_DATUM);
     tft.drawString(freqStr, freqX, textCenterY);
 
