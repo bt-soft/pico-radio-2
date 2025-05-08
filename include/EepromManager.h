@@ -8,7 +8,6 @@
 
 #include <type_traits>
 
-// #include "DebugDataInspector.h" // Ezt eltávolítjuk
 #include "defines.h"
 #include "utils.h"
 
@@ -60,7 +59,7 @@ class EepromManager {
      */
     inline static uint16_t getIfValid(T &dataRef, bool &valid, const uint16_t address = 0, const char *className = "Unknown") {
         // EepromManager<T> storage(dataRef); // Erre itt nincs szükség
-        T tempData;                         // Ideiglenes hely a beolvasáshoz
+        T tempData;  // Ideiglenes hely a beolvasáshoz
         uint16_t readCrc;
 
         // Adatok beolvasása
