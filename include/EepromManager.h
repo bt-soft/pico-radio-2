@@ -35,8 +35,8 @@ class EepromManager {
      * @note A konstruktorban kiszámoljuk a CRC-t is
      *
      */
-    EepromManager(const T &dataRef)
-        : data(dataRef), crc(calcCRC16((uint8_t *)&data, sizeof(T))) {  // EEPROM.begin hívás csak egyszer kellene, pl. a setup()-ban, nem minden példányosításkor.
+    EepromManager(const T &dataRef) : data(dataRef), crc(calcCRC16((uint8_t *)&data, sizeof(T))) {
+        // EEPROM.begin hívás csak egyszer kellene, pl. a setup()-ban, nem minden példányosításkor.
     }
 
     /**
