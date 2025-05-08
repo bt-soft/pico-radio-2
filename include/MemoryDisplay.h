@@ -1,5 +1,6 @@
 #ifndef __MEMORYDISPLAY_H
 #define __MEMORYDISPLAY_H
+#include <vector>  // std::vector használatához
 
 #include "DisplayBase.h"
 #include "StationData.h"   // Szükséges a StationData-hoz
@@ -27,6 +28,9 @@ class MemoryDisplay : public DisplayBase {
     uint16_t listX, listY, listW, listH;  // Lista területének koordinátái
     uint8_t lineHeight;                   // Egy sor magassága
 
+    // Rendezett állomások tárolására
+    std::vector<StationData> sortedStations;
+
     // Ideiglenes tároló az új/szerkesztett állomás nevéhez
     // A VirtualKeyboardDialog ebbe írja az eredményt.
     String stationNameBuffer = "";
@@ -35,11 +39,13 @@ class MemoryDisplay : public DisplayBase {
 
     // Helper metódusok
     void drawListItem(int index);  // Kirajzol egyetlen listaelemet a megadott indexre
+    void loadAndSortStations();    // Betölti és rendezi az állomásokat a sortedStations vektorba
     void drawStationList();
     void saveCurrentStation();     // Aktuális állomás mentése dialógussal
     void editSelectedStation();    // Kiválasztott állomás szerkesztése
     void deleteSelectedStation();  // Kiválasztott állomás törlése (megerősítéssel)
     void tuneToSelectedStation();  // Behúzza a kiválasztott állomást
+    void updateListAfterTuning(uint8_t previouslyTunedSortedIdx);  // Frissíti a listát behangolás után
 
     // Pointer a megfelelő store objektumra
     FmStationStore* pFmStore = nullptr;
