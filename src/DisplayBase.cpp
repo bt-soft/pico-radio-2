@@ -653,6 +653,14 @@ void DisplayBase::updateButtonStatus() {
         bool stepDisabled = ((currMod == LSB || currMod == USB || currMod == CW) && !rtv::bfoOn);
         btnStep->setState(stepDisabled ? TftButton::ButtonState::Disabled : TftButton::ButtonState::Off);
     }
+
+    // FM módban a "DeMod" gomb tiltva van
+    if (currMod == FM) {
+        TftButton *btnDeMod = findButtonByLabel("DeMod");
+        if (btnDeMod != nullptr) {
+            btnDeMod->setState(TftButton::ButtonState::Disabled);
+        }
+    }
 }
 
 /**
