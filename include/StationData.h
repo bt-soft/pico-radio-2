@@ -13,7 +13,11 @@
 
 // EEPROM címek (Optimalizált elrendezés)
 #define EEPROM_FM_STATIONS_ADDR 64   // <-- FM a Config után (Vége kb. 64 + 403 - 1 = 466)
-#define EEPROM_AM_STATIONS_ADDR 480  // <-- AM az FM után (Vége kb. 480 + 1003 - 1 = 1482)
+// Az FmStationList_t mérete: (MAX_FM_STATIONS * sizeof(StationData)) + sizeof(uint8_t)
+// sizeof(StationData) = 16(name)+2(freq)+2(bfo)+1(bandIdx)+1(mod)+1(bwIdx) = 23 bájt
+// FmStationList_t mérete = (20 * 23) + 1 = 461 bájt.
+// FM Store vége: EEPROM_FM_STATIONS_ADDR (64) + 461 = 525. Az AM Store-nak ezután kell kezdődnie.
+#define EEPROM_AM_STATIONS_ADDR 550  // <-- AM az FM után, biztonsági réssel (Vége kb. 550 + 1151 - 1 = 1700)
 
 // Egyetlen állomás adatai
 struct StationData {

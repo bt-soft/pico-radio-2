@@ -14,6 +14,7 @@
         "regex": "c",
         "chrono": "cpp",
         "compare": "cpp",
-        "cstdint": "cpp"
+        "cstdint": "cpp",
+        "algorithm": "cpp"
     }
 }

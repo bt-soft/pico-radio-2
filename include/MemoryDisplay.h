@@ -41,10 +41,10 @@ class MemoryDisplay : public DisplayBase {
     void drawListItem(int index);  // Kirajzol egyetlen listaelemet a megadott indexre
     void loadAndSortStations();    // Betölti és rendezi az állomásokat a sortedStations vektorba
     void drawStationList();
-    void saveCurrentStation();     // Aktuális állomás mentése dialógussal
-    void editSelectedStation();    // Kiválasztott állomás szerkesztése
-    void deleteSelectedStation();  // Kiválasztott állomás törlése (megerősítéssel)
-    void tuneToSelectedStation();  // Behúzza a kiválasztott állomást
+    void saveCurrentStation();                                     // Aktuális állomás mentése dialógussal
+    void editSelectedStation();                                    // Kiválasztott állomás szerkesztése
+    void deleteSelectedStation();                                  // Kiválasztott állomás törlése (megerősítéssel)
+    void tuneToSelectedStation();                                  // Behúzza a kiválasztott állomást
     void updateListAfterTuning(uint8_t previouslyTunedSortedIdx);  // Frissíti a listát behangolás után
 
     // Pointer a megfelelő store objektumra
