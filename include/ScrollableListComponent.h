@@ -30,9 +30,14 @@ class ScrollableListComponent {
     // Megjelenés
     uint16_t itemBgColor;
     uint16_t listBorderColor;
+    // Görgetősáv
+    bool scrollbarVisible;
+    int scrollbarX;
+    int scrollbarWidth;
 
     void calculateVisibleItems();
     void updateSelection(int newIndex, bool fromRotary);
+    void drawScrollbar();
     void clearListArea();
     void drawListBorder();
 

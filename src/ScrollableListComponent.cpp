@@ -2,6 +2,11 @@
 
 #include <algorithm>  // std::min és std::max miatt
 
+namespace ScrollbarConstants {
+    constexpr int SCROLLBAR_WIDTH = 5; // Görgetősáv szélessége pixelben
+    constexpr int SCROLLBAR_PADDING = 2; // Távolság a lista szélétől
+} // namespace ScrollbarConstants
+
 ScrollableListComponent::ScrollableListComponent(TFT_eSPI& tft_ref, int x, int y, int w, int h, IScrollableListDataSource* ds, uint16_t bgCol, uint16_t borderCol)
     : tft(tft_ref),
       dataSource(ds),
@@ -15,12 +20,16 @@ ScrollableListComponent::ScrollableListComponent(TFT_eSPI& tft_ref, int x, int y
       topItemIndex(0),
       currentItemCount(0),
       itemBgColor(bgCol),
-      listBorderColor(borderCol) {
+      listBorderColor(borderCol),
+      scrollbarVisible(false), // Kezdetben nem látható
+      scrollbarX(0),
+      scrollbarWidth(ScrollbarConstants::SCROLLBAR_WIDTH) {
     if (!dataSource) {
         // Hiba kezelése: a dataSource nem lehet null
         return;
     }
     itemHeight = dataSource->getItemHeight();
+    scrollbarX = listX + listW + ScrollbarConstants::SCROLLBAR_PADDING; // Lista jobb oldalán
     calculateVisibleItems();
 }
 
@@ -67,6 +76,7 @@ void ScrollableListComponent::refresh() {
         // Biztosítjuk, hogy a topItemIndex az igazítás után is érvényes határokon belül legyen
         if (topItemIndex < 0) topItemIndex = 0;
         topItemIndex = std::min(topItemIndex, std::max(0, currentItemCount - visibleItems));
+        scrollbarVisible = (currentItemCount > visibleItems); // Akkor látható, ha van mit görgetni
     }
     draw();
 }
@@ -75,6 +85,7 @@ void ScrollableListComponent::draw() {
     if (!dataSource) return;
 
     clearListArea();
+    // A görgetősáv területét is törölni kellene, ha a lista háttérszíne eltér a scrollbar háttérszínétől
 
     if (currentItemCount == 0) {
         // Opcionálisan "Lista üres" üzenet kirajzolása
@@ -84,6 +95,7 @@ void ScrollableListComponent::draw() {
         tft.setTextDatum(MC_DATUM);
         tft.drawString("Lista üres", listX + listW / 2, listY + listH / 2);
         drawListBorder();
+        scrollbarVisible = false; // Nincs elem, nincs scrollbar
         return;
     }
 
@@ -98,7 +110,44 @@ void ScrollableListComponent::draw() {
         }
         currentY += itemHeight;
     }
+    scrollbarVisible = (currentItemCount > visibleItems); // Frissítjük a láthatóságot
     drawListBorder();
+    if (scrollbarVisible) {
+        drawScrollbar();
+    }
+}
+
+void ScrollableListComponent::drawScrollbar() {
+    if (!scrollbarVisible || itemHeight == 0) { // Ha nem látható, vagy nincs elem magasság, nem rajzolunk
+        // Esetleg töröljük a régi scrollbart, ha volt
+        tft.fillRect(scrollbarX, listY, scrollbarWidth, listH, itemBgColor); // Törlés a lista háttérszínével
+        return;
+    }
+
+    // Görgetősáv háttere (opcionális, ha eltér a lista hátterétől)
+    // tft.fillRect(scrollbarX, listY, scrollbarWidth, listH, ScrollableListComponentDefaults::LIST_BORDER_COLOR); // Példa: sötétszürke háttér
+
+    // Pöcök magasságának kiszámítása
+    // Arányos a látható elemek számával a teljes elemszámhoz képest
+    int thumbHeight = (static_cast<float>(visibleItems) / currentItemCount) * listH;
+    if (thumbHeight < 5) thumbHeight = 5; // Minimális pöcök magasság
+    if (thumbHeight > listH) thumbHeight = listH; // Maximális pöcök magasság
+
+    // Pöcök Y pozíciójának kiszámítása
+    // Arányos a topItemIndex-szel a görgethető elemek számához képest
+    int scrollableItems = currentItemCount - visibleItems;
+    int thumbY = listY;
+    if (scrollableItems > 0) {
+        thumbY += (static_cast<float>(topItemIndex) / scrollableItems) * (listH - thumbHeight);
+    }
+     // Biztosítjuk, hogy a pöcök a sávon belül maradjon
+    thumbY = std::max(listY, std::min(thumbY, listY + listH - thumbHeight));
+
+
+    // Először töröljük a scrollbar teljes területét a lista háttérszínével (vagy egy dedikált scrollbar háttérszínnel)
+    tft.fillRect(scrollbarX, listY, scrollbarWidth, listH, itemBgColor); // Vagy egy másik háttérszín
+    // Pöcök kirajzolása
+    tft.fillRect(scrollbarX, thumbY, scrollbarWidth, thumbHeight, ScrollableListComponentDefaults::SELECTED_ITEM_BG_COLOR); // Pöcök színe lehet pl. a kiválasztott elem háttere
 }
 
 void ScrollableListComponent::updateSelection(int newIndex, bool fromRotary) {
@@ -126,6 +175,24 @@ void ScrollableListComponent::updateSelection(int newIndex, bool fromRotary) {
 
     if (oldTopItemIndex != topItemIndex) {
         draw();  // Teljes lista újrarajzolása, ha görgetődött
+    } else if (oldSelectedItemIndex != selectedItemIndex) { // Csak akkor, ha a kiválasztás tényleg változott
+        // Ha a topItemIndex nem változott, de a selectedItemIndex igen,
+        // akkor csak a régi és az új kiválasztott elemet kell újrarajzolni.
+        // Régi elem kijelölésének megszüntetése
+        if (oldSelectedItemIndex >= 0 && oldSelectedItemIndex < currentItemCount && oldSelectedItemIndex >= oldTopItemIndex &&
+            oldSelectedItemIndex < oldTopItemIndex + visibleItems) {
+            dataSource->drawListItem(tft, oldSelectedItemIndex, listX, listY + (oldSelectedItemIndex - topItemIndex) * itemHeight, listW, itemHeight, false);
+        }
+        // Új elem kijelölése
+        if (selectedItemIndex >= topItemIndex && selectedItemIndex < topItemIndex + visibleItems) {
+            dataSource->drawListItem(tft, selectedItemIndex, listX, listY + (selectedItemIndex - topItemIndex) * itemHeight, listW, itemHeight, true);
+        }
+        // A görgetősávot is frissíteni kell, ha látható, mert a pöcök pozíciója a topItemIndex-től függ,
+        // de a kiválasztás változása miatt is érdemes lehet frissíteni, ha pl. a pöcök színe a kiválasztástól függne.
+        // Jelen esetben a topItemIndex nem változott, így a pöcök pozíciója sem, de a láthatóságát ellenőrizzük.
+        if (scrollbarVisible) {
+            drawScrollbar();
+        }
     } else if (oldSelectedItemIndex != selectedItemIndex) {
         // Csak a megváltozott elemek újrarajzolása, ha nem görgetődött
         // Régi elem kijelölésének megszüntetése
@@ -137,6 +204,10 @@ void ScrollableListComponent::updateSelection(int newIndex, bool fromRotary) {
         if (selectedItemIndex >= topItemIndex && selectedItemIndex < topItemIndex + visibleItems) {  // Ellenőrizzük, hogy az új elem látható-e
             dataSource->drawListItem(tft, selectedItemIndex, listX, listY + (selectedItemIndex - topItemIndex) * itemHeight, listW, itemHeight, true);
         }
+    }
+    // Biztosítjuk, hogy a scrollbar láthatósága frissüljön
+    if (scrollbarVisible != (currentItemCount > visibleItems)) {
+        draw(); // Ha a scrollbar láthatósága változott, teljes újrarajzolás
     }
 }
 
