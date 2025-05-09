@@ -109,7 +109,10 @@ class Config : public StoreBase<Config_t> {
     /**
      * Alapértelmezett adatok betöltése
      */
-    void loadDefaults() override { memcpy(&data, &DEFAULT_CONFIG, sizeof(Config_t)); }
+    void loadDefaults() override {
+        memcpy(&data, &DEFAULT_CONFIG, sizeof(Config_t));
+        analogWrite(PIN_TFT_BACKGROUND_LED, data.tftBackgroundBrightness);  // Háttérvilágítás beállítása
+    }
 };
 
 // A főprogramban definiálva

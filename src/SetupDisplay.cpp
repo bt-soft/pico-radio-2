@@ -37,8 +37,8 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref
     settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};                    // Képernyővédő idő
     settingItems[3] = {"Inactive Digit Segments", ItemAction::INACTIVE_DIGIT_LIGHT};  // Inaktív szegmensek
     settingItems[4] = {"Beeper", ItemAction::BEEPER_ENABLED};                         // Beeper engedélyezése (4)
-    settingItems[5] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása (5)
-    settingItems[6] = {"Info", ItemAction::INFO};                                     // Információ
+    settingItems[5] = {"Info", ItemAction::INFO};                                     // Információ
+    settingItems[6] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása (5)
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -183,9 +183,12 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
     switch (action) {
 
         case SetupList::ItemAction::BRIGHTNESS:
-            DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("TFT Brightness"), F("Value:"), &config.data.tftBackgroundBrightness,
-                                                         (uint8_t)TFT_BACKGROUND_LED_MIN_BRIGHTNESS, (uint8_t)TFT_BACKGROUND_LED_MAX_BRIGHTNESS, (uint8_t)10,
-                                                         [this](uint8_t newBrightness) { analogWrite(PIN_TFT_BACKGROUND_LED, newBrightness); });
+            DisplayBase::pDialog =
+                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("TFT Brightness"), F("Value:"), &config.data.tftBackgroundBrightness,
+                                      (uint8_t)TFT_BACKGROUND_LED_MIN_BRIGHTNESS, (uint8_t)TFT_BACKGROUND_LED_MAX_BRIGHTNESS, (uint8_t)10, [this](uint8_t newBrightness) {
+                                          // Be is állítjuk a háttérvilágítást
+                                          analogWrite(PIN_TFT_BACKGROUND_LED, newBrightness);
+                                      });
             break;
 
         case SetupList::ItemAction::SQUELCH_BASIS: {
@@ -243,24 +246,23 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
     }
 }
 
+/**
+ * Dialógus gomb eseményének feldolgozása
+ */
 void SetupDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent &event) {
-    if (pDialog) {  // Biztosítjuk, hogy a pDialog ne legyen null
 
+    // Csak ha van dialóg
+    if (pDialog) {
         // Dialógus címének lekérése csak egyszer
         const char *dialogTitle = pDialog->getTitle();
 
         // Factory Reset dialógus specifikus kezelése
         if (dialogTitle && strcmp_P(PSTR("Confirm"), dialogTitle) == 0) {
             if (event.id == DLG_OK_BUTTON_ID) {  // "Yes" gomb
-                DEBUG("Factory Reset confirmed. Loading defaults...\n");
-                config.loadDefaults();  // Alapértelmezett konfig betöltése
-                config.checkSave();     // Mentés indítása (ez menti az EEPROM-ba)
-                Utils::beepTick();      // Visszajelzés
-            } else {                    // "No" gomb vagy X
-                DEBUG("Factory Reset cancelled.\n");
+                config.loadDefaults();           // Alapértelmezett konfig betöltése + beállítása
+                config.checkSave();              // Mentés indítása (ez menti az EEPROM-ba)
+                Utils::beepTick();               // Visszajelzés
             }
-            // A "Confirm" dialógus specifikus logikája itt véget ért.
-            // A dialógus bezárását és a képernyő újrarajzolását az alábbi közös hívás végzi.
         }
         // Más dialógusok (pl. ValueChangeDialog, MultiButtonDialog, InfoDialog) esetén
         // az értékek frissítését maga a dialógus vagy annak callback függvénye kezeli
