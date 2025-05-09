@@ -278,34 +278,52 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         if (touched && !scanEmpty) {
             Utils::beepTick();
             // ... (a signalScale számításának logikája) ...
-            int d = 0;
-            int tmpMax = spectrumY;
             float tmpMid = 0;
+            int tmpMax = spectrumEndY; // FIX 1: Helyes inicializálás (leggyengébb jel Y-ja)
             int count = 0;
             for (int i = 0; i < spectrumWidth; i++) {
                 if (scanValueRSSI[i] < spectrumEndY) {
                     tmpMid += (spectrumEndY - scanValueRSSI[i]);
-                    if (scanValueRSSI[i] < tmpMax) tmpMax = scanValueRSSI[i];
+                    if (scanValueRSSI[i] < tmpMax) tmpMax = scanValueRSSI[i]; // Keresi a legkisebb Y értéket (legerősebb jel)
                     count++;
                 }
             }
             if (count > 0) {
-                tmpMid = (spectrumHeight * 0.7f) / (tmpMid / count);
+                tmpMid = (spectrumHeight * 0.7f) / (tmpMid / count); // tmpMid mostantól a szorzófaktor
                 if ((spectrumEndY - ((spectrumEndY - tmpMax) * tmpMid)) < (spectrumY + spectrumHeight * 0.1f)) {
                     tmpMid = (spectrumHeight * 0.9f) / float(spectrumEndY - tmpMax);
                 }
-                if (tmpMid > 0.1f && tmpMid < 10.0f) {
-                    if ((signalScale * tmpMid) > 10.0f) tmpMid = 10.0f / signalScale;
-                    if ((signalScale * tmpMid) < 0.1f) tmpMid = 0.1f / signalScale;
+
+                float old_signalScale_val = signalScale; // Régi érték mentése az összehasonlításhoz
+
+                // tmpMid (szorzófaktor) beállítása úgy, hogy az új signalScale (signalScale * tmpMid) a korlátok között maradjon
+                // Fontos, hogy a signalScale itt még a régi értékét tartalmazza.
+                if (old_signalScale_val > 0) { // Osztás nullával elkerülése (bár a signalScale korlátozva van)
+                    if ((old_signalScale_val * tmpMid) > 10.0f) {
+                        tmpMid = 10.0f / old_signalScale_val;
+                    } else if ((old_signalScale_val * tmpMid) < 0.1f) { // 'else if' használata, mert csak az egyik korlát lehet aktív
+                        tmpMid = 0.1f / old_signalScale_val;
+                    }
+                } else { // Elvileg nem fordulhat elő
+                    tmpMid = 1.0f;
+                }
+
+                signalScale = old_signalScale_val * tmpMid; // Új signalScale alkalmazása
+
+                // Csak akkor rajzolunk újra, ha a signalScale ténylegesen megváltozott
+                if (std::abs(signalScale - old_signalScale_val) > 0.001f) {
                     signalScale *= tmpMid;
                     for (int i = 0; i < spectrumWidth; i++) {
                         if (scanValueRSSI[i] < spectrumEndY) {
-                            float original_rssi_like = (spectrumEndY - scanValueRSSI[i]) / (signalScale / tmpMid);
-                            scanValueRSSI[i] = constrain(spectrumEndY - static_cast<int>(original_rssi_like * signalScale), spectrumY, spectrumEndY);
+                            // (signalScale / tmpMid) itt az old_signalScale_val-t adja vissza
+                            float original_rssi_like = (float)(spectrumEndY - scanValueRSSI[i]) / old_signalScale_val;
+                            scanValueRSSI[i] = constrain(spectrumEndY - static_cast<int>(round(original_rssi_like * signalScale)), spectrumY, spectrumEndY);
                         }
                     }
                     drawScanGraph(false);
                     drawScanText(true);
+                } else {
+                    signalScale = old_signalScale_val; // Visszaállítás, ha nem volt szignifikáns változás
                 }
             }
         }
