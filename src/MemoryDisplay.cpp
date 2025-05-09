@@ -30,7 +30,10 @@ constexpr char CURRENT_TUNED_ICON[] = ">";                  // Ikon a behangolt 
 /**
  * Konstruktor
  */
-MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : DisplayBase(tft, si4735, band) {  // Base class konstruktor hívása
+MemoryDisplay::MemoryDisplay(TFT_eSPI& tft_ref, SI4735& si4735_ref, Band& band_ref)
+    : DisplayBase(tft_ref, si4735_ref, band_ref),
+      scrollListComponent(tft_ref, 0, 0, 0, 0, this), // Helyőrző, alább lesz beállítva
+      dynamicLineHeight(0) {
 
     // Aktuális mód meghatározása (FM vagy egyéb)
     isFmMode = (band.getCurrentBandType() == FM_BAND_TYPE);
@@ -44,22 +47,24 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
     uint16_t statusLineHeight = 20;                                         // Becsült magasság
     uint16_t bottomButtonsHeight = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2;  // Vízszintes gombok helye alul
 
-    listX = LIST_X_MARGIN;
-    listY = statusLineHeight + LIST_Y_MARGIN + 15;  // Lejjebb toljuk a listát a cím miatt
-    listW = tft.width() - (LIST_X_MARGIN * 2);
-    listH = tft.height() - listY - bottomButtonsHeight - LIST_Y_MARGIN;
+    // Sormagasság kiszámítása az itemHeight-hez
+    tft_ref.setFreeFont(&FreeSansBold9pt7b); // Elemekhez használt font
+    tft_ref.setTextSize(1);
+    dynamicLineHeight = tft_ref.fontHeight() + MemoryListConstants::ITEM_PADDING_Y * 2;
+    tft_ref.setFreeFont(); // Font visszaállítása
 
-    tft.setFreeFont(&FreeSansBold9pt7b);
-    tft.setTextSize(1);
-    lineHeight = tft.fontHeight() + MemoryListConstants::ITEM_PADDING_Y * 2;
-    tft.setFreeFont();
-    tft.setTextSize(ITEM_TEXT_SIZE_NORMAL);
+    int lX = LIST_X_MARGIN;
+    int lY = statusLineHeight + LIST_Y_MARGIN + 15;
+    int lW = tft_ref.width() - (LIST_X_MARGIN * 2);
+    int lH = tft_ref.height() - lY - bottomButtonsHeight - LIST_Y_MARGIN;
 
-    if (lineHeight > 0) {
-        visibleLines = listH / lineHeight;
-    } else {
-        visibleLines = 0;
-    }
+    // ScrollableListComponent inicializálása a kiszámított méretekkel
+    new (&scrollListComponent) ScrollableListComponent(tft_ref, lX, lY, lW, lH, this,
+                                                       MemoryListConstants::ITEM_BG_COLOR,
+                                                       MemoryListConstants::LIST_BORDER_COLOR);
+
+    // A selectedListIndex, listScrollOffset, visibleLines a scrollListComponent által kezelt
+    // A loadAndSortStations-t a scrollListComponent.refresh() hívja meg a loadData()-n keresztül
 
     // Képernyő gombok definiálása
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
@@ -78,30 +83,7 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
         backButton->setPosition(backButtonX, backButtonY);
     }
 
-    selectedListIndex = -1;
-    listScrollOffset = 0;
-
-    // Állomások betöltése és rendezése
-    loadAndSortStations();  // Ezt a konstruktor végére helyezzük
-
-    // Automatikus kiválasztás a behangolt állomásra a konstruktorban
-    // Most a sortedStations alapján keressük meg
-    uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
-    uint8_t currentTunedBandIdx = config.data.bandIdx;
-
-    if (!sortedStations.empty() && visibleLines > 0) {
-        for (uint8_t i = 0; i < sortedStations.size(); ++i) {
-            const StationData& station = sortedStations[i];  // sortedStations-ból vesszük
-            if (station.frequency == currentTunedFreq && station.bandIndex == currentTunedBandIdx) {
-                selectedListIndex = i;
-                listScrollOffset = selectedListIndex - (visibleLines / 2);
-                if (listScrollOffset < 0) listScrollOffset = 0;
-                // A max scroll offsetet a sortedStations méretéhez igazítjuk
-                listScrollOffset = min(listScrollOffset, max(0, (int)sortedStations.size() - visibleLines));
-                break;
-            }
-        }
-    }
+    // A kezdeti adatbetöltést és kiválasztást a drawScreen -> scrollListComponent.refresh() -> loadData() kezeli
 }
 
 /**
@@ -109,10 +91,8 @@ MemoryDisplay::MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band) : Displa
  */
 MemoryDisplay::~MemoryDisplay() {}
 
-/**
- * Betölti az állomásokat a megfelelő store-ból és rendezi őket frekvencia szerint.
- */
-void MemoryDisplay::loadAndSortStations() {
+
+void MemoryDisplay::loadData() {
     sortedStations.clear();
     uint8_t count = isFmMode ? pFmStore->getStationCount() : pAmStore->getStationCount();
     for (uint8_t i = 0; i < count; ++i) {
@@ -130,13 +110,24 @@ void MemoryDisplay::loadAndSortStations() {
         return false;
     });
 
-    if (selectedListIndex != -1 && selectedListIndex < count) {
-        // A kiválasztás megmarad, ha érvényes volt, de a drawScreen() újra megkeresi a behangoltat.
-    } else {
-        selectedListIndex = -1;
-        listScrollOffset = 0;
+    // Az aktuálisan behangolt állomás megkeresése a lista komponens kezdeti kiválasztásának beállításához
+    uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
+    uint8_t currentTunedBandIdx = config.data.bandIdx;
+    int initialSelection = -1;
+
+    if (!sortedStations.empty()) {
+        for (size_t i = 0; i < sortedStations.size(); ++i) {
+            if (sortedStations[i].frequency == currentTunedFreq && sortedStations[i].bandIndex == currentTunedBandIdx &&
+                (sortedStations[i].modulation != LSB && sortedStations[i].modulation != USB && sortedStations[i].modulation != CW || // AM/FM
+                 sortedStations[i].bfoOffset == band.getCurrentBand().varData.lastBFO) ) { // SSB/CW with matching BFO
+                initialSelection = i;
+                break;
+            }
+        }
     }
+    scrollListComponent.setSelectedItemIndex(initialSelection);
 }
+
 
 /**
  * Képernyő kirajzolása
@@ -153,98 +144,82 @@ void MemoryDisplay::drawScreen() {
     const char* title = isFmMode ? "FM Memory" : "AM/LW/SW Memory";
     tft.drawString(title, tft.width() / 2, 5);
 
-    tft.drawRect(listX, listY, listW, listH, LIST_BORDER_COLOR);
-
-    loadAndSortStations();
-
-    uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
-    uint8_t currentTunedBandIdx = config.data.bandIdx;
-    bool foundTunedInSorted = false;
-    if (!sortedStations.empty() && visibleLines > 0) {
-        for (uint8_t i = 0; i < sortedStations.size(); ++i) {
-            const StationData& station = sortedStations[i];
-            if (station.frequency == currentTunedFreq && station.bandIndex == currentTunedBandIdx) {
-                if (selectedListIndex != i) {
-                    selectedListIndex = i;
-                    listScrollOffset = selectedListIndex - (visibleLines / 2);
-                    if (listScrollOffset < 0) listScrollOffset = 0;
-                    listScrollOffset = min(listScrollOffset, max(0, (int)sortedStations.size() - visibleLines));
-                }
-                foundTunedInSorted = true;
-                break;
-            }
-        }
-    }
-    if (!foundTunedInSorted && !sortedStations.empty()) {
-        if (selectedListIndex < 0 || selectedListIndex >= sortedStations.size()) {
-            selectedListIndex = 0;
-            listScrollOffset = 0;
-        }
-    } else if (sortedStations.empty()) {
-        selectedListIndex = -1;
-        listScrollOffset = 0;
-    }
-
-    drawStationList();
+    scrollListComponent.refresh(); // Ez meghívja a loadData()-t, majd a draw()-t
 
     drawScreenButtons();
     updateActionButtonsState();
 }
 
+
+// IScrollableListDataSource implementációk
+int MemoryDisplay::getItemCount() const {
+    return sortedStations.size();
+}
+
+void MemoryDisplay::activateListItem(int index) {
+    tuneToSelectedStation(); // Az alapértelmezett aktiválás a hangolás
+}
+
+int MemoryDisplay::getItemHeight() const {
+    return dynamicLineHeight;
+}
+
 /**
  * Kirajzol egyetlen listaelemet a megadott indexre.
  */
-void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations indexe
+void MemoryDisplay::drawListItem(TFT_eSPI& tft_ref, int index, int itemX, int itemY, int itemW, int itemH, bool isSelected) {
     using namespace MemoryListConstants;
 
-    if (index < 0 || index >= sortedStations.size() || index < listScrollOffset || index >= listScrollOffset + visibleLines) {
-        return;
-    }
+    // Az index érvényességének ellenőrzése a listScrollOffset-tel szemben a ScrollableListComponent által kezelt
+    // Csak a sortedStations.size()-szal szemben kell ellenőrizni
+    if (index < 0 || index >= sortedStations.size()) return;
 
     const StationData& station = sortedStations[index];
 
     uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
     uint8_t currentTunedBandIdx = config.data.bandIdx;
 
-    bool isSelected = (index == selectedListIndex);
+    // Az isSelected paraméterként érkezik
     bool isTuned = (station.frequency == currentTunedFreq && station.bandIndex == currentTunedBandIdx);
+    if (isTuned && (station.modulation == LSB || station.modulation == USB || station.modulation == CW)) {
+        isTuned = (station.bfoOffset == band.getCurrentBand().varData.lastBFO);
+    }
 
     uint16_t bgColor = isSelected ? SELECTED_ITEM_BG_COLOR : ITEM_BG_COLOR;
     uint16_t textColor = isSelected ? SELECTED_ITEM_TEXT_COLOR : ITEM_TEXT_COLOR;
 
-    int yPos = listY + 1 + (index - listScrollOffset) * lineHeight;
-
-    tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, bgColor);
+    // Az itemX, itemY, itemW, itemH a ScrollableListComponent által biztosított
+    tft_ref.fillRect(itemX, itemY, itemW, itemH, bgColor);
 
     // Fő betűtípus beállítása a listaelemhez (név, ikon, moduláció).
     // Mindig FreeSansBold9pt7b, méret 1. A szín változik a kiválasztottság alapján.
-    tft.setFreeFont(&FreeSansBold9pt7b);
-    tft.setTextSize(1);
-    tft.setTextPadding(0);
+    tft_ref.setFreeFont(&FreeSansBold9pt7b);
+    tft_ref.setTextSize(1);
+    tft_ref.setTextPadding(0);
     // A textColor-t közvetlenül a név/moduláció rajzolása előtt állítjuk be.
 
-    int textCenterY = yPos + lineHeight / 2;
+    int textCenterY = itemY + itemH / 2;
 
     // Ikon kirajzolása, ha az állomás be van hangolva
-    int iconStartX = listX + ICON_PADDING_RIGHT;
+    int iconStartX = itemX + ICON_PADDING_RIGHT;
     if (isTuned) {
-        tft.setTextColor(TUNED_ICON_COLOR, bgColor);
-        tft.setTextDatum(ML_DATUM);  // Középre-balra igazítás
-        tft.drawString(CURRENT_TUNED_ICON, iconStartX, textCenterY);
+        tft_ref.setTextColor(TUNED_ICON_COLOR, bgColor);
+        tft_ref.setTextDatum(ML_DATUM);  // Középre-balra igazítás
+        tft_ref.drawString(CURRENT_TUNED_ICON, iconStartX, textCenterY);
     }
 
     // Helyfoglalás az ikonnak (mindig), a fent beállított fonttal mérve.
     int iconWidth = tft.textWidth(CURRENT_TUNED_ICON);
     // Biztosítjuk, hogy a textColor legyen aktív a további mérésekhez, ha nem volt ikon.
     // Erre itt nincs közvetlen szükség, mert a név/moduláció előtt újra beállítjuk.
-    int iconSpaceWidth = iconWidth + ICON_PADDING_RIGHT;
-    int textStartX = iconStartX + iconSpaceWidth;
+    int iconSpaceWidth = iconWidth + ICON_PADDING_RIGHT; // Az ikon által foglalt hely + padding
+    int textStartX = iconStartX + iconSpaceWidth; // Mindig foglalunk helyet az ikonnak, függetlenül attól, hogy ki van-e rajzolva
 
     // Frekvencia string előkészítése
     String freqStr;
     if (station.modulation == FM) {
         freqStr = String(station.frequency / 100.0f, 2) + " MHz";
-    } else if (station.modulation == LSB || station.modulation == USB || station.modulation == CW) {
+    } else if (station.modulation == LSB || station.modulation == USB || station.modulation == CW) { // SSB/CW frekvencia formázása
         uint32_t displayFreqHz = (uint32_t)station.frequency * 1000 - station.bfoOffset;
         long khz_part = displayFreqHz / 1000;
         int hz_tens_part = abs((int)(displayFreqHz % 1000)) / 10;
@@ -256,14 +231,14 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     }
 
     // Frekvencia szélességének mérése a dedikált kicsi (alapértelmezett) fonttal
-    tft.setFreeFont();   // Alapértelmezett/számozott font
-    tft.setTextSize(1);  // Kis betű a frekvenciához
-    int freqWidth = tft.textWidth(freqStr);
+    tft_ref.setFreeFont();   // Alapértelmezett/számozott font
+    tft_ref.setTextSize(1);  // Kis betű a frekvenciához
+    int freqWidth = tft_ref.textWidth(freqStr);
     // A freqX-et később számoljuk, ez a jobb oldali igazítási pont (MR_DATUM)
 
     // Visszaállítjuk a fő fontot (FreeSansBold9pt7b) a moduláció méréséhez és a név/moduláció rajzolásához.
-    tft.setFreeFont(&FreeSansBold9pt7b);
-    tft.setTextSize(1);
+    tft_ref.setFreeFont(&FreeSansBold9pt7b);
+    tft_ref.setTextSize(1);
 
     // --- Moduláció String és Szélesség (feltételes a layout számításhoz) ---
     int modWidthForLayout = 0;
@@ -272,13 +247,13 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
 
     if (station.modulation != FM) {
         modStrToDisplay = band.getBandModeDescByIndex(station.modulation);
-        modWidthForLayout = tft.textWidth(modStrToDisplay);
+        modWidthForLayout = tft_ref.textWidth(modStrToDisplay);
         nameModGapForLayout = NAME_MOD_GAP;
     }
     // FM esetén: modStrToDisplay nullptr marad, modWidthForLayout 0, nameModGapForLayout 0.
 
     // --- Elérhető névhossz számítása (az eredeti képletet használva, feltételes szélességekkel/résekkel) ---
-    int availableNameWidth = (listX + listW - ICON_PADDING_RIGHT) /* teljes elérhető szélesség a szöveges elemeknek */
+    int availableNameWidth = (itemX + itemW - ICON_PADDING_RIGHT) /* teljes elérhető szélesség a szöveges elemeknek */
                              - textStartX                         /* kivonjuk a név előtti helyet */
                              - modWidthForLayout                  /* kivonjuk a modulációs string helyét (0, ha FM) */
                              - freqWidth                          /* kivonjuk a frekvencia string helyét */
@@ -297,80 +272,44 @@ void MemoryDisplay::drawListItem(int index) {  // index itt a sortedStations ind
     }
 
     // Név csonkolása, ha túl hosszú az elérhető helyhez képest
-    while (tft.textWidth(displayName) > availableNameWidth && strlen(displayName) > 0) {
+    while (tft_ref.textWidth(displayName) > availableNameWidth && strlen(displayName) > 0) {
         displayName[strlen(displayName) - 1] = '\0';
     }
-    int actualNameWidth = tft.textWidth(displayName);  // A (potenciálisan csonkolt) név tényleges szélessége
+    int actualNameWidth = tft_ref.textWidth(displayName);  // A (potenciálisan csonkolt) név tényleges szélessége
 
     // --- Rajzolás ---
     int nameX = textStartX;
     // A modX és freqX pozíciókat közvetlenül a rajzolás előtt határozzuk meg
-    int freqX = listX + listW - ICON_PADDING_RIGHT;  // Jobbra igazított frekvencia
+    int freqX = itemX + itemW - ICON_PADDING_RIGHT;  // Jobbra igazított frekvencia
 
     // Név kirajzolása
-    tft.setTextColor(textColor, bgColor);  // Fő szövegszín beállítása
-    tft.setTextDatum(ML_DATUM);
-    tft.drawString(displayName, nameX, textCenterY);
+    tft_ref.setTextColor(textColor, bgColor);  // Fő szövegszín beállítása
+    tft_ref.setTextDatum(ML_DATUM);
+    tft_ref.drawString(displayName, nameX, textCenterY);
 
     // Moduláció kirajzolása (ha nem FM és a string be van állítva)
     if (station.modulation != FM && modStrToDisplay != nullptr) {
         // A textColor (fő szövegszín) és bgColor már be van állítva
         // A font (normál/vastag) már be van állítva
-        tft.setTextDatum(ML_DATUM);
+        tft_ref.setTextDatum(ML_DATUM); // Középre balra igazítás
         // A moduláció X pozíciója a név és a név-moduláció rés után
         int modDisplayX = nameX + actualNameWidth + nameModGapForLayout;
-        tft.drawString(modStrToDisplay, modDisplayX, textCenterY);
+        tft_ref.drawString(modStrToDisplay, modDisplayX, textCenterY);
     }
 
     // Frekvencia kirajzolása (jobbra igazítva)
-    tft.setFreeFont();                     // Alapértelmezett/számozott font
-    tft.setTextSize(1);                    // Mindig kis betűvel
-    tft.setTextColor(textColor, bgColor);  // Fő szövegszín beállítása
-    tft.setTextDatum(MR_DATUM);
-    tft.drawString(freqStr, freqX, textCenterY);
-
-    // Alapértelmezett szövegbeállítások visszaállítása (ha szükséges a ciklus további részében)
-    tft.setTextDatum(TL_DATUM);
-    tft.setFreeFont();
-    tft.setTextSize(1);
-}
-
-/**
- * Állomáslista kirajzolása
- */
-void MemoryDisplay::drawStationList() {
-    using namespace MemoryListConstants;
-    tft.fillRect(listX + 1, listY + 1, listW - 2, listH - 2, ITEM_BG_COLOR);
-
-    if (sortedStations.empty()) {
-        tft.setFreeFont();
-        tft.setTextSize(MemoryListConstants::ITEM_TEXT_SIZE_NORMAL);
-        tft.setTextColor(MemoryListConstants::ITEM_TEXT_COLOR, MemoryListConstants::ITEM_BG_COLOR);
-        tft.setTextDatum(MC_DATUM);
-        tft.drawString("Memory Empty", listX + listW / 2, listY + listH / 2);
-        return;
-    }
-    uint8_t count = sortedStations.size();
-
-    if (listScrollOffset < 0) listScrollOffset = 0;
-    if (listScrollOffset > max(0, count - visibleLines)) listScrollOffset = max(0, count - visibleLines);
-
-    for (int i = 0; i < visibleLines; ++i) {
-        int currentItemIndex = listScrollOffset + i;
-        if (currentItemIndex < count) {
-            drawListItem(currentItemIndex);
-        } else {
-            int yPos = listY + 1 + i * lineHeight;
-            tft.fillRect(listX + 1, yPos, listW - 2, lineHeight, ITEM_BG_COLOR);
-        }
-    }
+    tft_ref.setFreeFont();                     // Alapértelmezett/számozott font
+    tft_ref.setTextSize(1);                    // Mindig kis betűvel
+    tft_ref.setTextColor(textColor, bgColor);  // Fő szövegszín beállítása
+    tft_ref.setTextDatum(MR_DATUM);
+    tft_ref.drawString(freqStr, freqX, textCenterY);
 }
 
 /**
  * Az Edit, Delete, Tune gombok állapotának frissítése a kiválasztás alapján
  */
 void MemoryDisplay::updateActionButtonsState() {
-    bool itemSelected = (selectedListIndex != -1 && selectedListIndex < sortedStations.size());
+    bool itemSelected = (scrollListComponent.getSelectedItemIndex() != -1);
     TftButton* editButton = findButtonByLabel("Edit");
     if (editButton) editButton->setState(itemSelected ? TftButton::ButtonState::Off : TftButton::ButtonState::Disabled);
     TftButton* deleteButton = findButtonByLabel("Delete");
@@ -384,23 +323,10 @@ void MemoryDisplay::updateActionButtonsState() {
  * Újrarajzolja a korábban és az újonnan behangolt állomást a listában.
  * @param previouslyTunedSortedIdx A korábban behangolt állomás indexe a 'sortedStations' listában.
  */
-void MemoryDisplay::updateListAfterTuning(uint8_t previouslyTunedSortedIdx) {
-    // Újrarajzoljuk a korábban behangolt állomást (ha látható és eltér az újtól)
-    // Ez eltávolítja róla a '>' jelet, mivel már nem ez van behangolva.
-    // Figyelem: Ha previouslyTunedSortedIdx == (uint8_t)-1, az 255 lesz.
-    // Ezért a feltételnek helyesnek kell lennie. Ha -1-et akarunk jelezni, akkor int típust kellene használni.
-    // Jelenlegi implementációban a 255-ös indexet is érvényesnek veheti, ha a lista olyan nagy.
-    // De mivel a MAX_FM/AM_STATIONS < 255, ez nem okozhat problémát, a 255. index sosem lesz valid.
-    if (previouslyTunedSortedIdx != (uint8_t)-1 &&  // Explicit kasztolás a -1 összehasonlításhoz, ha uint8_t a paraméter
-        previouslyTunedSortedIdx != selectedListIndex && previouslyTunedSortedIdx >= listScrollOffset && previouslyTunedSortedIdx < listScrollOffset + visibleLines) {
-        drawListItem(previouslyTunedSortedIdx);
-    }
-
-    // Újrarajzoljuk az újonnan behangolt (aktuálisan kiválasztott) állomást (ha látható)
-    // Ez megjeleníti mellette a '>' jelet.
-    if (selectedListIndex != -1 && selectedListIndex >= listScrollOffset && selectedListIndex < listScrollOffset + visibleLines) {
-        drawListItem(selectedListIndex);
-    }
+void MemoryDisplay::updateListAfterTuning(int previouslyTunedSortedIdx) {
+    // Hangolás után a listát frissíteni kell, hogy megjelenjen az új '>' ikon
+    // és eltűnjön a régi.
+    scrollListComponent.refresh(); // Ez újratölti az adatokat, újraértékeli a kiválasztást és újrarajzol.
     updateActionButtonsState();
 }
 
@@ -409,126 +335,83 @@ void MemoryDisplay::updateListAfterTuning(uint8_t previouslyTunedSortedIdx) {
  */
 bool MemoryDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
     if (sortedStations.empty() || pDialog != nullptr) return false;
-    uint8_t count = sortedStations.size();
 
-    bool selectionChanged = false;
-    int newSelectedItemIndex = selectedListIndex;
+    bool scrolled = scrollListComponent.handleRotaryScroll(encoderState);
 
-    if (encoderState.direction == RotaryEncoder::Direction::Up) {
-        newSelectedItemIndex = (selectedListIndex == -1) ? 0 : min(selectedListIndex + 1, count - 1);
-        if (newSelectedItemIndex != selectedListIndex) {
-            selectionChanged = true;
-        }
-    } else if (encoderState.direction == RotaryEncoder::Direction::Down) {
-        newSelectedItemIndex = (selectedListIndex == -1) ? count - 1 : max(0, selectedListIndex - 1);
-        if (newSelectedItemIndex != selectedListIndex) {
-            selectionChanged = true;
-        }
-    } else if (encoderState.buttonState == RotaryEncoder::ButtonState::Clicked) {
-        if (selectedListIndex != -1 && selectedListIndex < count) {
+    if (encoderState.buttonState == RotaryEncoder::ButtonState::Clicked) {
+        if (scrollListComponent.getSelectedItemIndex() != -1) {
             uint16_t freqBeforeTune = band.getCurrentBand().varData.currFreq;
             uint8_t bandIdxBeforeTune = config.data.bandIdx;
-            int previouslyTunedSortedIndex = -1;  // int, mert -1 lehet
-            for (int i = 0; i < count; ++i) {
-                if (sortedStations[i].frequency == freqBeforeTune && sortedStations[i].bandIndex == bandIdxBeforeTune) {
+            int16_t bfoBeforeTune = band.getCurrentBand().varData.lastBFO;
+            int previouslyTunedSortedIndex = -1;
+            for (size_t i = 0; i < sortedStations.size(); ++i) {
+                if (sortedStations[i].frequency == freqBeforeTune && sortedStations[i].bandIndex == bandIdxBeforeTune &&
+                    (sortedStations[i].modulation != LSB && sortedStations[i].modulation != USB && sortedStations[i].modulation != CW ||
+                     sortedStations[i].bfoOffset == bfoBeforeTune) ) {
                     previouslyTunedSortedIndex = i;
                     break;
                 }
             }
-            tuneToSelectedStation();
-            updateListAfterTuning(static_cast<uint8_t>(previouslyTunedSortedIndex));  // Kasztolás uint8_t-ra
+            scrollListComponent.activateSelectedItem(); // Ez meghívja a tuneToSelectedStation-t
+            updateListAfterTuning(previouslyTunedSortedIndex);
             return true;
         }
     } else if (encoderState.buttonState == RotaryEncoder::ButtonState::DoubleClicked) {
-        if (selectedListIndex != -1 && selectedListIndex < count) {
+        if (scrollListComponent.getSelectedItemIndex() != -1) {
             editSelectedStation();
             return true;
         }
     }
 
-    if (selectionChanged) {
-        int oldSelectedItemIndex = selectedListIndex;
-        selectedListIndex = newSelectedItemIndex;
-        int oldScrollOffset = listScrollOffset;
-
-        if (selectedListIndex < listScrollOffset) {
-            listScrollOffset = selectedListIndex;
-        } else if (selectedListIndex >= listScrollOffset + visibleLines) {
-            listScrollOffset = selectedListIndex - visibleLines + 1;
-        }
-        if (listScrollOffset < 0) listScrollOffset = 0;
-        listScrollOffset = min(listScrollOffset, max(0, count - visibleLines));
-
-        if (oldScrollOffset != listScrollOffset) {
-            drawStationList();
-        } else {
-            if (oldSelectedItemIndex >= 0 && oldSelectedItemIndex < count && oldSelectedItemIndex >= oldScrollOffset && oldSelectedItemIndex < oldScrollOffset + visibleLines) {
-                drawListItem(oldSelectedItemIndex);
-            }
-            if (selectedListIndex >= 0 && selectedListIndex < count && selectedListIndex >= listScrollOffset && selectedListIndex < listScrollOffset + visibleLines) {
-                drawListItem(selectedListIndex);
-            }
-        }
+    if (scrolled) {
         updateActionButtonsState();
-        return true;
     }
-    if (encoderState.direction != RotaryEncoder::Direction::None) {
-        return true;
-    }
-    return false;
+
+    return scrolled || (encoderState.buttonState != RotaryEncoder::ButtonState::Open);
 }
 
 /**
  * Touch (nem képernyő button) esemény lekezelése
  */
 bool MemoryDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
-    if (sortedStations.empty() || pDialog != nullptr) return false;
-    uint8_t count = sortedStations.size();
+    if (pDialog) return false;
 
-    if (touched && tx >= listX && tx < (listX + listW) && ty >= listY && ty < (listY + listH)) {
-        int touchedRow = (ty - (listY + 1)) / lineHeight;
-        int touchedIndex = listScrollOffset + touchedRow;
+    // Az activateOnTouch = false használata a komponenshez, az aktiválást itt kezeljük a dupla koppintáshoz
+    bool listHandled = scrollListComponent.handleTouch(touched, tx, ty, false);
 
-        if (touchedIndex >= 0 && touchedIndex < count) {
-            int oldSelectedItemIndex = selectedListIndex;
-            int currentVisibleTop = listScrollOffset;
-            int currentVisibleBottom = listScrollOffset + visibleLines;
-
-            if (touchedIndex != selectedListIndex) {
-                selectedListIndex = touchedIndex;
-                if (oldSelectedItemIndex >= 0 && oldSelectedItemIndex < count && oldSelectedItemIndex >= currentVisibleTop && oldSelectedItemIndex < currentVisibleBottom) {
-                    drawListItem(oldSelectedItemIndex);
-                }
-                if (selectedListIndex >= 0 && selectedListIndex < count && selectedListIndex >= currentVisibleTop && selectedListIndex < currentVisibleBottom) {
-                    drawListItem(selectedListIndex);
-                }
-                updateActionButtonsState();
-            } else {
+    if (listHandled && touched) {
+        int currentSelection = scrollListComponent.getSelectedItemIndex();
+        if (currentSelection != -1) {
+            // Dupla koppintás logika
+            if (scrollListComponent.getSelectedItemIndex() == currentSelection) { // Ellenőrizzük, hogy a kiválasztás még mindig ugyanaz-e
                 static unsigned long lastTouchTime = 0;
                 static int lastTouchedIndex = -1;
-                if (selectedListIndex == lastTouchedIndex && millis() - lastTouchTime < 500) {  // Double tap
+                if (currentSelection == lastTouchedIndex && (millis() - lastTouchTime) < 500) { // Dupla koppintás
                     uint16_t freqBeforeTune = band.getCurrentBand().varData.currFreq;
                     uint8_t bandIdxBeforeTune = config.data.bandIdx;
+                    int16_t bfoBeforeTune = band.getCurrentBand().varData.lastBFO;
                     int previouslyTunedSortedIndex = -1;
-                    for (int i = 0; i < count; ++i) {
-                        if (sortedStations[i].frequency == freqBeforeTune && sortedStations[i].bandIndex == bandIdxBeforeTune) {
+                    for (size_t i = 0; i < sortedStations.size(); ++i) {
+                        if (sortedStations[i].frequency == freqBeforeTune && sortedStations[i].bandIndex == bandIdxBeforeTune &&
+                            (sortedStations[i].modulation != LSB && sortedStations[i].modulation != USB && sortedStations[i].modulation != CW ||
+                             sortedStations[i].bfoOffset == bfoBeforeTune) ) {
                             previouslyTunedSortedIndex = i;
                             break;
                         }
                     }
-                    tuneToSelectedStation();
-                    updateListAfterTuning(static_cast<uint8_t>(previouslyTunedSortedIndex));
+                    scrollListComponent.activateSelectedItem(); // Ez meghívja a tuneToSelectedStation-t
+                    updateListAfterTuning(previouslyTunedSortedIndex);
                     lastTouchTime = 0;
                     lastTouchedIndex = -1;
                 } else {
                     lastTouchTime = millis();
-                    lastTouchedIndex = selectedListIndex;
+                    lastTouchedIndex = currentSelection;
                 }
             }
-            return true;
+            updateActionButtonsState(); // Gombok frissítése az új kiválasztás alapján
         }
     }
-    return false;
+    return listHandled;
 }
 
 /**
@@ -542,18 +425,21 @@ void MemoryDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent& e
     } else if (STREQ("Delete", event.label)) {
         deleteSelectedStation();
     } else if (STREQ("Tune", event.label)) {
-        if (selectedListIndex != -1 && selectedListIndex < sortedStations.size()) {
+        if (scrollListComponent.getSelectedItemIndex() != -1) {
             uint16_t freqBeforeTune = band.getCurrentBand().varData.currFreq;
             uint8_t bandIdxBeforeTune = config.data.bandIdx;
+            int16_t bfoBeforeTune = band.getCurrentBand().varData.lastBFO;
             int previouslyTunedSortedIndex = -1;
-            for (int i = 0; i < sortedStations.size(); ++i) {
-                if (sortedStations[i].frequency == freqBeforeTune && sortedStations[i].bandIndex == bandIdxBeforeTune) {
+            for (size_t i = 0; i < sortedStations.size(); ++i) {
+                if (sortedStations[i].frequency == freqBeforeTune && sortedStations[i].bandIndex == bandIdxBeforeTune &&
+                    (sortedStations[i].modulation != LSB && sortedStations[i].modulation != USB && sortedStations[i].modulation != CW ||
+                     sortedStations[i].bfoOffset == bfoBeforeTune) ) {
                     previouslyTunedSortedIndex = i;
                     break;
                 }
             }
-            tuneToSelectedStation();
-            updateListAfterTuning(static_cast<uint8_t>(previouslyTunedSortedIndex));
+            scrollListComponent.activateSelectedItem(); // Ez meghívja a tuneToSelectedStation-t
+            updateListAfterTuning(previouslyTunedSortedIndex);
         }
     } else if (STREQ("Back", event.label)) {
         ::newDisplay = prevDisplay;
@@ -573,34 +459,28 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                 if (currentDialogMode == DialogMode::SAVE_NEW_STATION) {
                     Utils::safeStrCpy(pendingStationData.name, stationNameBuffer.c_str());
                     if (addStationInternal(pendingStationData)) {
-                        loadAndSortStations();
+                        loadData(); // Régi loadAndSortStations() helyett
                         bool foundNew = false;
                         for (size_t i = 0; i < sortedStations.size(); ++i) {
                             if (sortedStations[i].frequency == pendingStationData.frequency && sortedStations[i].bandIndex == pendingStationData.bandIndex &&
                                 sortedStations[i].bfoOffset == pendingStationData.bfoOffset) {
-                                selectedListIndex = i;
+                                scrollListComponent.setSelectedItemIndex(i);
                                 foundNew = true;
+                                scrollListComponent.setSelectedItemIndex(i);
                                 break;
                             }
-                        }
-                        if (foundNew && visibleLines > 0) {
-                            listScrollOffset = selectedListIndex - (visibleLines / 2);
-                            if (listScrollOffset < 0) listScrollOffset = 0;
-                            listScrollOffset = min(listScrollOffset, max(0, (int)sortedStations.size() - visibleLines));
-                        } else if (!foundNew) {
-                            selectedListIndex = -1;
                         }
                         refreshListAndButtons = true;
                     } else {
                         delete pDialog;
-                        pDialog = new MessageDialog(this, tft, 250, 100, F("Error"), F("Memory full or station exists!"), "OK");
+                        pDialog = new MessageDialog(this, tft, 280, 100, F("Error"), F("Memory full or station exists!"), "OK");
                         currentDialogMode = DialogMode::NONE;
                         closeDialog = false;
                     }
                 } else {  // EDIT_STATION_NAME
-                    if (selectedListIndex != -1 && selectedListIndex < sortedStations.size()) {
-                        const StationData& stationToEdit = sortedStations[selectedListIndex];
-                        int originalIndex = isFmMode ? pFmStore->findStation(stationToEdit.frequency, stationToEdit.bandIndex)
+                    if (scrollListComponent.getSelectedItemIndex() != -1 && scrollListComponent.getSelectedItemIndex() < sortedStations.size()) {
+                        const StationData& stationToEdit = sortedStations[scrollListComponent.getSelectedItemIndex()];
+                        int originalIndex = isFmMode ? pFmStore->findStation(stationToEdit.frequency, stationToEdit.bandIndex, stationToEdit.bfoOffset)
                                                      : pAmStore->findStation(stationToEdit.frequency, stationToEdit.bandIndex);
                         if (originalIndex != -1 && (stationToEdit.modulation == LSB || stationToEdit.modulation == USB || stationToEdit.modulation == CW)) {
                             const StationData* originalStation = isFmMode ? pFmStore->getStationByIndex(originalIndex) : pAmStore->getStationByIndex(originalIndex);
@@ -620,17 +500,17 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                             StationData updatedStation = stationToEdit;
                             Utils::safeStrCpy(updatedStation.name, stationNameBuffer.c_str());
                             if (updateStationInternal(originalIndex, updatedStation)) {
-                                loadAndSortStations();
+                                loadData(); // Régi loadAndSortStations() helyett
                                 bool foundEdited = false;
                                 for (size_t i = 0; i < sortedStations.size(); ++i) {
                                     if (sortedStations[i].frequency == updatedStation.frequency && sortedStations[i].bandIndex == updatedStation.bandIndex &&
                                         sortedStations[i].bfoOffset == updatedStation.bfoOffset && strcmp(sortedStations[i].name, updatedStation.name) == 0) {
-                                        selectedListIndex = i;
+                                        scrollListComponent.setSelectedItemIndex(i);
                                         foundEdited = true;
                                         break;
                                     }
                                 }
-                                if (!foundEdited) selectedListIndex = -1;
+                                if (!foundEdited) scrollListComponent.setSelectedItemIndex(-1);
                                 refreshListAndButtons = true;
                             } else {
                                 delete pDialog;
@@ -646,9 +526,9 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
             }
         } else if (currentDialogMode == DialogMode::DELETE_CONFIRM) {
             if (event.id == DLG_OK_BUTTON_ID) {
-                if (selectedListIndex != -1 && selectedListIndex < sortedStations.size()) {
-                    const StationData& stationToDelete = sortedStations[selectedListIndex];
-                    int originalIndex = isFmMode ? pFmStore->findStation(stationToDelete.frequency, stationToDelete.bandIndex)
+                if (scrollListComponent.getSelectedItemIndex() != -1 && scrollListComponent.getSelectedItemIndex() < sortedStations.size()) {
+                    const StationData& stationToDelete = sortedStations[scrollListComponent.getSelectedItemIndex()];
+                    int originalIndex = isFmMode ? pFmStore->findStation(stationToDelete.frequency, stationToDelete.bandIndex, stationToDelete.bfoOffset)
                                                  : pAmStore->findStation(stationToDelete.frequency, stationToDelete.bandIndex);
                     if (originalIndex != -1 && (stationToDelete.modulation == LSB || stationToDelete.modulation == USB || stationToDelete.modulation == CW)) {
                         const StationData* originalStation = isFmMode ? pFmStore->getStationByIndex(originalIndex) : pAmStore->getStationByIndex(originalIndex);
@@ -666,8 +546,8 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
 
                     if (originalIndex != -1) {
                         if (deleteStationInternal(originalIndex)) {
-                            loadAndSortStations();
-                            selectedListIndex = -1;
+                            loadData(); // Régi loadAndSortStations() helyett
+                            scrollListComponent.setSelectedItemIndex(-1);
                             refreshListAndButtons = true;
                         } else {
                             delete pDialog;
@@ -687,6 +567,7 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
         DisplayBase::processDialogButtonResponse(event);
         currentDialogMode = DialogMode::NONE;
         if (refreshListAndButtons) {
+            scrollListComponent.refresh(); // Biztosítjuk, hogy a lista újrarajzolódjon az új adatokkal/kiválasztással
             updateActionButtonsState();
         }
     } else if (pDialog) {
@@ -774,8 +655,9 @@ void MemoryDisplay::saveCurrentStation() {
 }
 
 void MemoryDisplay::editSelectedStation() {
-    if (selectedListIndex < 0 || selectedListIndex >= sortedStations.size()) return;
-    const StationData& station = sortedStations[selectedListIndex];
+    int currentSelection = scrollListComponent.getSelectedItemIndex();
+    if (currentSelection < 0 || currentSelection >= sortedStations.size()) return;
+    const StationData& station = sortedStations[currentSelection];
 
     stationNameBuffer = station.name;
     currentDialogMode = DialogMode::EDIT_STATION_NAME;
@@ -783,8 +665,9 @@ void MemoryDisplay::editSelectedStation() {
 }
 
 void MemoryDisplay::deleteSelectedStation() {
-    if (selectedListIndex < 0 || selectedListIndex >= sortedStations.size()) return;
-    const StationData& station = sortedStations[selectedListIndex];
+    int currentSelection = scrollListComponent.getSelectedItemIndex();
+    if (currentSelection < 0 || currentSelection >= sortedStations.size()) return;
+    const StationData& station = sortedStations[currentSelection];
 
     currentDialogMode = DialogMode::DELETE_CONFIRM;
     String msg = "Delete '" + String(station.name) + "'?";
@@ -792,8 +675,9 @@ void MemoryDisplay::deleteSelectedStation() {
 }
 
 void MemoryDisplay::tuneToSelectedStation() {
-    if (selectedListIndex < 0 || selectedListIndex >= sortedStations.size()) return;
-    const StationData& station = sortedStations[selectedListIndex];
+    int currentSelection = scrollListComponent.getSelectedItemIndex();
+    if (currentSelection < 0 || currentSelection >= sortedStations.size()) return;
+    const StationData& station = sortedStations[currentSelection];
 
     band.tuneMemoryStation(station.frequency, station.bfoOffset, station.bandIndex, station.modulation, station.bandwidthIndex);
     Si4735Utils::checkAGC();

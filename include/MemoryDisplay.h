@@ -3,10 +3,12 @@
 #include <vector>  // std::vector használatához
 
 #include "DisplayBase.h"
+#include "IScrollableListDataSource.h"
+#include "ScrollableListComponent.h"
 #include "StationData.h"   // Szükséges a StationData-hoz
 #include "StationStore.h"  // Szükséges a store objektumokhoz
 
-class MemoryDisplay : public DisplayBase {
+class MemoryDisplay : public DisplayBase, public IScrollableListDataSource {
    private:
     // Enum a dialógus céljának jelzésére
     enum class DialogMode {
@@ -21,15 +23,11 @@ class MemoryDisplay : public DisplayBase {
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;  // Hova térjünk vissza
     bool isFmMode = true;                                                   // FM vagy AM memóriát mutatunk?
 
-    // Lista megjelenítéséhez szükséges változók
-    int listScrollOffset = 0;             // Hányadik elemtől listázunk
-    int selectedListIndex = -1;           // Kiválasztott elem indexe (-1, ha nincs)
-    uint8_t visibleLines = 0;             // Hány sor fér ki a listából
-    uint16_t listX, listY, listW, listH;  // Lista területének koordinátái
-    uint8_t lineHeight;                   // Egy sor magassága
-
     // Rendezett állomások tárolására
     std::vector<StationData> sortedStations;
+
+    ScrollableListComponent scrollListComponent;
+    int dynamicLineHeight;  // Kiszámított sormagasság
 
     // Ideiglenes tároló az új/szerkesztett állomás nevéhez
     // A VirtualKeyboardDialog ebbe írja az eredményt.
@@ -38,14 +36,12 @@ class MemoryDisplay : public DisplayBase {
     StationData pendingStationData;
 
     // Helper metódusok
-    void drawListItem(int index);  // Kirajzol egyetlen listaelemet a megadott indexre
-    void loadAndSortStations();    // Betölti és rendezi az állomásokat a sortedStations vektorba
-    void drawStationList();
-    void saveCurrentStation();                                     // Aktuális állomás mentése dialógussal
-    void editSelectedStation();                                    // Kiválasztott állomás szerkesztése
-    void deleteSelectedStation();                                  // Kiválasztott állomás törlése (megerősítéssel)
-    void tuneToSelectedStation();                                  // Behúzza a kiválasztott állomást
-    void updateListAfterTuning(uint8_t previouslyTunedSortedIdx);  // Frissíti a listát behangolás után
+    void loadAndSortStations();                                // Betölti és rendezi az állomásokat a sortedStations vektorba
+    void saveCurrentStation();                                 // Aktuális állomás mentése dialógussal
+    void editSelectedStation();                                // Kiválasztott állomás szerkesztése
+    void deleteSelectedStation();                              // Kiválasztott állomás törlése (megerősítéssel)
+    void tuneToSelectedStation();                              // Behúzza a kiválasztott állomást
+    void updateListAfterTuning(int previouslyTunedSortedIdx);  // Frissíti a listát behangolás után
 
     // Pointer a megfelelő store objektumra
     FmStationStore* pFmStore = nullptr;
@@ -65,6 +61,13 @@ class MemoryDisplay : public DisplayBase {
     void processScreenButtonTouchEvent(TftButton::ButtonTouchEvent& event) override;
     void processDialogButtonResponse(TftButton::ButtonTouchEvent& event) override;
     void displayLoop() override;
+
+    // IScrollableListDataSource implementation
+    int getItemCount() const override;
+    void drawListItem(TFT_eSPI& tft_ref, int index, int x, int y, int w, int h, bool isSelected) override;
+    void activateListItem(int index) override;
+    int getItemHeight() const override;
+    void loadData() override;
 
    public:
     MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band);

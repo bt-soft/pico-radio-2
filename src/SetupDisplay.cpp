@@ -3,7 +3,7 @@
 #include "InfoDialog.h"
 #include "MultiButtonDialog.h"
 #include "ValueChangeDialog.h"
-#include "utils.h"  // STREQ miatt
+#include "utils.h"
 
 // Lista megjelenítési konstansok
 namespace SetupListConstants {
@@ -23,7 +23,12 @@ constexpr uint16_t TITLE_COLOR = TFT_YELLOW;
 /**
  * Konstruktor
  */
-SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tft, si4735, band) {
+SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref)
+    : DisplayBase(tft_ref, si4735_ref, band_ref),
+      scrollListComponent(tft_ref, SetupListConstants::LIST_AREA_X_START, SetupListConstants::LIST_START_Y, tft_ref.width() - (SetupListConstants::LIST_AREA_X_START * 2),
+                          // A lista magassága: képernyő magassága - lista Y kezdete - alsó gombok magassága - margók
+                          tft_ref.height() - SetupListConstants::LIST_START_Y - (SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5),
+                          this) {  // dataSource ez a SetupDisplay példány
     using namespace SetupList;
 
     // Beállítási lista elemeinek definiálása
@@ -32,10 +37,6 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayB
     settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};                    // Képernyővédő idő
     settingItems[3] = {"Inactive Digit Segments", ItemAction::INACTIVE_DIGIT_LIGHT};  // Inaktív szegmensek
     settingItems[4] = {"Info", ItemAction::INFO};                                     // Információ
-    itemCount = MAX_SETTINGS;
-
-    selectedItemIndex = 0;
-    topItemIndex = 0;
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -81,71 +82,32 @@ void SetupDisplay::drawScreen() {
     uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
     tft.drawRect(LIST_AREA_X_START - 1, LIST_START_Y - 1, listAreaW + 2, listAreaH + 2, LIST_BORDER_COLOR);
 
-    // Beállítási lista kirajzolása
-    drawSettingsList();
+    // Beállítási lista kirajzolása a komponens segítségével
+    scrollListComponent.refresh();  // Adatok betöltése és rajzolás
 
     // "Exit" gomb kirajzolása (a DisplayBase::drawScreenButtons kezeli)
     DisplayBase::drawScreenButtons();
 }
 
 /**
- * Beállítási lista kirajzolása
- */
-void SetupDisplay::drawSettingsList() {
-    using namespace SetupListConstants;
-    int yPos = LIST_START_Y;
-    int screenHeight = tft.height();
-    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
-
-    // Az alsó gombok helyének kihagyása a lista magasságából
-    int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;  // 5px extra hely
-
-    int visibleItems = (screenHeight - LIST_START_Y - bottomMargin) / ITEM_HEIGHT;
-
-    for (int i = 0; i < visibleItems; ++i) {
-        int currentItemIndex = topItemIndex + i;
-        if (currentItemIndex < itemCount) {
-            drawSettingItem(currentItemIndex, yPos, currentItemIndex == selectedItemIndex);
-            yPos += ITEM_HEIGHT;
-        } else {
-            // Ha nincs több elem, üres területet rajzolunk
-            tft.fillRect(LIST_AREA_X_START, yPos, listAreaW, ITEM_HEIGHT, ITEM_BG_COLOR);
-            yPos += ITEM_HEIGHT;
-        }
-    }
-    // Ha kevesebb elem van, mint a látható hely, a maradékot is töröljük
-    if (itemCount < visibleItems) {
-        tft.fillRect(LIST_AREA_X_START, LIST_START_Y + itemCount * ITEM_HEIGHT, listAreaW, screenHeight - (LIST_START_Y + itemCount * ITEM_HEIGHT) - bottomMargin, ITEM_BG_COLOR);
-    }
-}
-
-/**
  * Egy beállítási listaelem kirajzolása
  */
-void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
+void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, int w, int h, bool isSelected) {
     using namespace SetupListConstants;
     uint16_t bgColor = isSelected ? SELECTED_ITEM_BG_COLOR : ITEM_BG_COLOR;
     uint16_t textColor = isSelected ? SELECTED_ITEM_TEXT_COLOR : ITEM_TEXT_COLOR;
     uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
 
     // 1. Terület törlése a háttérszínnel
-    tft.fillRect(LIST_AREA_X_START, yPos, listAreaW, ITEM_HEIGHT, bgColor);
+    tft_ref.fillRect(x, y, w, h, bgColor);  // A kapott x, y, w, h használata
 
     // 2. Szöveg tulajdonságainak beállítása
-    // if (isSelected) {
-    //     tft.setFreeFont(&FreeSansBold9pt7b);  // Bold font a kiválasztott elemhez
-    //     tft.setTextSize(1);                   // Normál szövegméret
-    // } else {
-    //     tft.setFreeFont();   // Normál font a nem kiválasztott elemhez
-    //     tft.setTextSize(2);  // Normál szövegméret
-    // }
-    tft.setFreeFont(&FreeSansBold9pt7b);
-
-    tft.setTextColor(textColor, bgColor);
-    tft.setTextDatum(ML_DATUM);  // Középre balra
+    tft_ref.setFreeFont(&FreeSansBold9pt7b);
+    tft_ref.setTextColor(textColor, bgColor);
+    tft_ref.setTextDatum(ML_DATUM);  // Középre balra
 
     // 3. A címke (label) kirajzolása
-    tft.drawString(settingItems[itemIndex].label, LIST_AREA_X_START + ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
+    tft_ref.drawString(settingItems[itemIndex].label, x + ITEM_PADDING_X, y + h / 2);
 
     // 4. Az aktuális érték stringjének előkészítése és kirajzolása
     String valueStr = "";
@@ -179,55 +141,24 @@ void SetupDisplay::drawSettingItem(int itemIndex, int yPos, bool isSelected) {
         tft.setTextDatum(MR_DATUM);  // Középre jobbra igazítás az értékhez
 
         // Az érték kirajzolása a sor jobb szélére, belső paddinggel
-        tft.drawString(valueStr, LIST_AREA_X_START + listAreaW - ITEM_PADDING_X, yPos + ITEM_HEIGHT / 2);
+        tft_ref.drawString(valueStr, x + w - ITEM_PADDING_X, y + h / 2);
         // A következő elem rajzolásakor a setTextDatum újra be lesz állítva ML_DATUM-ra a labelhez.
     }
 }
 
-/**
- * Kiválasztás frissítése és görgetés kezelése
- */
-void SetupDisplay::updateSelection(int newIndex, bool fromRotary) {
-    using namespace SetupListConstants;
+// IScrollableListDataSource implementációk
+int SetupDisplay::getItemCount() const { return MAX_SETTINGS; }
 
-    // Korai kilépés, ha az index érvénytelen, vagy érintésnél nem változott a kiválasztás
-    if (newIndex < 0 || newIndex >= itemCount) return;
-    if (!fromRotary && newIndex == selectedItemIndex) return;
-
-    int oldSelectedItemIndex = selectedItemIndex;
-    int oldTopItemIndex = topItemIndex;  // Mentsük el a régi topItemIndexet is
-    selectedItemIndex = newIndex;
-
-    // Görgetés kezelése
-    int screenHeight = tft.height();
-    int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
-    int visibleItems = (screenHeight - LIST_START_Y - bottomMargin) / ITEM_HEIGHT;
-    if (visibleItems <= 0) visibleItems = 1;  // Biztosítjuk, hogy legalább 1 elem látható legyen
-
-    if (selectedItemIndex < topItemIndex) {
-        topItemIndex = selectedItemIndex;
-    } else if (selectedItemIndex >= topItemIndex + visibleItems) {
-        topItemIndex = selectedItemIndex - visibleItems + 1;
+void SetupDisplay::activateListItem(int index) {
+    if (index >= 0 && index < MAX_SETTINGS) {
+        activateSetting(settingItems[index].action);
     }
-    // Biztosítjuk, hogy a topItemIndex ne legyen negatív
-    if (topItemIndex < 0) topItemIndex = 0;
+}
 
-    // Csak akkor rajzoljuk újra a teljes listát, ha a lista görgetődött (topItemIndex változott)
-    if (oldTopItemIndex != topItemIndex) {
-        // akkor a teljes látható listát újra kell rajzolni.
-        drawSettingsList();
+int SetupDisplay::getItemHeight() const { return SetupListConstants::ITEM_HEIGHT; }
 
-    } else if (oldSelectedItemIndex != selectedItemIndex) {
-        // Ha csak a kiválasztás változott, de a lista nem görgetődött,
-        // akkor csak a régi és az új kiválasztott elemet rajzoljuk újra.
-        // Biztosítjuk, hogy a régi kiválasztott index érvényes és látható volt
-        if (oldSelectedItemIndex >= 0 && oldSelectedItemIndex < itemCount && oldSelectedItemIndex >= oldTopItemIndex && oldSelectedItemIndex < oldTopItemIndex + visibleItems) {
-            drawSettingItem(oldSelectedItemIndex, LIST_START_Y + (oldSelectedItemIndex - topItemIndex) * ITEM_HEIGHT, false);
-        }
-        if (selectedItemIndex >= topItemIndex && selectedItemIndex < topItemIndex + visibleItems) {
-            drawSettingItem(selectedItemIndex, LIST_START_Y + (selectedItemIndex - topItemIndex) * ITEM_HEIGHT, true);
-        }
-    }
+void SetupDisplay::loadData() {
+    // Statikus adatok, itt nincs szükség specifikus betöltési műveletre a SetupDisplay esetén
 }
 
 /**
@@ -295,34 +226,22 @@ void SetupDisplay::displayLoop() {}
  * Rotary encoder esemény lekezelése
  */
 bool SetupDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
+
     if (pDialog) return false;  // Ha dialógus aktív, nem kezeljük
 
-    int newSelectedItemIndex = selectedItemIndex;
-    bool selectionChanged = false;
-
-    if (encoderState.direction == RotaryEncoder::Direction::Up) {
-        if (selectedItemIndex < itemCount - 1) {
-            newSelectedItemIndex = selectedItemIndex + 1;
-            selectionChanged = true;
-        }
-    } else if (encoderState.direction == RotaryEncoder::Direction::Down) {
-        if (selectedItemIndex > 0) {
-            newSelectedItemIndex = selectedItemIndex - 1;
-            selectionChanged = true;
-        }
-    }
-
-    if (selectionChanged) {
-        updateSelection(newSelectedItemIndex, true);
-    }
+    bool scrolled = scrollListComponent.handleRotaryScroll(encoderState);
 
     if (encoderState.buttonState == RotaryEncoder::ButtonState::Clicked) {
-        if (selectedItemIndex >= 0 && selectedItemIndex < itemCount) {
-            activateSetting(settingItems[selectedItemIndex].action);
-            return true;  // Kezeltük
+        int currentSelection = scrollListComponent.getSelectedItemIndex();
+        if (currentSelection != -1) {
+            // activateSetting(settingItems[currentSelection].action); // Közvetlen hívás
+            scrollListComponent.activateSelectedItem();  // Komponensen keresztül
+            return true;                                 // Kezeltük
         }
     }
-    return selectionChanged || (encoderState.buttonState != RotaryEncoder::ButtonState::Open);  // Kezeltük, ha volt mozgás vagy gombnyomás
+
+    // Kezeltük, ha volt mozgás vagy gombnyomás (kivéve ha csak Open volt a gomb)
+    return scrolled || (encoderState.buttonState != RotaryEncoder::ButtonState::Open);
 }
 
 /**
@@ -330,23 +249,7 @@ bool SetupDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
  */
 bool SetupDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
     using namespace SetupListConstants;
-    if (pDialog || !touched) return false;  // Ha dialógus aktív vagy nincs érintés
-    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
+    if (pDialog) return false;
 
-    // Lista területének ellenőrzése
-    int screenHeight = tft.height();
-    int bottomMargin = SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5;
-    int listHeight = screenHeight - LIST_START_Y - bottomMargin;
-
-    if (tx >= LIST_AREA_X_START && tx < (LIST_AREA_X_START + listAreaW) && ty >= LIST_START_Y && ty < (LIST_START_Y + listHeight)) {
-        int touchedItemRelative = (ty - LIST_START_Y) / ITEM_HEIGHT;
-        int touchedItemAbsolute = topItemIndex + touchedItemRelative;
-
-        if (touchedItemAbsolute >= 0 && touchedItemAbsolute < itemCount) {
-            updateSelection(touchedItemAbsolute, false);
-            activateSetting(settingItems[touchedItemAbsolute].action);
-            return true;  // Kezeltük
-        }
-    }
-    return false;  // Nem a listán volt az érintés
+    return scrollListComponent.handleTouch(touched, tx, ty, true);  // activateOnTouch = true
 }

@@ -70,10 +70,18 @@ bool FmStationStore::deleteStation(uint8_t index) {
     return true;
 }
 
-int FmStationStore::findStation(uint16_t frequency, uint8_t bandIndex) {
+int FmStationStore::findStation(uint16_t frequency, uint8_t bandIndex, int16_t bfoOffset) {
     for (uint8_t i = 0; i < data.count; ++i) {
         if (data.stations[i].frequency == frequency && data.stations[i].bandIndex == bandIndex) {
-            return i;  // Megtaláltuk
+            // FM esetén a moduláció mindig FM, a bfoOffset nem releváns a kereséshez.
+            // Ha AM/SSB/CW van az FMStore-ban tárolva (bár ez valószínűtlen az FMStore esetén),
+            // a bfoOffset-et ellenőrizni kell, ha az állomás LSB/USB/CW.
+            // Feltételezzük, hogy az FMStore elsősorban FM állomásokat tárol, ahol a bfoOffset 0 vagy figyelmen kívül hagyott.
+            if (data.stations[i].modulation == LSB || data.stations[i].modulation == USB || data.stations[i].modulation == CW) {
+                if (data.stations[i].bfoOffset == bfoOffset) return i;
+            } else { // FM vagy AM (ha itt tárolva)
+                return i;
+            }
         }
     }
     return -1;  // Nem található
@@ -141,10 +149,15 @@ bool AmStationStore::deleteStation(uint8_t index) {
     return true;
 }
 
-int AmStationStore::findStation(uint16_t frequency, uint8_t bandIndex) {
+int AmStationStore::findStation(uint16_t frequency, uint8_t bandIndex, int16_t bfoOffset) {
     for (uint8_t i = 0; i < data.count; ++i) {
         if (data.stations[i].frequency == frequency && data.stations[i].bandIndex == bandIndex) {
-            return i;
+            // AM/SSB/CW esetén a bfoOffset releváns LSB/USB/CW-hez
+            if (data.stations[i].modulation == LSB || data.stations[i].modulation == USB || data.stations[i].modulation == CW) {
+                if (data.stations[i].bfoOffset == bfoOffset) return i;
+            } else { // AM
+                return i;
+            }
         }
     }
     return -1;

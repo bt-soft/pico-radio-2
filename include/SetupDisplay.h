@@ -2,6 +2,8 @@
 #define __SETUPDISPLAY_H
 
 #include "DisplayBase.h"
+#include "IScrollableListDataSource.h"
+#include "ScrollableListComponent.h"
 
 namespace SetupList {
 enum class ItemAction { BRIGHTNESS, INFO, SQUELCH_BASIS, SAVER_TIMEOUT, INACTIVE_DIGIT_LIGHT, NONE };
@@ -12,7 +14,7 @@ struct SettingItem {
 };
 }  // namespace SetupList
 
-class SetupDisplay : public DisplayBase {
+class SetupDisplay : public DisplayBase, public IScrollableListDataSource {
 
    private:
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;
@@ -20,9 +22,7 @@ class SetupDisplay : public DisplayBase {
     // Lista alapú menühöz
     static const int MAX_SETTINGS = 5;  // Maximális beállítási elemek száma
     SetupList::SettingItem settingItems[MAX_SETTINGS];
-    int itemCount = 0;
-    int selectedItemIndex = 0;
-    int topItemIndex = 0;  // A lista tetején lévő elem indexe (görgetéshez)
+    ScrollableListComponent scrollListComponent;
 
    protected:
     /**
@@ -40,6 +40,13 @@ class SetupDisplay : public DisplayBase {
      * Képernyő menügomb esemény feldolgozása
      */
     void processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event) override;
+
+    // IScrollableListDataSource implementáció
+    int getItemCount() const override;
+    void drawListItem(TFT_eSPI &tft_ref, int index, int x, int y, int w, int h, bool isSelected) override;
+    void activateListItem(int index) override;
+    int getItemHeight() const override;
+    void loadData() override;
 
    public:
     SetupDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band);

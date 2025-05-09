@@ -4,7 +4,7 @@
 // Először a típusdefiníciók kellenek
 #include "StationData.h"
 // Utána jöhet az ősosztály
-#include "DebugDataInspector.h" // Szükséges a debug kiíratáshoz
+#include "DebugDataInspector.h"  // Szükséges a debug kiíratáshoz
 #include "StoreBase.h"
 
 // Üres alapértelmezett listák deklarációja (definíció a .cpp fájlban)
@@ -33,7 +33,7 @@ class FmStationStore : public StoreBase<FmStationList_t> {
     uint16_t performLoad() override {
         uint16_t loadedCrc = EepromManager<FmStationList_t>::load(r(), EEPROM_FM_STATIONS_ADDR, getClassName());
 #ifdef __DEBUG
-        DebugDataInspector::printFmStationData(r()); // Akkor is kiírjuk, ha defaultot töltött
+        DebugDataInspector::printFmStationData(r());  // Akkor is kiírjuk, ha defaultot töltött
 #endif
         // Count ellenőrzés marad itt
         if (data.count > MAX_FM_STATIONS) {
@@ -61,7 +61,7 @@ class FmStationStore : public StoreBase<FmStationList_t> {
     bool addStation(const StationData& newStation);
     bool updateStation(uint8_t index, const StationData& updatedStation);
     bool deleteStation(uint8_t index);
-    int findStation(uint16_t frequency, uint8_t bandIndex);  // Visszaadja az indexet, vagy -1
+    int findStation(uint16_t frequency, uint8_t bandIndex, int16_t bfoOffset = 0);  // Visszaadja az indexet, vagy -1
 
     inline uint8_t getStationCount() const { return data.count; }
 
@@ -90,7 +90,7 @@ class AmStationStore : public StoreBase<AmStationList_t> {
     uint16_t performLoad() override {
         uint16_t loadedCrc = EepromManager<AmStationList_t>::load(r(), EEPROM_AM_STATIONS_ADDR, getClassName());
 #ifdef __DEBUG
-        DebugDataInspector::printAmStationData(r()); // Akkor is kiírjuk, ha defaultot töltött
+        DebugDataInspector::printAmStationData(r());  // Akkor is kiírjuk, ha defaultot töltött
 #endif
         // Count ellenőrzés marad itt
         if (data.count > MAX_AM_STATIONS) {
@@ -109,11 +109,11 @@ class AmStationStore : public StoreBase<AmStationList_t> {
         DEBUG("AM Station defaults loaded.\n");
     }
 
-        // Helper metódusok (hasonlóak az FM-hez)
+    // Helper metódusok (hasonlóak az FM-hez)
     bool addStation(const StationData& newStation);
     bool updateStation(uint8_t index, const StationData& updatedStation);
     bool deleteStation(uint8_t index);
-    int findStation(uint16_t frequency, uint8_t bandIndex);
+    int findStation(uint16_t frequency, uint8_t bandIndex, int16_t bfoOffset = 0); // Visszaadja az indexet, vagy -1
 
     inline uint8_t getStationCount() const { return data.count; }
 
