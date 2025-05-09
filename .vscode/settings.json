@@ -15,6 +15,7 @@
         "chrono": "cpp",
         "compare": "cpp",
         "cstdint": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "eeprom.h": "c"
     }
 }

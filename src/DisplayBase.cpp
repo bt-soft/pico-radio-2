@@ -978,7 +978,8 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         } else if (currMod == FM) {
             title = F("Step tune FM");
             labels = band.getStepSizeLabels(Band::stepSizeFM, labelsCount);
-
+            w = 300;
+            h = 100;
         } else {
             title = F("Step tune AM/SSB");
             labels = band.getStepSizeLabels(Band::stepSizeAM, labelsCount);
