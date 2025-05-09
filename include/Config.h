@@ -52,6 +52,7 @@ struct Config_t {
     uint8_t tftBackgroundBrightness;    // TFT Háttérvilágítás
     bool tftDigitLigth;                 // Inaktív szegmens látszódjon?
     uint8_t screenSaverTimeoutMinutes;  // Képernyővédő ideje percekben (1-30)
+    bool beeperEnabled;                 // Hangjelzés engedélyezése
 };
 
 // Alapértelmezett konfigurációs adatok (readonly, const)

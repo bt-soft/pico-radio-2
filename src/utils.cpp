@@ -2,6 +2,7 @@
 
 #include "defines.h"
 
+#include "Config.h" // Szükséges a config objektum eléréséhez
 namespace Utils {
 
 /**
@@ -97,6 +98,8 @@ void displayException(TFT_eSPI &tft, const char *msg) {
  *  Pitty hangjelzés
  */
 void beepTick() {
+    // Csak akkor csipogunk, ha a beeper engedélyezve van
+    if (!config.data.beeperEnabled) return;
     tone(PIN_BEEPER, 800);
     delay(10);
     noTone(PIN_BEEPER);
@@ -106,6 +109,8 @@ void beepTick() {
  * Hiba jelzés
  */
 void beepError() {
+    // Csak akkor csipogunk, ha a beeper engedélyezve van
+    if (!config.data.beeperEnabled) return;
     tone(PIN_BEEPER, 500);
     delay(100);
     tone(PIN_BEEPER, 500);

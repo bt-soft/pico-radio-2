@@ -3,7 +3,7 @@
 #include "InfoDialog.h"
 #include "MultiButtonDialog.h"
 #include "ValueChangeDialog.h"
-#include "utils.h"
+#include "defines.h"
 
 // Lista megjelenítési konstansok
 namespace SetupListConstants {
@@ -36,7 +36,9 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref
     settingItems[1] = {"Squelch Basis", ItemAction::SQUELCH_BASIS};                   // Squelch alapja
     settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};                    // Képernyővédő idő
     settingItems[3] = {"Inactive Digit Segments", ItemAction::INACTIVE_DIGIT_LIGHT};  // Inaktív szegmensek
-    settingItems[4] = {"Info", ItemAction::INFO};                                     // Információ
+    settingItems[4] = {"Beeper", ItemAction::BEEPER_ENABLED};                         // Beeper engedélyezése (4)
+    settingItems[5] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása (5)
+    settingItems[6] = {"Info", ItemAction::INFO};                                     // Információ
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -125,6 +127,9 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
         case SetupList::ItemAction::INACTIVE_DIGIT_LIGHT:
             valueStr = config.data.tftDigitLigth ? "ON" : "OFF";
             break;
+        case SetupList::ItemAction::BEEPER_ENABLED:
+            valueStr = config.data.beeperEnabled ? "ON" : "OFF";  // Flash string
+            break;
         case SetupList::ItemAction::INFO:
         case SetupList::ItemAction::NONE:
         default:
@@ -157,8 +162,9 @@ void SetupDisplay::activateListItem(int index) {
 
 int SetupDisplay::getItemHeight() const { return SetupListConstants::ITEM_HEIGHT; }
 
-void SetupDisplay::loadData() {
+int SetupDisplay::loadData() {
     // Statikus adatok, itt nincs szükség specifikus betöltési műveletre a SetupDisplay esetén
+    return -1;  // Nincs specifikus elem, amit ki kellene választani
 }
 
 /**
@@ -182,10 +188,6 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
                                                          [this](uint8_t newBrightness) { analogWrite(PIN_TFT_BACKGROUND_LED, newBrightness); });
             break;
 
-        case SetupList::ItemAction::INFO:
-            pDialog = new InfoDialog(this, tft, si4735);
-            break;
-
         case SetupList::ItemAction::SQUELCH_BASIS: {
             const char *options[] = {"SNR", "RSSI"};
             uint8_t optionCount = ARRAY_ITEM_COUNT(options);
@@ -204,12 +206,36 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
 
         case SetupList::ItemAction::SAVER_TIMEOUT:
             DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Screen Saver Timeout"), F("Minutes (1-30):"), &config.data.screenSaverTimeoutMinutes,
-                                                         (uint8_t)1, (uint8_t)30, (uint8_t)1, [this](uint8_t newTimeout) {});
+                                                         (uint8_t)1, (uint8_t)30, (uint8_t)1, [this](uint8_t newTimeout) {
+                                                             // Nincs szükség további műveletre.
+                                                         });
             break;
 
         case SetupList::ItemAction::INACTIVE_DIGIT_LIGHT:
             DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Inactive Digit Segments"), F("State:"), &config.data.tftDigitLigth, false, true, true,
-                                                         [this](bool newValue) {});
+                                                         [this](bool newValue) {
+                                                             // Nincs szükség további műveletre.
+                                                         });
+            break;
+
+        case SetupList::ItemAction::BEEPER_ENABLED:
+            DisplayBase::pDialog =
+                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Beeper"), F("State:"), &config.data.beeperEnabled, false, true, true, [this](bool newValue) {
+                    // A ValueChangeDialog már beállította a config.data.beeperEnabled értékét.
+                    // Ha az új érték true, csipogunk egyet.
+                    if (newValue) {
+                        Utils::beepTick();
+                    }
+                });
+            break;
+
+        case SetupList::ItemAction::FACTORY_RESET:
+            // Megerősítő dialógus megnyitása
+            pDialog = new MessageDialog(this, tft, 250, 120, F("Confirm"), F("Reset to factory defaults?"), "Yes", "No");
+            break;
+
+        case SetupList::ItemAction::INFO:
+            pDialog = new InfoDialog(this, tft, si4735);
             break;
 
         case SetupList::ItemAction::NONE:
@@ -217,10 +243,35 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
     }
 }
 
-/**
- * Esemény nélküli display loop
- */
-void SetupDisplay::displayLoop() {}
+void SetupDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent &event) {
+    if (pDialog) {  // Biztosítjuk, hogy a pDialog ne legyen null
+
+        // Dialógus címének lekérése csak egyszer
+        const char *dialogTitle = pDialog->getTitle();
+
+        // Factory Reset dialógus specifikus kezelése
+        if (dialogTitle && strcmp_P(PSTR("Confirm"), dialogTitle) == 0) {
+            if (event.id == DLG_OK_BUTTON_ID) {  // "Yes" gomb
+                DEBUG("Factory Reset confirmed. Loading defaults...\n");
+                config.loadDefaults();  // Alapértelmezett konfig betöltése
+                config.checkSave();     // Mentés indítása (ez menti az EEPROM-ba)
+                Utils::beepTick();      // Visszajelzés
+            } else {                    // "No" gomb vagy X
+                DEBUG("Factory Reset cancelled.\n");
+            }
+            // A "Confirm" dialógus specifikus logikája itt véget ért.
+            // A dialógus bezárását és a képernyő újrarajzolását az alábbi közös hívás végzi.
+        }
+        // Más dialógusok (pl. ValueChangeDialog, MultiButtonDialog, InfoDialog) esetén
+        // az értékek frissítését maga a dialógus vagy annak callback függvénye kezeli
+        // mielőtt ez a metódus meghívódna. Itt csak a bezárásukról és a képernyő
+        // frissítéséről kell gondoskodnunk.
+    }
+
+    // Minden dialógus esetén (beleértve a "Confirm"-ot is a specifikus logika után)
+    // meghívjuk az ősosztály metódusát a dialógus bezárásához és a képernyő újrarajzolásához.
+    DisplayBase::processDialogButtonResponse(event);
+}
 
 /**
  * Rotary encoder esemény lekezelése

@@ -16,6 +16,7 @@
         "compare": "cpp",
         "cstdint": "cpp",
         "algorithm": "cpp",
-        "eeprom.h": "c"
+        "eeprom.h": "c",
+        "cstring": "cpp"
     }
 }

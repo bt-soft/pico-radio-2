@@ -50,23 +50,30 @@ void ScrollableListComponent::drawListBorder() {
 
 void ScrollableListComponent::refresh() {
     if (!dataSource) return;
-    dataSource->loadData();  // Az adatforrás töltse be/frissítse az adatait
+    int newSelectedItem = dataSource->loadData(); // Adatok betöltése és a javasolt kiválasztott index lekérése
     currentItemCount = dataSource->getItemCount();
     itemHeight = dataSource->getItemHeight();  // Újra lekérjük, hátha változott
     calculateVisibleItems();
 
-    // Kiválasztás és görgetés igazítása, ha a jelenlegi kiválasztás határon kívül van
-    if (selectedItemIndex >= currentItemCount) {
-        selectedItemIndex = currentItemCount > 0 ? currentItemCount - 1 : -1;
-    }
-    if (selectedItemIndex < 0 && currentItemCount > 0) {
-        selectedItemIndex = 0;  // Alapértelmezetten az első elem, ha nincs kiválasztva és a lista nem üres
+    // A dataSource által javasolt indexet használjuk, ha érvényes,
+    // egyébként a meglévő logikát a selectedItemIndex érvényesítésére.
+    if (newSelectedItem >= 0 && newSelectedItem < currentItemCount) {
+        selectedItemIndex = newSelectedItem;
+    } else {
+        // Meglévő logika a selectedItemIndex érvényesítésére
+        if (selectedItemIndex >= currentItemCount) {
+            selectedItemIndex = currentItemCount > 0 ? currentItemCount - 1 : -1;
+        }
+        if (selectedItemIndex < 0 && currentItemCount > 0) {
+            selectedItemIndex = 0;  // Alapértelmezetten az első elem, ha nincs kiválasztva és a lista nem üres
+        }
     }
 
     // A topItemIndex igazítása, hogy a selectedItem látható legyen
     if (topItemIndex > std::max(0, currentItemCount - visibleItems)) {  // Biztosítjuk, hogy a topItemIndex ne legyen túl magas
         topItemIndex = std::max(0, currentItemCount - visibleItems);
     }
+
     if (selectedItemIndex != -1) {  // Csak akkor igazítunk, ha van kiválasztott elem
         if (selectedItemIndex < topItemIndex) {
             topItemIndex = selectedItemIndex;
@@ -76,8 +83,8 @@ void ScrollableListComponent::refresh() {
         // Biztosítjuk, hogy a topItemIndex az igazítás után is érvényes határokon belül legyen
         if (topItemIndex < 0) topItemIndex = 0;
         topItemIndex = std::min(topItemIndex, std::max(0, currentItemCount - visibleItems));
-        scrollbarVisible = (currentItemCount > visibleItems);  // Akkor látható, ha van mit görgetni
     }
+    scrollbarVisible = (currentItemCount > visibleItems);  // Akkor látható, ha van mit görgetni
     draw();
 }
 
@@ -88,12 +95,12 @@ void ScrollableListComponent::draw() {
     // A görgetősáv területét is törölni kellene, ha a lista háttérszíne eltér a scrollbar háttérszínétől
 
     if (currentItemCount == 0) {
-        // Opcionálisan "Lista üres" üzenet kirajzolása
-        tft.setFreeFont();   // Vagy egy specifikus font
-        tft.setTextSize(1);  // Konfigurálhatóvá tehető
+        // A üres üzenet kirajzolása
+        tft.setFreeFont();
+        tft.setTextSize(2);
         tft.setTextColor(ScrollableListComponentDefaults::ITEM_TEXT_COLOR, itemBgColor);
         tft.setTextDatum(MC_DATUM);
-        tft.drawString("Lista üres", listX + listW / 2, listY + listH / 2);
+        tft.drawString("Empty List", listX + listW / 2, listY + listH / 2);
         drawListBorder();
         scrollbarVisible = false;  // Nincs elem, nincs scrollbar
         return;
@@ -259,11 +266,6 @@ bool ScrollableListComponent::handleTouch(bool touched, uint16_t tx, uint16_t ty
 }
 
 /**
- * Kiválasztott elem indexének lekérdezése
- */
-int ScrollableListComponent::getSelectedItemIndex() const { return selectedItemIndex; }
-
-/**
  *  Kiválasztott elem indexének beállítása
  */
 void ScrollableListComponent::setSelectedItemIndex(int index) {
@@ -279,5 +281,19 @@ void ScrollableListComponent::setSelectedItemIndex(int index) {
 void ScrollableListComponent::activateSelectedItem() {
     if (dataSource && selectedItemIndex >= 0 && selectedItemIndex < currentItemCount) {
         dataSource->activateListItem(selectedItemIndex);
+    }
+}
+
+/**
+ * Újrarajzol egyetlen elemet a listában az adott indexen.
+ * @param itemIndex Az újrarajzolandó elem indexe.
+ */
+void ScrollableListComponent::redrawItem(int itemIndex) {
+    if (!dataSource || itemIndex < 0 || itemIndex >= currentItemCount) return;
+
+    // Ellenőrizzük, hogy az elem látható-e
+    if (itemIndex >= topItemIndex && itemIndex < topItemIndex + visibleItems) {
+        int itemScreenY = listY + (itemIndex - topItemIndex) * itemHeight;
+        dataSource->drawListItem(tft, itemIndex, listX, itemScreenY, listW, itemHeight, itemIndex == selectedItemIndex);
     }
 }

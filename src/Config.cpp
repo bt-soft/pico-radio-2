@@ -46,4 +46,5 @@ const Config_t DEFAULT_CONFIG = {
     .tftBackgroundBrightness = TFT_BACKGROUND_LED_MAX_BRIGHTNESS,  // TFT Háttérvilágítás
     .tftDigitLigth = true,                                         // Inaktív szegmens látszódjon?
     .screenSaverTimeoutMinutes = SCREEN_SAVER_TIMEOUT,             // Képernyővédő alapértelmezetten 5 perc
+    .beeperEnabled = true,                                         // Hangjelzés engedélyezése
 };

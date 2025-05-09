@@ -144,7 +144,13 @@ class DialogBase : public IGuiEvents {
         return false;
     }
 
-   private:
+    /**
+     * Visszaadja a dialógus címét.
+     * Figyelem: A visszatérési érték (const char*) a programmemóriára (Flash) mutat.
+     * Sztringliterálokkal (RAM) való összehasonlításhoz használj PROGMEM-tudatos függvényeket (pl. strcmp_P).
+     */
+    const char *getTitle() const { return (const char *)title; }
+
    private:
     /**
      * Fátyol kirajzolása

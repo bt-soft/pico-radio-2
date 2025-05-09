@@ -35,6 +35,9 @@ class MemoryDisplay : public DisplayBase, public IScrollableListDataSource {
     // Ideiglenes tároló az új állomás mentéséhez szükséges egyéb adatokhoz
     StationData pendingStationData;
 
+    bool selectSpecificStationAfterLoad = false;
+    StationData stationToSelectAfterLoad;
+
     // Helper metódusok
     void loadAndSortStations();                                // Betölti és rendezi az állomásokat a sortedStations vektorba
     void saveCurrentStation();                                 // Aktuális állomás mentése dialógussal
@@ -67,7 +70,7 @@ class MemoryDisplay : public DisplayBase, public IScrollableListDataSource {
     void drawListItem(TFT_eSPI& tft_ref, int index, int x, int y, int w, int h, bool isSelected) override;
     void activateListItem(int index) override;
     int getItemHeight() const override;
-    void loadData() override;
+    int loadData() override;
 
    public:
     MemoryDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band);

@@ -37,7 +37,6 @@ class ScrollableListComponent {
 
     void calculateVisibleItems();
     void updateSelection(int newIndex, bool fromRotary);
-    void drawScrollbar();
     void clearListArea();
     void drawListBorder();
 
@@ -49,12 +48,18 @@ class ScrollableListComponent {
     bool handleRotaryScroll(RotaryEncoder::EncoderState encoderState);
     bool handleTouch(bool touched, uint16_t tx, uint16_t ty, bool activateOnTouch = true);
 
-    int getSelectedItemIndex() const;
+    void drawScrollbar();
+
+    inline int getSelectedItemIndex() const { return selectedItemIndex; }  // Visszaadja a kiválasztott elem indexét;
+
+    inline bool isScrollbarVisible() const { return scrollbarVisible; }  // Visszaadja, hogy a görgetősáv látható-e
+
     void setSelectedItemIndex(int index);  // Lehetővé teszi a szülő számára a kiválasztás beállítását
     void refresh();                        // Újratölti az adatokat és újrarajzol
 
     // Lehetővé teszi a szülő számára az aktiválás indítását (pl. dupla koppintás után)
     void activateSelectedItem();
+    void redrawItem(int itemIndex);
 };
 
 #endif  // SCROLLABLELISTCOMPONENT_H

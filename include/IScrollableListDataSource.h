@@ -26,7 +26,7 @@ class IScrollableListDataSource {
     virtual int getItemHeight() const = 0;
 
     // Opcionális: Akkor hívódik meg, amikor a lista komponensnek szüksége van az adatok betöltésére/frissítésére.
-    virtual void loadData() {};
+    virtual int loadData() = 0;
 };
 
 #endif  // ISCROLLABLELISTDATASOURCE_H
