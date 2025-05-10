@@ -555,8 +555,6 @@ void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[
         if (initialAgcMode == Si4735Utils::AgcGainMode::Manual) {
             agcButton->setLabel("Att");
         }
-    } else {
-        DEBUG("Error: AGC button not found after creation!\n");
     }
 
     // Felszabadítjuk a dinamikusan allokált memóriát, ha volt allokálva
