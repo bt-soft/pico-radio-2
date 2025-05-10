@@ -42,46 +42,28 @@ constexpr uint8_t SBarPlusWidth = 100;
 // Mérősáv rajzolása
 constexpr uint8_t MeterBarY = 38;
 constexpr uint8_t MeterBarHeight = 6;
+
 constexpr uint8_t MeterBarRedStartX = 15;
 constexpr uint8_t MeterBarRedWidth = 15;
-constexpr uint8_t MeterBarOrangeStartX = 20;
+
+// Az S1 (első narancs) közvetlenül az S0 (piros) után kezdődik
+constexpr uint8_t MeterBarOrangeStartX = MeterBarRedStartX + MeterBarRedWidth + 2;  // 15 + 15 + 2 = 32
 constexpr uint8_t MeterBarOrangeWidth = 10;
-constexpr uint8_t MeterBarOrangeSpacing = 12;
-constexpr uint8_t MeterBarGreenStartX = 128;
-constexpr uint8_t MeterBarGreenWidth = 14;
-constexpr uint8_t MeterBarGreenSpacing = 16;
-constexpr uint8_t MeterBarFinalOrangeStartX = 224;
+constexpr uint8_t MeterBarOrangeSpacing = 12;  // S0-S1, S1-S2, ... S8-S9 közötti távolság
+
+// Az S9+10dB (első zöld) közvetlenül az S8 (utolsó narancs) után kezdődik
+constexpr uint8_t MeterBarGreenStartX = MeterBarOrangeStartX + ((8 - 1) * MeterBarOrangeSpacing) + MeterBarOrangeWidth + 2;  // 32 + (7*12) + 10 + 2 = 32 + 84 + 10 + 2 = 128
+constexpr uint8_t MeterBarGreenWidth = 14;                                                                                   // A zöld sávok szélessége
+constexpr uint8_t MeterBarGreenSpacing = 16;                                                                                 // Zöld sávok közötti távolság
+constexpr uint8_t MeterBarFinalOrangeStartX = 224;                                                                           // Utolsó narancs sáv (S9+60dB felett)
 constexpr uint8_t MeterBarFinalOrangeWidth = 3;
-constexpr uint8_t MeterBarMaxPixelValue = 208;
-constexpr uint8_t MeterBarBlackFillOffset = 22;
-constexpr uint8_t MeterBarBlackFillBaseWidth = 207;
-constexpr uint8_t MeterBarSPointLimit = 9;  // S9-ig
-constexpr uint8_t MeterBarTotalLimit = 15;  // S9 + 6 plusz pont
+constexpr uint8_t MeterBarMaxPixelValue = 208;  // A teljes mérősáv hossza pixelben (a sample.cpp alapján)
+constexpr uint8_t MeterBarSPointLimit = 9;      // S9-ig (0-8 index, tehát 9 elem)
+constexpr uint8_t MeterBarTotalLimit = 15;      // S9 + 6 plusz pont (9-14 index, tehát 6 elem)
 
 // Szöveges címkék rajzolása
 constexpr uint8_t RssiLabelXOffset = 10;
-// constexpr uint8_t SignalLabelYOffset = 60;  // Közös Y eltolás az RSSI és SNR címkékhez (Lejjebb hozva)
-constexpr uint8_t SignalLabelYOffset = 0;  // Közös Y eltolás az RSSI és SNR címkékhez (Lejjebb hozva)
-
-// RSSI -> S-Pont konverziós konstansok (HF)
-constexpr uint8_t HF_RSSI_S1 = 1, HF_RSSI_S2 = 2, HF_RSSI_S3 = 3, HF_RSSI_S4 = 4;
-constexpr uint8_t HF_RSSI_S5_START = 10, HF_RSSI_S6_START = 16, HF_RSSI_S7_START = 22, HF_RSSI_S8_START = 28, HF_RSSI_S9_START = 34;
-constexpr uint8_t HF_RSSI_P10_START = 44, HF_RSSI_P20_START = 54, HF_RSSI_P30_START = 64, HF_RSSI_P40_START = 74, HF_RSSI_P50_START = 84, HF_RSSI_P60_START = 94;
-constexpr uint8_t HF_PIXEL_S0 = 12, HF_PIXEL_S1 = 12, HF_PIXEL_S2 = 24, HF_PIXEL_S3 = 36, HF_PIXEL_S4 = 48;
-constexpr uint8_t HF_PIXEL_S5 = 60, HF_PIXEL_S6 = 72, HF_PIXEL_S7 = 84, HF_PIXEL_S8 = 96, HF_PIXEL_S9 = 108;
-constexpr uint8_t HF_PIXEL_P10 = 124, HF_PIXEL_P20 = 140, HF_PIXEL_P30 = 156, HF_PIXEL_P40 = 172, HF_PIXEL_P50 = 188, HF_PIXEL_P60 = 204;
-constexpr uint8_t HF_PIXEL_MAX = 208;
-constexpr uint8_t HF_PIXEL_STEP = 2;
-
-// RSSI -> S-Pont konverziós konstansok (FM)
-constexpr uint8_t FM_RSSI_S3 = 1, FM_RSSI_S5 = 2;
-constexpr uint8_t FM_RSSI_S7_START = 8, FM_RSSI_S8_START = 14, FM_RSSI_S9_START = 24;
-constexpr uint8_t FM_RSSI_P10_START = 34, FM_RSSI_P20_START = 44, FM_RSSI_P30_START = 54, FM_RSSI_P40_START = 64, FM_RSSI_P50_START = 74;
-constexpr uint8_t FM_PIXEL_S0 = 36, FM_PIXEL_S3 = 36, FM_PIXEL_S5 = 60;
-constexpr uint8_t FM_PIXEL_S7 = 84, FM_PIXEL_S8 = 96, FM_PIXEL_S9 = 108;
-constexpr uint8_t FM_PIXEL_P10 = 124, FM_PIXEL_P20 = 140, FM_PIXEL_P30 = 156, FM_PIXEL_P40 = 172, FM_PIXEL_P50 = 188, FM_PIXEL_P60 = 204;
-constexpr uint8_t FM_PIXEL_MAX = 208;
-constexpr uint8_t FM_PIXEL_STEP = 2;
+constexpr uint8_t SignalLabelYOffsetInFM = 60;
 
 // Kezdeti állapot a prev_spoint-hoz
 constexpr uint8_t InitialPrevSpoint = 0xFF;  // uint8_t-hoz 0xFF használata -1 helyett
@@ -95,44 +77,89 @@ class SMeter {
     TFT_eSPI &tft;
     uint32_t smeterX;
     uint32_t smeterY;
+    uint8_t prev_spoint;
 
     /**
      * RSSI érték konvertálása S-pont értékre
+     *
+     * RSSI értékek 0-127 dBuV között
+     * S-Pont értékek 0-MeterBarMaxPixelValue (pl. 208) között
      */
-    uint8_t rssiConverter(uint8_t rssi, bool isFM) {
-        using namespace SMeterConstants;
-        if (!isFM) {
-            // HF konverzió
-            if (rssi <= HF_RSSI_S1) return HF_PIXEL_S0;
-            if (rssi <= HF_RSSI_S2) return HF_PIXEL_S1 + (rssi - HF_RSSI_S1) * (HF_PIXEL_S2 - HF_PIXEL_S1);  // Pontosabb interpoláció
-            if (rssi <= HF_RSSI_S3) return HF_PIXEL_S2 + (rssi - HF_RSSI_S2) * (HF_PIXEL_S3 - HF_PIXEL_S2);
-            if (rssi <= HF_RSSI_S4) return HF_PIXEL_S3 + (rssi - HF_RSSI_S3) * (HF_PIXEL_S4 - HF_PIXEL_S3);
-            if (rssi <= HF_RSSI_S5_START) return HF_PIXEL_S4 + (rssi - HF_RSSI_S4) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_S6_START) return HF_PIXEL_S5 + (rssi - HF_RSSI_S5_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_S7_START) return HF_PIXEL_S6 + (rssi - HF_RSSI_S6_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_S8_START) return HF_PIXEL_S7 + (rssi - HF_RSSI_S7_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_S9_START) return HF_PIXEL_S8 + (rssi - HF_RSSI_S8_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_P10_START) return HF_PIXEL_S9 + (rssi - HF_RSSI_S9_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_P20_START) return HF_PIXEL_P10 + (rssi - HF_RSSI_P10_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_P30_START) return HF_PIXEL_P20 + (rssi - HF_RSSI_P20_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_P40_START) return HF_PIXEL_P30 + (rssi - HF_RSSI_P30_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_P50_START) return HF_PIXEL_P40 + (rssi - HF_RSSI_P40_START) * HF_PIXEL_STEP;
-            if (rssi <= HF_RSSI_P60_START) return HF_PIXEL_P50 + (rssi - HF_RSSI_P50_START) * HF_PIXEL_STEP;
-            return (rssi > HF_RSSI_P60_START) ? HF_PIXEL_P60 : HF_PIXEL_MAX;  // Vagy csak HF_PIXEL_P60? A kód 204/208-at adott.
-        } else {
-            // FM konverzió
-            if (rssi < FM_RSSI_S3) return FM_PIXEL_S0;
-            if (rssi <= FM_RSSI_S5) return FM_PIXEL_S3 + (rssi - FM_RSSI_S3) * (FM_PIXEL_S5 - FM_PIXEL_S3);  // Interpoláció
-            if (rssi <= FM_RSSI_S7_START) return FM_PIXEL_S5 + (rssi - FM_RSSI_S5) * FM_PIXEL_STEP;
-            if (rssi <= FM_RSSI_S8_START) return FM_PIXEL_S7 + (rssi - FM_RSSI_S7_START) * FM_PIXEL_STEP;
-            if (rssi <= FM_RSSI_S9_START) return FM_PIXEL_S8 + (rssi - FM_RSSI_S8_START) * FM_PIXEL_STEP;
-            if (rssi <= FM_RSSI_P10_START) return FM_PIXEL_S9 + (rssi - FM_RSSI_S9_START) * FM_PIXEL_STEP;
-            if (rssi <= FM_RSSI_P20_START) return FM_PIXEL_P10 + (rssi - FM_RSSI_P10_START) * FM_PIXEL_STEP;
-            if (rssi <= FM_RSSI_P30_START) return FM_PIXEL_P20 + (rssi - FM_RSSI_P20_START) * FM_PIXEL_STEP;
-            if (rssi <= FM_RSSI_P40_START) return FM_PIXEL_P30 + (rssi - FM_RSSI_P30_START) * FM_PIXEL_STEP;
-            if (rssi <= FM_RSSI_P50_START) return FM_PIXEL_P40 + (rssi - FM_RSSI_P40_START) * FM_PIXEL_STEP;
-            return (rssi > FM_RSSI_P50_START) ? FM_PIXEL_P60 : FM_PIXEL_MAX;  // Vagy csak FM_PIXEL_P50? A kód 204/208-at adott.
+    uint8_t rssiConverter(uint8_t rssi, bool isFMMode) {
+        int spoint;
+        if (isFMMode) {
+            // dBuV to S point konverzió
+            if (rssi < 1)
+                spoint = 36;
+            else if ((rssi >= 1) and (rssi <= 2))
+                spoint = 60;  // S6
+            else if ((rssi > 2) and (rssi <= 8))
+                spoint = 84 + (rssi - 2) * 2;  // S7
+            else if ((rssi > 8) and (rssi <= 14))
+                spoint = 96 + (rssi - 8) * 2;  // S8
+            else if ((rssi > 14) and (rssi <= 24))
+                spoint = 108 + (rssi - 14) * 2;  // S9
+            else if ((rssi > 24) and (rssi <= 34))
+                spoint = 124 + (rssi - 24) * 2;  // S9 +10
+            else if ((rssi > 34) and (rssi <= 44))
+                spoint = 140 + (rssi - 34) * 2;  // S9 +20
+            else if ((rssi > 44) and (rssi <= 54))
+                spoint = 156 + (rssi - 44) * 2;  // S9 +30
+            else if ((rssi > 54) and (rssi <= 64))
+                spoint = 172 + (rssi - 54) * 2;  // S9 +40
+            else if ((rssi > 64) and (rssi <= 74))
+                spoint = 188 + (rssi - 64) * 2;  // S9 +50
+            else if (rssi > 74 && rssi <= 76)
+                spoint = 204;  // S9 +60
+            else if (rssi > 76)
+                spoint = SMeterConstants::MeterBarMaxPixelValue;  // >S9 +60
+            else
+                spoint = 36;  // Default ha egyik sem illik
+
+        } else {  // AM/SSB/CW
+
+            // dBuV to S point konverzió
+            if ((rssi >= 0) and (rssi <= 1))
+                spoint = 12;  // S0
+            else if ((rssi > 1) and (rssi <= 2))
+                spoint = 24;  // S1
+            else if ((rssi > 2) and (rssi <= 3))
+                spoint = 36;  // S2
+            else if ((rssi > 3) and (rssi <= 4))
+                spoint = 48;  // S3
+            else if ((rssi > 4) and (rssi <= 10))
+                spoint = 48 + (rssi - 4) * 2;  // S4
+            else if ((rssi > 10) and (rssi <= 16))
+                spoint = 60 + (rssi - 10) * 2;  // S5
+            else if ((rssi > 16) and (rssi <= 22))
+                spoint = 72 + (rssi - 16) * 2;  // S6
+            else if ((rssi > 22) and (rssi <= 28))
+                spoint = 84 + (rssi - 22) * 2;  // S7
+            else if ((rssi > 28) and (rssi <= 34))
+                spoint = 96 + (rssi - 28) * 2;  // S8
+            else if ((rssi > 34) and (rssi <= 44))
+                spoint = 108 + (rssi - 34) * 2;  // S9
+            else if ((rssi > 44) and (rssi <= 54))
+                spoint = 124 + (rssi - 44) * 2;  // S9 +10
+            else if ((rssi > 54) and (rssi <= 64))
+                spoint = 140 + (rssi - 54) * 2;  // S9 +20
+            else if ((rssi > 64) and (rssi <= 74))
+                spoint = 156 + (rssi - 64) * 2;  // S9 +30
+            else if ((rssi > 74) and (rssi <= 84))
+                spoint = 172 + (rssi - 74) * 2;  // S9 +40
+            else if ((rssi > 84) and (rssi <= 94))
+                spoint = 188 + (rssi - 84) * 2;  // S9 +50
+            else if (rssi > 94 && rssi <= 95)
+                spoint = 204;  // S9 +60
+            else if (rssi > 95)
+                spoint = SMeterConstants::MeterBarMaxPixelValue;  // >S9 +60
+            else
+                spoint = 0;  // Default ha egyik sem illik
         }
+        // Biztosítjuk, hogy az érték a megengedett tartományban maradjon
+        if (spoint < 0) spoint = 0;
+        if (spoint > SMeterConstants::MeterBarMaxPixelValue) spoint = SMeterConstants::MeterBarMaxPixelValue;
+        return static_cast<uint8_t>(spoint);
     }
 
     /**
@@ -140,39 +167,84 @@ class SMeter {
      */
     void smeter(uint8_t rssi, bool isFMMode) {
         using namespace SMeterConstants;
-        static uint8_t prev_spoint = InitialPrevSpoint;
         uint8_t spoint = rssiConverter(rssi, isFMMode);
 
         if (spoint == prev_spoint) return;  // Ha nem változott, nem frissítünk
         prev_spoint = spoint;
 
         int tik = 0;
-        int met = spoint + SPointTickWidth;  // +2 helyett
+        // A 'met' itt a rendelkezésre álló "energia" a sávok kirajzolásához.
+        int met = spoint;
+
+        // Annak az X koordinátája, ahol az utolsó színes sáv véget ért (abszolút a tft-hez képest)
+        // Kezdetben a piros sáv elejére állítjuk, ha spoint=0, akkor ez marad.
+        int end_of_colored_x_abs = smeterX + MeterBarRedStartX;
 
         // Narancs és piros sávok
-        while (met > (SPointSpacing - SPointTickWidth / 2) && tik < MeterBarSPointLimit) {  // 11 helyett (12-1) vagy (12-2/2)
-            if (tik == 0)
-                tft.fillRect(smeterX + MeterBarRedStartX, smeterY + MeterBarY, MeterBarRedWidth, MeterBarHeight, TFT_RED);
-            else
-                tft.fillRect(smeterX + MeterBarOrangeStartX + (tik * MeterBarOrangeSpacing), smeterY + MeterBarY, MeterBarOrangeWidth, MeterBarHeight, TFT_ORANGE);
-            met -= MeterBarOrangeSpacing;
+        // Amíg van "energia" (met > 0) ÉS még a piros/narancs szegmensen belül vagyunk (tik < MeterBarSPointLimit)
+        while (met > 0 && tik < MeterBarSPointLimit) {
+            if (tik == 0) {                                        // S0 - Piros
+                int draw_width = min(met, (int)MeterBarRedWidth);  // Ne rajzoljunk többet, mint amennyi "energia" van, vagy a sáv szélessége
+                if (draw_width > 0) {
+                    tft.fillRect(smeterX + MeterBarRedStartX, smeterY + MeterBarY, draw_width, MeterBarHeight, TFT_RED);
+                    end_of_colored_x_abs = smeterX + MeterBarRedStartX + draw_width;
+                }
+                met -= MeterBarRedWidth;  // Teljes sáv "költségét" vonjuk le
+            } else {                      // S1-S8 - Narancs
+                // Az X pozíció számítása: a piros sáv után kezdődik, és (tik-1) narancs sávnyi távolságra.
+                int current_bar_x = smeterX + MeterBarOrangeStartX + ((tik - 1) * MeterBarOrangeSpacing);
+                int draw_width = min(met, (int)MeterBarOrangeWidth);
+                if (draw_width > 0) {
+                    tft.fillRect(current_bar_x, smeterY + MeterBarY, draw_width, MeterBarHeight, TFT_ORANGE);
+                    end_of_colored_x_abs = current_bar_x + draw_width;
+                }
+                met -= MeterBarOrangeWidth;  // Teljes sáv "költségét" vonjuk le
+            }
             tik++;
         }
 
         // Zöld sávok
-        while (met > (MeterBarGreenSpacing - SPointTickWidth / 2) && tik < MeterBarTotalLimit) {  // 15 helyett (16-1)
-            tft.fillRect(smeterX + MeterBarGreenStartX + ((tik - MeterBarSPointLimit) * MeterBarGreenSpacing), smeterY + MeterBarY, MeterBarGreenWidth, MeterBarHeight, TFT_GREEN);
-            met -= MeterBarGreenSpacing;
+        // Amíg van "energia" (met > 0) ÉS még a zöld szegmensen belül vagyunk (tik < MeterBarTotalLimit)
+        while (met > 0 && tik < MeterBarTotalLimit) {
+            // tik itt MeterBarSPointLimit-től MeterBarTotalLimit-1 -ig megy
+            // Az X pozíció: a zöld sávok kezdete + (aktuális zöld sáv indexe) * zöld sávok távolsága
+            int current_bar_x = smeterX + MeterBarGreenStartX + ((tik - MeterBarSPointLimit) * MeterBarGreenSpacing);
+            int draw_width = min(met, (int)MeterBarGreenWidth);
+            if (draw_width > 0) {
+                tft.fillRect(current_bar_x, smeterY + MeterBarY, draw_width, MeterBarHeight, TFT_GREEN);
+                end_of_colored_x_abs = current_bar_x + draw_width;
+            }
+            met -= MeterBarGreenWidth;  // Teljes sáv "költségét" vonjuk le
             tik++;
         }
 
-        // Utolsó sáv
-        if (tik == MeterBarTotalLimit && met > (MeterBarFinalOrangeWidth / 2 + 1)) {  // 4 helyett
-            tft.fillRect(smeterX + MeterBarFinalOrangeStartX, smeterY + MeterBarY, MeterBarFinalOrangeWidth, MeterBarHeight, TFT_ORANGE);
-        } else {
-            // Fekete kitöltés a maradék területre
-            tft.fillRect(smeterX + MeterBarBlackFillOffset + spoint - met, smeterY + MeterBarY, MeterBarBlackFillBaseWidth - (SPointTickWidth + spoint) + met, MeterBarHeight,
-                         TFT_BLACK);
+        // Utolsó sáv (S9+60dB felett)
+        // Ha elértük a zöld szegmens végét ÉS még van "energia"
+        if (tik == MeterBarTotalLimit && met > 0) {
+            int draw_width = min(met, (int)MeterBarFinalOrangeWidth);
+            if (draw_width > 0) {
+                tft.fillRect(smeterX + MeterBarFinalOrangeStartX, smeterY + MeterBarY, draw_width, MeterBarHeight, TFT_ORANGE);
+                end_of_colored_x_abs = smeterX + MeterBarFinalOrangeStartX + draw_width;
+            }
+            // met -= MeterBarFinalOrangeWidth; // Itt már nem kell csökkenteni, mert ez az utolsó
+        }
+
+        // A mérősáv teljes látható végének X koordinátája (a skála definíciója alapján)
+        // A MeterBarMaxPixelValue a teljes hosszt jelenti a MeterBarRedStartX-től.
+        int meter_display_area_end_x_abs = smeterX + MeterBarRedStartX + MeterBarMaxPixelValue;
+
+        // Biztosítjuk, hogy end_of_colored_x_abs ne lépje túl a maximális értéket
+        if (end_of_colored_x_abs > meter_display_area_end_x_abs) {
+            end_of_colored_x_abs = meter_display_area_end_x_abs;
+        }
+        // És ne legyen kisebb, mint a kezdete (ha pl. spoint=0 és semmi sem rajzolódott)
+        if (spoint == 0) {  // Ha spoint 0, semmi nem rajzolódik, end_of_colored_x_abs marad a kezdeti értéken.
+            end_of_colored_x_abs = smeterX + MeterBarRedStartX;
+        }
+
+        // Fekete kitöltés az utolsó színes sáv végétől a skála végéig
+        if (end_of_colored_x_abs < meter_display_area_end_x_abs) {
+            tft.fillRect(end_of_colored_x_abs, smeterY + MeterBarY, meter_display_area_end_x_abs - end_of_colored_x_abs, MeterBarHeight, TFT_BLACK);
         }
     }
 
@@ -180,7 +252,7 @@ class SMeter {
     /**
      * Konstruktor
      */
-    SMeter(TFT_eSPI &tft, uint8_t smeterX, uint8_t smeterY) : tft(tft), smeterX(smeterX), smeterY(smeterY) {}
+    SMeter(TFT_eSPI &tft, uint8_t smeterX, uint8_t smeterY) : tft(tft), smeterX(smeterX), smeterY(smeterY), prev_spoint(SMeterConstants::InitialPrevSpoint) {}
 
     /**
      * S-Meter skála kirajzolása
@@ -202,7 +274,7 @@ class SMeter {
         for (int i = 1; i <= PlusScaleCount; i++) {
             tft.fillRect(smeterX + PlusScaleStartX + (i * PlusScaleSpacing), smeterY + PlusScaleY, PlusScaleTickWidth, PlusScaleTickHeight, TFT_RED);
             tft.setCursor(smeterX + PlusScaleStartX - 6 + (i * PlusScaleSpacing), smeterY + PlusScaleNumberY);  // -6 korrekció
-            if (i % 2 == 0) {
+            if (i % 2 == 0) {                                                                                   // Csak minden másodiknál írjuk ki a +számot
                 tft.print("+");
                 tft.print(i * 10);
             }
@@ -214,32 +286,33 @@ class SMeter {
     }
 
     /**
-     * S-Meter + RSSI/SNR kiírás (FM esetén nincs SNR/RSSI kijelzés)
+     * S-Meter + RSSI/SNR kiírás
      *  @param rssi the current receive signal strength (0–127 dBμV)
      *  @param snr the current SNR metric (0–127 dB)
+     *  @param isFMMode true, ha FM módban vagyunk, false egyébként (AM/SSB/CW)
      */
     void showRSSI(uint8_t rssi, uint8_t snr, bool isFMMode) {
-        smeter(rssi, isFMMode);
 
-        if (isFMMode) {
-            return;  // Exit early for FM mode
-        }
+        // A skála kirajzolása csak egyszer történik, a drawSmeterScale() hívásakor
+        smeter(rssi, isFMMode);
 
         using namespace SMeterConstants;
 
         // --- Szöveg kirajzolása a skála ALATT (snprintf-fel és explicit törléssel) ---
         tft.setFreeFont();
         tft.setTextSize(1);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);  // Szín a sample.cpp alapján
 
         // Formázott string létrehozása snprintf segítségével, fix szélességgel az SNR-nek
         char signalBuffer[40];  // Buffer a teljes szövegnek
-        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %3d dBuV    SNR: %3d dB", rssi, snr);
+        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %3d dBuV   SNR: %3d dB", rssi, snr);
 
-        // Teljes string kirajzolása egyszerre (Bottom Left igazítás) padding NÉLKÜL, ez törli a korábbi felirat értékeket is
-        tft.setTextDatum(BL_DATUM);
-        tft.setTextPadding(0);  // NINCS padding
-        tft.drawString(signalBuffer, smeterX + RssiLabelXOffset, smeterY + SignalLabelYOffset);
+        // Először töröljük a területet, ahova írni fogunk, hogy ne maradjon ott a régi érték
+        // A terület szélessége kb. a ScaleWidth, magassága egy sornyi.
+        uint16_t text_y_pos = smeterY + ScaleEndYOffset;
+        tft.fillRect(smeterX + RssiLabelXOffset, text_y_pos - tft.fontHeight(1), ScaleWidth - RssiLabelXOffset, tft.fontHeight(1) + 2, TFT_COLOR_BACKGROUND);
+        tft.setTextDatum(TL_DATUM);  // Top Left igazítás
+        tft.drawString(signalBuffer, smeterX + RssiLabelXOffset, text_y_pos);
     }
 };
 

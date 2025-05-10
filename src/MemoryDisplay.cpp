@@ -487,7 +487,6 @@ void MemoryDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent& e
  */
 void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& event) {
     bool closeDialog = true;
-    bool refreshListAndButtons = false;
 
     if (pDialog) {
         if (currentDialogMode == DialogMode::SAVE_NEW_STATION || currentDialogMode == DialogMode::EDIT_STATION_NAME) {
@@ -497,7 +496,6 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                     if (addStationInternal(pendingStationData)) {
                         stationToSelectAfterLoad = pendingStationData;  // Ezt kell kiválasztani
                         selectSpecificStationAfterLoad = true;
-                        refreshListAndButtons = true;
                     } else {
                         delete pDialog;
                         pDialog = new MessageDialog(this, tft, 280, 100, F("Error"), F("Memory full or station exists!"), "OK");
@@ -535,7 +533,6 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                             if (updateStationInternal(originalIndex, pendingStationData)) {
                                 stationToSelectAfterLoad = pendingStationData;  // Ezt kell kiválasztani
                                 selectSpecificStationAfterLoad = true;
-                                refreshListAndButtons = true;
                             } else {
                                 delete pDialog;
                                 pDialog = new MessageDialog(this, tft, 250, 100, F("Error"), F("Error in modify!"), "OK");
@@ -569,10 +566,7 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
                     }
 
                     if (originalIndex != -1) {
-                        if (deleteStationInternal(originalIndex)) {
-                            // A scrollListComponent.refresh() majd beállítja a kiválasztást -1-re, ha nem talál semmit
-                            refreshListAndButtons = true;
-                        } else {
+                        if (!deleteStationInternal(originalIndex)) {
                             delete pDialog;
                             pDialog = new MessageDialog(this, tft, 250, 100, F("Error"), F("Failed to delete Station!"), "OK");
                             currentDialogMode = DialogMode::NONE;
@@ -589,10 +583,6 @@ void MemoryDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent& eve
     if (closeDialog) {
         DisplayBase::processDialogButtonResponse(event);
         currentDialogMode = DialogMode::NONE;
-        if (refreshListAndButtons) {
-            drawScreen();  // Újrarajzolja a teljes képernyőt, ami magában foglalja a lista frissítését és a gombok állapotának frissítését
-            // updateActionButtonsState(); // Ezt már a drawScreen() is meghívja
-        }
     } else if (pDialog) {
         pDialog->drawDialog();
     }
@@ -678,6 +668,9 @@ void MemoryDisplay::saveCurrentStation() {
     pDialog = new VirtualKeyboardDialog(this, tft, F("Enter Station Name"), stationNameBuffer);
 }
 
+/**
+ * KIválasztott elem javítása
+ */
 void MemoryDisplay::editSelectedStation() {
     int currentSelection = scrollListComponent.getSelectedItemIndex();
     if (currentSelection < 0 || currentSelection >= sortedStations.size()) return;
@@ -688,6 +681,9 @@ void MemoryDisplay::editSelectedStation() {
     pDialog = new VirtualKeyboardDialog(this, tft, F("Edit Station Name"), stationNameBuffer);
 }
 
+/**
+ * Kiválasztott elem törlése
+ */
 void MemoryDisplay::deleteSelectedStation() {
     int currentSelection = scrollListComponent.getSelectedItemIndex();
     if (currentSelection < 0 || currentSelection >= sortedStations.size()) return;
@@ -698,6 +694,9 @@ void MemoryDisplay::deleteSelectedStation() {
     pDialog = new MessageDialog(this, tft, 250, 120, F("Confirm Delete"), F(msg.c_str()), "Delete", "Cancel");
 }
 
+/**
+ * Kiválasztott állomás hangolása
+ */
 void MemoryDisplay::tuneToSelectedStation() {
     int currentSelection = scrollListComponent.getSelectedItemIndex();
     if (currentSelection < 0 || currentSelection >= sortedStations.size()) return;

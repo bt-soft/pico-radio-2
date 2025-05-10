@@ -315,7 +315,7 @@ void FmDisplay::displayLoop() {
         elapsedTimedValues = millis();
     }
 
-    // Az RDS szöveg görgetése 
+    // Az RDS szöveg görgetése
     if (config.data.rdsEnabled) {
         pRds->scrollRdsText();
     }
