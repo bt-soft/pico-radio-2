@@ -82,9 +82,12 @@ constexpr uint8_t InitialPrevSpoint = 0xFF;  // Érvénytelen érték, hogy az e
 class SMeter {
    private:
     TFT_eSPI &tft;
-    uint32_t smeterX;     // S-Meter komponens bal felső sarkának X koordinátája
-    uint32_t smeterY;     // S-Meter komponens bal felső sarkának Y koordinátája
-    uint8_t prev_spoint;  // Előzőleg kirajzolt S-pont érték (pixelben), optimalizáláshoz
+    uint32_t smeterX;            // S-Meter komponens bal felső sarkának X koordinátája
+    uint32_t smeterY;            // S-Meter komponens bal felső sarkának Y koordinátája
+    uint8_t prev_spoint_bars;    // Előző S-pont érték a grafikus sávokhoz
+    uint8_t prev_rssi_for_text;  // Előző RSSI érték a szöveges kiíráshoz
+    uint8_t prev_snr_for_text;   // Előző SNR érték a szöveges kiíráshoz
+    char prev_text_buffer[40];   // Előzőleg kiírt szöveges buffer
 
     /**
      * RSSI érték konvertálása S-pont értékre (pixelben).
@@ -168,16 +171,16 @@ class SMeter {
     }
 
     /**
-     * S-Meter érték kirajzolása a mért RSSI alapján.
+     * S-Meter grafikus sávjainak kirajzolása a mért RSSI alapján.
      * @param rssi Aktuális RSSI érték.
      * @param isFMMode Igaz, ha FM módban vagyunk.
      */
-    void smeter(uint8_t rssi, bool isFMMode) {
+    void drawMeterBars(uint8_t rssi, bool isFMMode) {
         using namespace SMeterConstants;
         uint8_t spoint = rssiConverter(rssi, isFMMode);  // Jelerősség pixelben
 
-        if (spoint == prev_spoint) return;  // Optimalizáció: ne rajzoljunk feleslegesen
-        prev_spoint = spoint;
+        if (spoint == prev_spoint_bars) return;  // Optimalizáció: ne rajzoljunk sávokat feleslegesen
+        prev_spoint_bars = spoint;
 
         int tik = 0;       // 'tik': aktuálisan rajzolt sáv indexe (S0, S1, ..., S9+10dB, ...)
         int met = spoint;  // 'met': hátralévő "jelerősség energia" pixelben, amit még ki kell rajzolni
@@ -260,7 +263,10 @@ class SMeter {
      * @param smeterX Az S-Meter komponens bal felső sarkának X koordinátája.
      * @param smeterY Az S-Meter komponens bal felső sarkának Y koordinátája.
      */
-    SMeter(TFT_eSPI &tft, uint8_t smeterX, uint8_t smeterY) : tft(tft), smeterX(smeterX), smeterY(smeterY), prev_spoint(SMeterConstants::InitialPrevSpoint) {}
+    SMeter(TFT_eSPI &tft, uint8_t smeterX, uint8_t smeterY)
+        : tft(tft), smeterX(smeterX), smeterY(smeterY), prev_spoint_bars(SMeterConstants::InitialPrevSpoint), prev_rssi_for_text(0xFF), prev_snr_for_text(0xFF) {
+        prev_text_buffer[0] = '\0';  // Üres stringgel inicializáljuk
+    }
 
     /**
      * S-Meter skála kirajzolása (a statikus részek: vonalak, számok).
@@ -304,30 +310,42 @@ class SMeter {
      * @param isFMMode Igaz, ha FM módban vagyunk, hamis egyébként (AM/SSB/CW).
      */
     void showRSSI(uint8_t rssi, uint8_t snr, bool isFMMode) {
+
         // 1. Dinamikus S-Meter sávok kirajzolása az aktuális RSSI alapján
-        smeter(rssi, isFMMode);
+        drawMeterBars(rssi, isFMMode);  // Ez már tartalmazza a prev_spoint_bars optimalizációt
 
-        using namespace SMeterConstants;
+        // 2. RSSI és SNR értékek szöveges kiírása, csak ha változott az értékük
+        if (rssi != prev_rssi_for_text || snr != prev_snr_for_text) {
+            using namespace SMeterConstants;
 
-        // 2. RSSI és SNR értékek szöveges kiírása a skála ALÁ
-        tft.setFreeFont();  // Alapértelmezett font
-        tft.setTextSize(1);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            char current_text_buffer[40];
+            snprintf(current_text_buffer, sizeof(current_text_buffer), "RSSI: %3d dBuV   SNR: %3d dB", rssi, snr);
 
-        // Formázott string létrehozása (pl. "RSSI:  32 dBuV   SNR:  15 dB")
-        char signalBuffer[40];
-        snprintf(signalBuffer, sizeof(signalBuffer), "RSSI: %3d dBuV   SNR: %3d dB", rssi, snr);
+            // Csak akkor rajzolunk újra, ha a formázott szöveg ténylegesen megváltozott
+            if (strcmp(current_text_buffer, prev_text_buffer) != 0) {
+                uint16_t text_y_pos = smeterY + ScaleEndYOffset + 2;
+                uint16_t text_x_pos = smeterX + RssiLabelXOffset;
 
-        // Szöveg pozíciójának meghatározása
-        uint16_t text_y_pos = smeterY + ScaleEndYOffset + 2;  // Pár pixel margó a skála alatt
-        uint16_t text_x_pos = smeterX + RssiLabelXOffset;
+                tft.setFreeFont();
+                tft.setTextSize(1);
+                tft.setTextDatum(TL_DATUM);  // Bal felső igazítás
 
-        // Először töröljük a területet, ahova írni fogunk, hogy ne maradjon ott a régi érték.
-        // A törlési szélesség lefedi a maximálisan várható szöveghosszt.
-        tft.fillRect(text_x_pos, text_y_pos, ScaleWidth - RssiLabelXOffset, tft.fontHeight(1) + 2, TFT_COLOR_BACKGROUND);
+                // Előző szöveg "törlése" a háttérszínnel való felülrajzolással
+                if (prev_text_buffer[0] != '\0') {  // Csak ha volt mit törölni
+                    tft.setTextColor(TFT_COLOR_BACKGROUND, TFT_COLOR_BACKGROUND);
+                    tft.drawString(prev_text_buffer, text_x_pos, text_y_pos);
+                }
 
-        tft.setTextDatum(TL_DATUM);  // Igazítás: Top-Left
-        tft.drawString(signalBuffer, text_x_pos, text_y_pos);
+                // Új szöveg kirajzolása a megfelelő színnel
+                // A drawString karakter háttérszínét is beállítjuk, így felülírja a régit
+                tft.setTextColor(TFT_GREEN, TFT_COLOR_BACKGROUND);
+                tft.drawString(current_text_buffer, text_x_pos, text_y_pos);
+
+                strcpy(prev_text_buffer, current_text_buffer);  // Elmentjük az aktuális szöveget
+            }
+            prev_rssi_for_text = rssi;  // Elmentjük az aktuális numerikus értékeket
+            prev_snr_for_text = snr;
+        }
     }
 };
 
