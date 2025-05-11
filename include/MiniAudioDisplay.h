@@ -16,8 +16,8 @@ constexpr float MINI_AMPLITUDE_SCALE = 200.0;  // Skálázási faktor a mini kij
 // Mini kijelző területének definíciója
 constexpr int MINI_DISPLAY_AREA_X = 20;
 constexpr int MINI_DISPLAY_AREA_Y = 50;   // Státuszsor és cím alatt
-constexpr int MINI_DISPLAY_AREA_W = 280;  // Kijelző szélesség - 2*margó
-constexpr int MINI_DISPLAY_AREA_H = 100;  // Magasság a mini kijelzőnek
+constexpr int MINI_DISPLAY_AREA_W = 86;  // Maximális szélesség a grafikus elemek közül
+constexpr int MINI_DISPLAY_AREA_H = 24;  // A vízesés magasságához igazítva (MINI_WF_HEIGHT)
 
 // Mini vízeséshez (FFT.ino alapján)
 constexpr int MINI_WF_WIDTH = 84;

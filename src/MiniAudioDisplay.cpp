@@ -80,13 +80,13 @@ void MiniAudioDisplay::drawModeIndicator() {
             modeText += "Off";
             break;
         case 1:
-            modeText += "Spectrum (LowRes)";
+            modeText += "Spect (LowRes)";
             break;
         case 2:
-            modeText += "Spectrum (HighRes)";
+            modeText += "Spect (HighRes)";
             break;
         case 3:
-            modeText += "Oscilloscope";
+            modeText += "Scope";
             break;
         case 4:
             modeText += "Waterfall";
