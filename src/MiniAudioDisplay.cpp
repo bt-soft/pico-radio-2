@@ -51,11 +51,12 @@ void MiniAudioDisplay::drawScreen() {
 
     drawScreenButtons();  // Minden horizontális gomb kirajzolása
 
+    clearMiniDisplayArea();
+    drawModeIndicator();
+
     // Mini kijelző területének körvonala
     tft.drawRect(MiniAudioDisplayConstants::MINI_DISPLAY_AREA_X - 1, MiniAudioDisplayConstants::MINI_DISPLAY_AREA_Y - 1, MiniAudioDisplayConstants::MINI_DISPLAY_AREA_W + 2,
                  MiniAudioDisplayConstants::MINI_DISPLAY_AREA_H + 2, TFT_DARKGREY);
-    clearMiniDisplayArea();
-    drawModeIndicator();
 }
 
 void MiniAudioDisplay::clearMiniDisplayArea() {
@@ -125,18 +126,23 @@ void MiniAudioDisplay::cycleMiniWindowMode() {
 
 void MiniAudioDisplay::FFTSampleMini(bool collectOsciSamples) {
     using namespace MiniAudioDisplayConstants;
+    int osci_sample_idx = 0;  // Külön index az oszcilloszkóp mintákhoz
     // Az FFT.ino FFTSample logikája alapján
     for (int i = 0; i < FFT_SAMPLES; i++) {
         uint32_t sum = 0;
         // Túlmintavételezés, mint az FFT.ino-ban (dly=0 eset)
         for (int j = 0; j < 4; j++) {
-            sum += analogRead(AUDIO_INPUT_PIN);
+            sum += analogRead(AUDIO_INPUT_PIN);  // Konstans használata
         }
 
         double averaged_sample = sum / 4.0;
-        if (collectOsciSamples && i < MINI_OSCI_SAMPLES_TO_DRAW) {
-            // Nyers (átlagolt) minták mentése az oszcilloszkóphoz
-            osciSamples[i] = static_cast<int>(averaged_sample);
+        if (collectOsciSamples) {
+            // Minden N-edik mintát mentünk az oszcilloszkóphoz
+            // Például minden 2. mintát:
+            if (i % 2 == 0 && osci_sample_idx < MINI_OSCI_SAMPLES_TO_DRAW) {
+                osciSamples[osci_sample_idx] = static_cast<int>(averaged_sample);
+                osci_sample_idx++;
+            }
         }
         vReal[i] = averaged_sample - 2048.0;  // DC eltolás az FFT-hez
         vImag[i] = 0.0;
@@ -163,7 +169,7 @@ void MiniAudioDisplay::drawMiniSpectrumLowRes() {
     }
     int actual_start_x_low_res = MINI_DISPLAY_AREA_X + x_pixel_offset_low_res;
 
-    tft.drawRect(actual_start_x_low_res - 1, MINI_DISPLAY_AREA_Y - 1, total_width_low_res + 2, MINI_DISPLAY_AREA_H + 2, TFT_DARKGREY);
+    //////////////////////tft.drawRect(actual_start_x_low_res - 1, MINI_DISPLAY_AREA_Y - 1, total_width_low_res + 2, MINI_DISPLAY_AREA_H + 2, TFT_DARKGREY);
 
     for (byte band_idx = 0; band_idx <= LOW_RES_BANDS; band_idx++) {
         if (Rpeak[band_idx] > 0) {
@@ -216,7 +222,7 @@ void MiniAudioDisplay::drawMiniSpectrumHighRes() {
     }
     int actual_start_x_high_res = MINI_DISPLAY_AREA_X + x_pixel_offset;
 
-    tft.drawRect(actual_start_x_high_res - 1, MINI_DISPLAY_AREA_Y - 1, HIGH_RES_BINS_TO_DISPLAY + 2, MINI_DISPLAY_AREA_H + 2, TFT_DARKGREY);
+    //////////////////////tft.drawRect(actual_start_x_high_res - 1, MINI_DISPLAY_AREA_Y - 1, HIGH_RES_BINS_TO_DISPLAY + 2, MINI_DISPLAY_AREA_H + 2, TFT_DARKGREY);
 
     for (int i = 2; i < HIGH_RES_BINS_TO_DISPLAY + 2; i++) {
         if (i >= FFT_SAMPLES / 2) break;
@@ -242,7 +248,7 @@ void MiniAudioDisplay::drawMiniSpectrumHighRes() {
 void MiniAudioDisplay::drawMiniOscilloscope() {
     using namespace MiniAudioDisplayConstants;
 
-    clearMiniDisplayArea();  // Terület törlése minden rajzolás előtt
+    // clearMiniDisplayArea();  // Terület törlése minden rajzolás előtt
 
     int x_pixel_offset_osci = 0;
     if (MINI_DISPLAY_AREA_W > MINI_OSCI_SAMPLES_TO_DRAW) {
@@ -250,7 +256,10 @@ void MiniAudioDisplay::drawMiniOscilloscope() {
     }
     int actual_start_x_osci = MINI_DISPLAY_AREA_X + x_pixel_offset_osci;
 
-    tft.drawRect(actual_start_x_osci - 1, MINI_DISPLAY_AREA_Y - 1, MINI_OSCI_SAMPLES_TO_DRAW + 2, MINI_DISPLAY_AREA_H + 2, TFT_DARKGREY);
+    // Előző jelalak törlése a háttérszínnel (TFT_NAVY)
+    // Optimalizáció: Csak akkor töröljünk, ha volt mit.
+    // De egyszerűbb minden ciklusban törölni a jelalak területét.
+    tft.fillRect(actual_start_x_osci, MINI_DISPLAY_AREA_Y, MINI_OSCI_SAMPLES_TO_DRAW, MINI_DISPLAY_AREA_H, TFT_NAVY);
 
     int prev_x = -1, prev_y = -1;
 
