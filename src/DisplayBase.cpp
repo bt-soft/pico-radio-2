@@ -6,27 +6,6 @@
 #include "ValueChangeDialog.h"
 
 namespace DisplayConstants {
-// // Status line méretek és pozíciók
-// constexpr int StatusLineRectWidth = 39;
-// constexpr int StatusLineHeight = 16;
-// constexpr int StatusLineWidth = 240;
-
-// constexpr int StatusLineBfoX = 20;
-// constexpr int StatusLineAgcX = 60;
-// constexpr int StatusLineModX = 95;
-// constexpr int StatusLineBandWidthX = 135;
-// constexpr int StatusLineBandNameX = 180;
-// constexpr int StatusLineStepX = 220;
-// constexpr int StatusLineAntCapX = 260;
-// constexpr int StatusLineTempX = 300;  // Új pozíció a hőmérsékletnek
-// constexpr int StatusLineVbusX = 340;  // Új pozíció a Vbus-nak
-
-// // Gombok méretei és margói
-// constexpr uint8_t MaxButtonsInRow = 6;
-// constexpr uint8_t ButtonWidth = 39;
-// constexpr uint8_t ButtonHeight = 16;
-// constexpr uint8_t ButtonMargin = 5;
-
 // Színek
 constexpr uint16_t BfoStepColor = TFT_ORANGE;
 constexpr uint16_t AgcColor = TFT_COLOR(255, 130, 0);
@@ -941,8 +920,8 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                 band.bandSet(false);
 
                 // Státuszsor frissítése az új mód kijelzéséhez
-                dawStatusLine();       // Frissíteni kell a státuszsort!
-                updateButtonStatus();  // <<<--- Gombok állapotának frissítése módváltás után
+                dawStatusLine();       // Frissíteni kell a státuszsort
+                updateButtonStatus();  // Frissítjük a gombok állapotát
             },
             band.getCurrentBandModeDesc());
         processed = true;
@@ -1262,23 +1241,31 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
  * @return true, ha az állomás a memóriában van, egyébként false.
  */
 bool DisplayBase::checkIfCurrentStationIsInMemo() {
-    BandTable &currentBandData = band.getCurrentBand();
-    uint16_t freq = currentBandData.varData.currFreq;
-    uint8_t bandIdx = config.data.bandIdx;  // Az aktuális sáv indexe a configból
-    uint8_t mod = currentBandData.varData.currMod;
-    int16_t bfo = 0;
+    // Aktuális állomás adatainak lekérdezése
+    BandTable& currentBandData = band.getCurrentBand();
+    uint16_t currentFreq = currentBandData.varData.currFreq;
+    uint8_t currentBandIndex = config.data.bandIdx; // Az aktuális sáv indexe a globális konfigurációból
+    uint8_t currentModulation = currentBandData.varData.currMod;
+    int16_t currentBfoOffset = 0;
 
-    if (mod == LSB || mod == USB || mod == CW) {
-        bfo = currentBandData.varData.lastBFO;
+    // BFO eltolás figyelembevétele, ha a moduláció LSB, USB vagy CW
+    if (currentModulation == LSB || currentModulation == USB || currentModulation == CW) {
+        currentBfoOffset = currentBandData.varData.lastBFO;
     }
 
-    bool isFm = (band.getCurrentBandType() == FM_BAND_TYPE);
+    // Annak meghatározása, hogy FM vagy AM-típusú sávon vagyunk-e
+    bool isFmBand = (band.getCurrentBandType() == FM_BAND_TYPE);
     int memoIdx = -1;
 
-    if (isFm) {
-        memoIdx = fmStationStore.findStation(freq, bandIdx, bfo);
+    // Keresés a megfelelő memóriatárolóban
+    if (isFmBand) {
+        // FM sáv esetén az FM állomások között keresünk
+        memoIdx = fmStationStore.findStation(currentFreq, currentBandIndex, currentBfoOffset);
     } else {
-        memoIdx = amStationStore.findStation(freq, bandIdx, bfo);
+        // Minden más esetben (AM, SW, LW) az AM állomások között keresünk
+        memoIdx = amStationStore.findStation(currentFreq, currentBandIndex, currentBfoOffset);
     }
+
+    // Ha a findStation nem -1-et adott vissza, az azt jelenti, hogy az állomás megtalálható a memóriában
     return (memoIdx != -1);
 }
