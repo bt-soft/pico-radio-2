@@ -67,7 +67,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 
    public:
     // Lehetséges képernyő típusok
-    enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory, audioAnalyzer };
+    enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory, audioAnalyzer, miniAudioAnalyzer };
 
     // Gombok orientációja
     enum ButtonOrientation { Horizontal, Vertical };

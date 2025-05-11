@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-#include "AudioAnalyzerDisplay.h"
 #include "PicoSensorUtils.h"
 #include "defines.h"
 #include "rtVars.h"
@@ -44,11 +43,13 @@ Band band(si4735, config);
 FmStationStore fmStationStore;
 AmStationStore amStationStore;
 
-//------------------- Képernyő
+//------------------- Képernyők
 #include "AmDisplay.h"
+#include "AudioAnalyzerDisplay.h"
 #include "FmDisplay.h"
 #include "FreqScanDisplay.h"
 #include "MemoryDisplay.h"
+#include "MiniAudioDisplay.h"
 #include "ScreenSaverDisplay.h"
 #include "SetupDisplay.h"
 DisplayBase *pDisplay = nullptr;
@@ -121,8 +122,14 @@ void changeDisplay() {
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
 
-            case DisplayBase::DisplayType::audioAnalyzer:  // Új case
+            case DisplayBase::DisplayType::audioAnalyzer:
                 ::pDisplay = new AudioAnalyzerDisplay(tft, si4735, band);
+                // Beállítjuk a képernyőnek, hogy hova térjen vissza
+                ::pDisplay->setPrevDisplayType(::currentDisplay);
+                break;
+
+            case DisplayBase::DisplayType::miniAudioAnalyzer:
+                ::pDisplay = new MiniAudioDisplay(tft, si4735, band);
                 // Beállítjuk a képernyőnek, hogy hova térjen vissza
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
