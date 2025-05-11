@@ -127,11 +127,15 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  */
 bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
-    uint8_t currMod = band.getCurrentBand().varData.currMod;
+    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {
+        return true;
+    }
 
     // A frekvencia kijelző kezeli a touch eseményeket SSB/CW módban
+    uint8_t currMod = band.getCurrentBand().varData.currMod;
     if (currMod == LSB or currMod == USB or currMod == CW) {
         bool handled = pSevenSegmentFreq->handleTouch(touched, tx, ty);
+
         if (handled) {
             DisplayBase::drawStepStatus();  // Frissítjük a státusvonalban a kiírást
         }
@@ -139,9 +143,6 @@ bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         return handled;
     }
 
-    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {
-        return true;
-    }
     return false;
 }
 
