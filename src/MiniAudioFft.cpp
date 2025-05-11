@@ -2,6 +2,9 @@
 
 #include "rtVars.h"  // rtv::muteStat eléréséhez
 
+// Konstans a módkijelző láthatósági idejéhez (ms)
+constexpr uint32_t MODE_INDICATOR_TIMEOUT_MS = 20000;  // 20 másodperc
+
 /**
  * @brief A MiniAudioFft komponens konstruktora.
  *
@@ -23,10 +26,11 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
       height(h),
       // currentMode itt nem kap explicit kezdőértéket, a setInitialMode állítja be
       prevMuteState(rtv::muteStat),         // Némítás előző állapotának inicializálása
+      modeIndicatorShowUntil(0),            // Kezdetben nem látható (setInitialMode állítja)
+      isIndicatorCurrentlyVisible(true),    // Kezdetben látható (setInitialMode állítja)
       configModeFieldRef(configModeField),  // Referencia elmentése
       FFT(),                                // FFT objektum inicializálása
       highResOffset(0) {
-
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
     if (this->height > 0 && this->width > 0) {
@@ -50,9 +54,9 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
  */
 void MiniAudioFft::setInitialMode(DisplayMode mode) {
     currentMode = mode;
-    clearArea();          // Terület törlése
-    drawModeIndicator();  // Módkijelző kirajzolása
-    // A grafikon az első loop() híváskor fog kirajzolódni, ha a mód nem Off.
+    isIndicatorCurrentlyVisible = true;  // Induláskor mindig látható
+    modeIndicatorShowUntil = millis() + MODE_INDICATOR_TIMEOUT_MS;
+    forceRedraw();  // Ez gondoskodik a clearArea-ról és a drawModeIndicator-ról
 }
 
 /**
@@ -74,7 +78,10 @@ void MiniAudioFft::cycleMode() {
     // Új mód mentése a konfigurációba a referencián keresztül
     configModeFieldRef = static_cast<uint8_t>(currentMode);
 
-    clearArea();  // Teljes terület törlése az új mód előtt
+    // Módkijelző időzítőjének és láthatóságának beállítása
+    isIndicatorCurrentlyVisible = true;
+    modeIndicatorShowUntil = millis() + MODE_INDICATOR_TIMEOUT_MS;
+
     // Mód-specifikus pufferek resetelése
     if (currentMode == DisplayMode::SpectrumLowRes || (currentMode != DisplayMode::SpectrumLowRes && Rpeak[0] != 0)) {
         memset(Rpeak, 0, sizeof(Rpeak));
@@ -88,22 +95,35 @@ void MiniAudioFft::cycleMode() {
     }
     highResOffset = 0;  // Magas felbontású spektrum eltolásának resetelése
 
-    drawModeIndicator();  // Módváltáskor azonnal kirajzoljuk az új mód nevét
+    forceRedraw();  // Teljes újrarajzolás, ami kezeli a clearArea-t és a drawModeIndicator-t
 }
 
 /**
- * @brief Letörli a komponens teljes rajzolási területét feketére.
+ * @brief Letörli a komponens teljes rajzolási területét feketére, és megrajzolja a keretet.
+ * A keret magassága az `isIndicatorCurrentlyVisible` állapottól függ.
  */
 void MiniAudioFft::clearArea() {
-    tft.fillRect(posX, posY, width, height, TFT_BLACK);
+    constexpr int frameThickness = 1;
+    int effectiveH = getEffectiveHeight();
 
-    // Mini kijelző területének kerete
-    constexpr int frameThickness = 1;  // Keret vastagsága
-    int frameOuterX = posX - frameThickness;
-    int frameOuterY = posY - frameThickness;
-    int frameOuterW = width + (frameThickness * 2);
-    int frameOuterH = height + (frameThickness * 2) + 1;
-    tft.drawRect(frameOuterX, frameOuterY, frameOuterW, frameOuterH, TFT_DARKGREY);  // Külső keret rajzolása
+    // 1. Meghatározzuk a komponens maximális lehetséges külső határait
+    //    (beleértve a keretet is, amikor a módkijelző látható volt).
+    //    Ez a terület lesz feketére törölve, hogy a régi keretmaradványok eltűnjenek.
+    int maxOuterX = posX - frameThickness;
+    int maxOuterY = posY - frameThickness;
+    int maxOuterW = width + (frameThickness * 2);
+    int maxOuterH_forClear = height + (frameThickness * 2); // A komponens maximális magasságát használjuk a törléshez
+
+    // Teljes maximális terület törlése feketére
+    tft.fillRect(maxOuterX, maxOuterY, maxOuterW, maxOuterH_forClear, TFT_BLACK);
+
+    // 2. Az ÚJ keret kirajzolása az AKTUÁLIS effektív magasság alapján.
+    int currentFrameOuterX = posX - frameThickness;
+    int currentFrameOuterY = posY - frameThickness;
+    int currentFrameOuterW = width + (frameThickness * 2);
+    int currentFrameOuterH_forNewFrame = effectiveH + (frameThickness * 2); // Keret az aktuális effektív magassághoz
+
+    tft.drawRect(currentFrameOuterX, currentFrameOuterY, currentFrameOuterW, currentFrameOuterH_forNewFrame, TFT_COLOR(80, 80, 80));
 }
 
 /**
@@ -119,24 +139,47 @@ int MiniAudioFft::getIndicatorAreaHeight() const {
 }
 
 /**
+ * @brief Visszaadja a komponens aktuális effektív magasságát,
+ * figyelembe véve a módkijelző láthatóságát.
+ * @return Az effektív magasság pixelekben.
+ */
+int MiniAudioFft::getEffectiveHeight() const {
+    if (isIndicatorCurrentlyVisible) {
+        return height;  // Teljes magasság, ha a kijelző látszik
+    } else {
+        return height - getIndicatorAreaHeight();  // Csökkentett magasság, ha nem látszik
+    }
+}
+
+/**
  * @brief Kiszámítja és visszaadja a grafikonok számára ténylegesen rendelkezésre álló magasságot.
- * Ez a komponens teljes magassága mínusz a módkijelzőnek fenntartott terület.
+ * Ez a komponens teljes magassága mínusz a módkijelzőnek MINDIG fenntartott terület,
+ * függetlenül attól, hogy a kijelző éppen látható-e. A grafikonok nem nyúlnak bele ebbe a sávba.
  * @return int A grafikonok rajzolási magassága pixelekben.
  */
 int MiniAudioFft::getGraphHeight() const { return height - getIndicatorAreaHeight(); }
 
 /**
  * @brief Kiszámítja és visszaadja a módkijelző területének Y kezdőpozícióját a komponensen belül.
+ * Ez mindig a grafikon területe alatt van.
  * @return int A módkijelző Y kezdőpozíciója.
  */
 int MiniAudioFft::getIndicatorAreaY() const { return posY + getGraphHeight(); }
 
 /**
- * @brief Kirajzolja az aktuális mód nevét a komponens aljára, a számára fenntartott sávba.
- *
- * A szöveg hátterét feketére állítja, így felülírja az előző szöveget.
+ * @brief Kirajzolja az aktuális mód nevét a komponens aljára, a számára fenntartott sávba,
+ * de csak akkor, ha az `isIndicatorCurrentlyVisible` igaz.
  */
 void MiniAudioFft::drawModeIndicator() {
+    if (!isIndicatorCurrentlyVisible) {
+        // Ha nem látható, akkor a `clearArea` már a kisebb kerettel törölt.
+        // Azt a területet, ahol a módkijelző volt, expliciten feketére kell állítani,
+        // hogy eltűnjön a szöveg, amikor az `isIndicatorCurrentlyVisible` false-ra vált.
+        // Ezt a `loop` fogja kezelni a `forceRedraw` hívásával, amikor a láthatóság változik.
+        // Itt elég, ha nem rajzolunk semmit. A `forceRedraw` `clearArea`-ja gondoskodik a háttérről.
+        return;
+    }
+
     int indicatorH = getIndicatorAreaHeight();
     int indicatorYstart = getIndicatorAreaY();  // A módkijelző sávjának teteje
 
@@ -144,8 +187,8 @@ void MiniAudioFft::drawModeIndicator() {
 
     tft.setFreeFont();
     tft.setTextSize(1);
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.setTextDatum(BC_DATUM);  // Alul-középre igazítás
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);  // Háttér fekete, ez törli az előzőt
+    tft.setTextDatum(BC_DATUM);               // Alul-középre igazítás
 
     String modeText = "";
     switch (currentMode) {
@@ -168,15 +211,16 @@ void MiniAudioFft::drawModeIndicator() {
             modeText = "Envelope";
             break;
         default:
-            modeText = "Unk";  // Rövidebb, ha valamiért érvénytelen lenne
+            modeText = "Unk";
             break;
     }
 
-    // Módkijelző területének explicit törlése
+    // Módkijelző területének explicit törlése a szövegkirajzolás előtt
     tft.fillRect(posX, indicatorYstart, width, indicatorH, TFT_BLACK);
     // Szöveg kirajzolása a komponens aljára, középre.
     // Az Y koordináta a szöveg alapvonala lesz.
-    tft.drawString(modeText, posX + width / 2, posY + height + 1);  // 2 pixel a BC_DATUM és a komponens alja közötti margó miatt
+    // A `posY + height - 2` a teljes komponensmagasság aljára igazít.
+    tft.drawString(modeText, posX + width / 2, posY + height - 2);
 }
 
 /**
@@ -227,35 +271,43 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
  * és kirajzolja az aktuális megjelenítési módot.
  */
 void MiniAudioFft::loop() {
-    bool muteStateJustChanged = (rtv::muteStat != prevMuteState);
+    bool needsFullRedrawAfterChecks = false;
+    bool muteStateChangedThisLoop = (rtv::muteStat != prevMuteState);
     prevMuteState = rtv::muteStat;
 
+    if (muteStateChangedThisLoop) {
+        needsFullRedrawAfterChecks = true;  // Némítás változásakor mindig teljes újrarajzolás
+    }
+
+    // Módkijelző láthatóságának időzítő alapú ellenőrzése
+    if (isIndicatorCurrentlyVisible && millis() >= modeIndicatorShowUntil) {
+        isIndicatorCurrentlyVisible = false;
+        needsFullRedrawAfterChecks = true;  // Láthatóság változott, teljes újrarajzolás kell
+    }
+
+    if (needsFullRedrawAfterChecks) {
+        forceRedraw();  // Ez kezeli a némítást, a módot, és a kijelzőt
+        return;         // Ha újrarajzoltunk, ebben a ciklusban nincs több teendő
+    }
+
+    // Ha némítva van (és nem most változott az állapota, mert azt már a forceRedraw kezelte)
     if (rtv::muteStat) {
-        // Csak akkor rajzoljuk újra a "MUTED"-et, ha most lett némítva
-        if (muteStateJustChanged) {
-            clearArea();
-            drawMuted();
-        }
-        return;
+        return;  // A "MUTED" felirat már kint van a forceRedraw miatt
     }
 
-    // Ha éppen most szűnt meg a némítás, teljes újrarajzolás szükséges
-    if (muteStateJustChanged && !rtv::muteStat) {
-        forceRedraw();  // Ez gondoskodik a grafikon és a módkijelző újrarajzolásáról
-        return;
-    }
-
-    // Ha a mód "Ki" (0), akkor nincs dinamikus tartalom, amit frissíteni kellene.
-    // A `cycleMode` vagy `forceRedraw` már kirajzolta az "Off" feliratot a `drawModeIndicator` hívásával.
+    // Ha a mód "Ki" (és nem most változott az állapota)
     if (currentMode == DisplayMode::Off) {
-        return;
+        return;  // Az "Off" felirat már kint van
     }
 
-    // FFT mintavételezés és számítás (az oszcilloszkóp módhoz gyűjtünk extra mintákat)
+    // --- Csak akkor jutunk ide, ha nincs némítás, a mód nem "Off", és nem volt állapotváltozás miatti forceRedraw ---
+
+    // FFT mintavételezés és számítás
     performFFT(currentMode == DisplayMode::Oscilloscope);
 
     // Grafikonok kirajzolása a nekik szánt (csökkentett) területre
-    // Ezek a függvények csak a `posY`-tól `posY + getGraphHeight() - 1`-ig rajzolnak.
+    // Ezek a függvények a `posY`-tól `posY + getGraphHeight() - 1`-ig rajzolnak.
+    // A `getGraphHeight()` mindig a grafikon magasságát adja vissza, a módkijelző sávja nélkül.
     switch (currentMode) {
         case DisplayMode::SpectrumLowRes:
             drawSpectrumLowRes();
@@ -272,10 +324,10 @@ void MiniAudioFft::loop() {
         case DisplayMode::Envelope:
             drawEnvelope();
             break;
+            // Nem kell default, mert a currentMode mindig érvényes DisplayMode érték.
     }
     // A drawModeIndicator() metódust NEM hívjuk itt minden ciklusban,
-    // csak akkor, ha a mód ténylegesen megváltozik (cycleMode),
-    // vagy ha a teljes komponenst újra kell rajzolni (forceRedraw, némítás feloldása).
+    // csak akkor, ha a mód/láthatóság ténylegesen megváltozik (cycleMode, forceRedraw).
 }
 
 /**
@@ -291,10 +343,7 @@ void MiniAudioFft::loop() {
  */
 bool MiniAudioFft::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
     if (touched && (tx >= posX && tx < (posX + width) && ty >= posY && ty < (posY + height))) {
-        cycleMode();  // Ez már tartalmazza a clearArea()-t és a drawModeIndicator() hívást
-        // A loop() meghívása itt opcionális. Ha a cycleMode után azonnal szeretnénk az új mód
-        // első grafikonját is látni, akkor itt hívható. Különben a következő normál loop ciklus rajzolja.
-        // Jelenleg a cycleMode csak a módkijelzőt frissíti, a grafikon a következő loop()-ban frissül.
+        cycleMode();  // Ez beállítja az isIndicatorCurrentlyVisible-t, a timert, és hívja a forceRedraw-t
         return true;
     }
     return false;
@@ -303,21 +352,18 @@ bool MiniAudioFft::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 /**
  * @brief Kényszeríti a komponens teljes újrarajzolását az aktuális módban.
  *
- * Letörli a komponenst és meghívja a `loop` függvényt az újrarajzoláshoz.
+ * Letörli a komponenst az effektív magasságnak megfelelően, és újrarajzolja a tartalmat.
  */
 void MiniAudioFft::forceRedraw() {
-    clearArea();
-    prevMuteState = rtv::muteStat;  // Szinkronizáljuk a némítás állapotát
+    clearArea();  // Ez már az `getEffectiveHeight()`-et használja a kerethez és a törléshez
 
     if (rtv::muteStat) {
-        drawMuted();
-
+        drawMuted();  // A drawMuted-nek is az effektív magasság közepére kell rajzolnia
     } else if (currentMode == DisplayMode::Off) {
-        drawModeIndicator();  // "Off" kirajzolása
-
+        drawModeIndicator();  // "Off" kirajzolása (ha látható)
     } else {
-        // Módok 1-5: grafikon kirajzolása
-        performFFT(currentMode == DisplayMode::Oscilloscope);  // Szükséges az adatokhoz
+        // Aktív módok (1-5): grafikon kirajzolása
+        performFFT(currentMode == DisplayMode::Oscilloscope);
         switch (currentMode) {
             case DisplayMode::SpectrumLowRes:
                 drawSpectrumLowRes();
@@ -334,13 +380,16 @@ void MiniAudioFft::forceRedraw() {
             case DisplayMode::Envelope:
                 drawEnvelope();
                 break;
-                // Nincs szükség default-ra, ha minden enum értéket lefedünk
         }
-        drawModeIndicator();  // És a módkijelző kirajzolása
+        drawModeIndicator();  // És a módkijelző kirajzolása (ha látható)
     }
 }
 
 // --- Rajzoló metódusok (a MiniAudioDisplay.cpp alapján adaptálva) ---
+// A grafikonrajzoló függvények (drawSpectrumLowRes, stb.) változatlanok maradnak,
+// mivel a `getGraphHeight()` által visszaadott magasságot használják,
+// ami most már konzisztensen a módkijelző feletti terület magasságát jelenti.
+// A `posY` szintén a grafikonterület tetejét jelöli.
 
 /**
  * @brief Alacsony felbontású spektrum analizátor kirajzolása.
@@ -366,12 +415,15 @@ void MiniAudioFft::drawSpectrumLowRes() {
     int x_offset = (width - total_drawn_width) / 2;
     int current_draw_x_on_screen = posX + x_offset;
 
+    // Grafikon területének törlése (csak a grafikon sávja)
+    // Ezt a fő `clearArea` már elvégezte, vagy a `loop` frissíti az oszlopokat.
+    // Itt csak a csúcsokat töröljük.
     for (int band_idx = 0; band_idx < bands_to_process; band_idx++) {
         if (Rpeak[band_idx] > 0) {
             int xP = current_draw_x_on_screen + band_total_pixels * band_idx;
-            int yP = posY + graphH - Rpeak[band_idx];
+            int yP = posY + graphH - Rpeak[band_idx];  // Y a grafikon területén belül
             int erase_h = std::min(2, posY + graphH - yP);
-            if (yP < posY + graphH && erase_h > 0) {
+            if (yP < posY + graphH && erase_h > 0) {  // Biztosítjuk, hogy a grafikonon belül törlünk
                 tft.fillRect(xP, yP, band_width_pixels, erase_h, TFT_BLACK);
             }
         }
@@ -413,7 +465,7 @@ void MiniAudioFft::displayBand(int band_idx, int magnitude, int actual_start_x_o
     if (graphH <= 0) return;
 
     int dsize = magnitude / AMPLITUDE_SCALE;
-    dsize = constrain(dsize, 0, peak_max_height_for_mode);
+    dsize = constrain(dsize, 0, peak_max_height_for_mode);  // peak_max_height_for_mode már graphH-1
 
     constexpr int band_width_pixels = 3;
     constexpr int band_gap_pixels = 2;
@@ -423,9 +475,10 @@ void MiniAudioFft::displayBand(int band_idx, int magnitude, int actual_start_x_o
     if (xPos + band_width_pixels > posX + width || xPos < posX) return;
 
     if (dsize > 0) {
-        int y_start_bar = posY + graphH - dsize;
+        int y_start_bar = posY + graphH - dsize;  // Y a grafikon területén belül
         int bar_h = dsize;
-        if (y_start_bar < posY) {
+        // Biztosítjuk, hogy a sáv a grafikon területén belül maradjon
+        if (y_start_bar < posY) {  // Elvileg a constrain(dsize) ezt kezeli
             bar_h -= (posY - y_start_bar);
             y_start_bar = posY;
         }
@@ -497,7 +550,7 @@ void MiniAudioFft::drawOscilloscope() {
         double scaled_to_half_height = centered_sample * (static_cast<double>(graphH) / 2.0 - 1.0) / 2048.0;
 
         int y_pos = posY + graphH / 2 - static_cast<int>(round(scaled_to_half_height));
-        y_pos = constrain(y_pos, posY, posY + graphH - 1);
+        y_pos = constrain(y_pos, posY, posY + graphH - 1);  // Korlátozás a grafikon területére
         int x_pos = posX + i;
 
         if (prev_x != -1) {
@@ -518,18 +571,19 @@ void MiniAudioFft::drawOscilloscope() {
  */
 void MiniAudioFft::drawWaterfall() {
     using namespace MiniAudioFftConstants;
-    int graphH = getGraphHeight();
+    int graphH = getGraphHeight();  // A grafikon tényleges rajzolási magassága
+    // A `wabuf` sorainak száma `this->height`, oszlopainak száma `this->width`.
     if (width == 0 || height == 0 || wabuf.empty() || wabuf[0].empty()) return;
 
     // 1. Adatok eltolása balra a `wabuf`-ban
-    for (int r = 0; r < height; ++r) {  // Teljes `this->height`
+    for (int r = 0; r < height; ++r) {  // A teljes `this->height` magasságon iterálunk a `wabuf` miatt
         for (int c = 0; c < width - 1; ++c) {
             wabuf[r][c] = wabuf[r][c + 1];
         }
     }
 
     // 2. Új adatok betöltése a `wabuf` jobb szélére
-    for (int r = 0; r < height; ++r) {  // Teljes `this->height`
+    for (int r = 0; r < height; ++r) {  // A teljes `this->height` magasságon iterálunk
         int fft_bin_index = 2 + (r * (FFT_SAMPLES / 2 - 2)) / std::max(1, (height - 1));
         if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
         if (fft_bin_index < 2) fft_bin_index = 2;
@@ -539,8 +593,9 @@ void MiniAudioFft::drawWaterfall() {
     }
 
     // 3. Pixelek kirajzolása a grafikon területére
-    if (graphH <= 0) return;  // Ha nincs hely a grafikonnak, ne rajzoljunk
-    for (int r_wabuf = 0; r_wabuf < height; ++r_wabuf) {
+    if (graphH <= 0) return;
+    for (int r_wabuf = 0; r_wabuf < height; ++r_wabuf) {  // Iterálás a `wabuf` összes során
+        // Átskálázzuk a `r_wabuf` indexet a `graphH` magasságra a képernyőn való megjelenítéshez.
         int screen_y_relative_inverted = (r_wabuf * (graphH - 1)) / std::max(1, (height - 1));
         int screen_y_on_component = posY + (graphH - 1 - screen_y_relative_inverted);
 
@@ -598,12 +653,10 @@ void MiniAudioFft::drawEnvelope() {
 
     // 3. Burkológörbe kirajzolása
     const int half_graph_h = graphH / 2;
-    // A simításhoz használt előző értéknek a `wabuf` index skáláján kell lennie (0-tól `height-1`-ig).
-    // Ezért `height / 2`-vel inicializáljuk, nem `half_graph_h`-val.
-    int prev_smoothed_env_idx_wabuf_scale = height / 2;
+    int prev_smoothed_env_idx_wabuf_scale = height / 2;  // Simítás a `wabuf` (teljes `height`) skáláján
 
     for (int c = 0; c < width; ++c) {
-        int env_idx_for_col_wabuf = height / 2;  // Domináns bin indexe a `wabuf` skáláján
+        int env_idx_for_col_wabuf = height / 2;
         int max_val_in_col = 0;
         bool column_has_signal = false;
 
@@ -615,7 +668,6 @@ void MiniAudioFft::drawEnvelope() {
             }
         }
 
-        // Simítás a `wabuf` index skáláján
         int smoothed_env_idx_wabuf = static_cast<int>(ENVELOPE_SMOOTH_FACTOR * prev_smoothed_env_idx_wabuf_scale + (1.0f - ENVELOPE_SMOOTH_FACTOR) * env_idx_for_col_wabuf);
         prev_smoothed_env_idx_wabuf_scale = smoothed_env_idx_wabuf;
 
@@ -623,10 +675,9 @@ void MiniAudioFft::drawEnvelope() {
         tft.drawFastVLine(col_x_on_screen, posY, graphH, TFT_BLACK);  // Oszlop törlése a grafikon területén
 
         if (column_has_signal) {
-            // A `smoothed_env_idx_wabuf` (0-tól `height-1`-ig) a vastagság alapja.
             for (int i = 0; i <= smoothed_env_idx_wabuf; ++i) {
                 int y_offset = static_cast<int>(static_cast<float>(i) * ENVELOPE_THICKNESS_SCALER);
-                y_offset = std::min(y_offset, half_graph_h - 1);  // Korlátozás a grafikon félmagasságára
+                y_offset = std::min(y_offset, half_graph_h - 1);
 
                 int yUpper = posY + half_graph_h - y_offset;
                 int yLower = posY + half_graph_h + y_offset;
@@ -646,15 +697,15 @@ void MiniAudioFft::drawEnvelope() {
 }
 
 /**
- * @brief Kirajzolja a "MUTED" feliratot a képernyő közepére.
- *
- * A szöveg hátterét feketére állítja, így felülírja az előző szöveget.
+ * @brief Kirajzolja a "MUTED" feliratot a komponens aktuális effektív magasságának közepére.
  */
 void MiniAudioFft::drawMuted() {
+    int effectiveH = getEffectiveHeight();
+    if (width < 10 || effectiveH < 10) return;  // Nincs elég hely
 
-    if (width < 10 || height < 10) return;
-
-    tft.setCursor(posX + width / 2, posY + height / 2);
+    // A `clearArea` már törölte a hátteret az `effectiveH` magasságig.
+    // Ide rajzoljuk a "MUTED" feliratot.
+    tft.setCursor(posX + width / 2, posY + effectiveH / 2);  // Középre az effektív magasságon belül
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_YELLOW);
     tft.setFreeFont();

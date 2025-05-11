@@ -101,6 +101,8 @@ class MiniAudioFft {
 
     DisplayMode currentMode;  // Aktuális megjelenítési mód
     bool prevMuteState;   // Előző némítási állapot a változások érzékeléséhez
+    uint32_t modeIndicatorShowUntil; // Időbélyeg, meddig látható a módkijelző
+    bool isIndicatorCurrentlyVisible; // A módkijelző aktuálisan látható-e
     uint8_t& configModeFieldRef; // Referencia a Config mezőre a mód mentéséhez
 
     ArduinoFFT<double> FFT;                             // FFT objektum
@@ -164,6 +166,11 @@ class MiniAudioFft {
      * @return A módkijelző Y kezdőpozíciója.
      */
     int getIndicatorAreaY() const;
+    /**
+     * @brief Visszaadja a komponens aktuális effektív magasságát, figyelembe véve a módkijelző láthatóságát.
+     * @return Az effektív magasság pixelekben.
+     */
+    int getEffectiveHeight() const;
 
     void drawMuted();
 };

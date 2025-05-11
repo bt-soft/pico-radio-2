@@ -194,22 +194,25 @@ void MemoryDisplay::drawListItem(TFT_eSPI& tft_ref, int index, int itemX, int it
     // Csak a sortedStations.size()-szal szemben kell ellenőrizni
     if (index < 0 || index >= sortedStations.size()) return;
 
-    const StationData& station = sortedStations[index];
-
-    uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
-    uint8_t currentTunedBandIdx = config.data.bandIdx;
-
-    // Az isSelected paraméterként érkezik
-    bool isTuned = (station.frequency == currentTunedFreq && station.bandIndex == currentTunedBandIdx);
-    if (isTuned && (station.modulation == LSB || station.modulation == USB || station.modulation == CW)) {
-        isTuned = (station.bfoOffset == band.getCurrentBand().varData.lastBFO);
-    }
-
     uint16_t bgColor = isSelected ? SELECTED_ITEM_BG_COLOR : ITEM_BG_COLOR;
     uint16_t textColor = isSelected ? SELECTED_ITEM_TEXT_COLOR : ITEM_TEXT_COLOR;
 
     // Az itemX, itemY, itemW, itemH a ScrollableListComponent által biztosított
-    tft_ref.fillRect(itemX, itemY, itemW, itemH, bgColor);
+    // 1. Terület törlése a háttérszínnel
+    // A kiválasztott elem háttérrajzolási paramétereinek módosítása a 2px-es margóhoz
+    int bgX = itemX;
+    int bgY = itemY;
+    int bgW = itemW;
+    int bgH = itemH;
+
+    // Kis margót hagyunk a kiválasztott elem körül
+    if (isSelected) {
+        bgX += 4;
+        bgY += 4;
+        bgW -= 4;
+        bgH -= 4;
+    }
+    tft_ref.fillRect(bgX, bgY, bgW, bgH, bgColor);
 
     // Fő betűtípus beállítása a listaelemhez (név, ikon, moduláció).
     // Mindig FreeSansBold9pt7b, méret 1. A szín változik a kiválasztottság alapján.
@@ -221,6 +224,13 @@ void MemoryDisplay::drawListItem(TFT_eSPI& tft_ref, int index, int itemX, int it
     int textCenterY = itemY + itemH / 2;
 
     // Ikon kirajzolása, ha az állomás be van hangolva
+    const StationData& station = sortedStations[index];
+    uint16_t currentTunedFreq = band.getCurrentBand().varData.currFreq;
+    uint8_t currentTunedBandIdx = config.data.bandIdx;
+    bool isTuned = (station.frequency == currentTunedFreq && station.bandIndex == currentTunedBandIdx);
+    if (isTuned && (station.modulation == LSB || station.modulation == USB || station.modulation == CW)) {
+        isTuned = (station.bfoOffset == band.getCurrentBand().varData.lastBFO);
+    }
     int iconStartX = itemX + ICON_PADDING_RIGHT;
     if (isTuned) {
         tft_ref.setTextColor(TUNED_ICON_COLOR, bgColor);
