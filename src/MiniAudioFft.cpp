@@ -13,16 +13,18 @@
  * @param y A komponens bal felső sarkának Y koordinátája a képernyőn.
  * @param w A komponens szélessége pixelekben.
  * @param h A komponens magassága pixelekben.
+ * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
  */
-MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h)
+MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configModeField)
     : tft(tft_ref),
       posX(x),
       posY(y),
       width(w),
       height(h),
-      currentMode(1),                // Kezdő mód: Alacsony felbontású spektrum
-      prevMuteState(rtv::muteStat),  // Némítás előző állapotának inicializálása
-      FFT(),                         // FFT objektum inicializálása
+      // currentMode itt nem kap explicit kezdőértéket, a setInitialMode állítja be
+      prevMuteState(rtv::muteStat),              // Némítás előző állapotának inicializálása
+      configModeFieldRef(configModeField),       // Referencia elmentése
+      FFT(),                                     // FFT objektum inicializálása
       highResOffset(0) {
 
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
@@ -42,6 +44,18 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h)
 }
 
 /**
+ * @brief Beállítja a komponens kezdeti megjelenítési módját.
+ * Ezt a szülő képernyő hívja meg a konstruktor után, a configból kiolvasott értékkel.
+ * @param mode A beállítandó DisplayMode.
+ */
+void MiniAudioFft::setInitialMode(DisplayMode mode) {
+    currentMode = mode;
+    clearArea();          // Terület törlése
+    drawModeIndicator();  // Módkijelző kirajzolása
+    // A grafikon az első loop() híváskor fog kirajzolódni, ha a mód nem Off.
+}
+
+/**
  * @brief Vált a következő megjelenítési módra.
  *
  * Körbejár a rendelkezésre álló módok között (0-tól 5-ig).
@@ -49,19 +63,27 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h)
  * és reseteli a mód-specifikus puffereket.
  */
 void MiniAudioFft::cycleMode() {
-    currentMode++;
-    if (currentMode >= 6) {  // 0-5 módok (0=Ki, 1=AlacsonyFelb, 2=MagasFelb, 3=Szkóp, 4=Vízesés, 5=Burkoló)
-        currentMode = 0;
+    // Az enum értékének növelése és körbejárás
+    uint8_t modeValue = static_cast<uint8_t>(currentMode);
+    modeValue++;
+    if (modeValue > static_cast<uint8_t>(DisplayMode::Envelope)) {  // Az utolsó érvényes mód az Envelope
+        modeValue = static_cast<uint8_t>(DisplayMode::Off);         // Visszaugrás az Off-ra
     }
+    currentMode = static_cast<DisplayMode>(modeValue);
+
+    // Új mód mentése a konfigurációba a referencián keresztül
+    configModeFieldRef = static_cast<uint8_t>(currentMode);
+
     clearArea();  // Teljes terület törlése az új mód előtt
     // Mód-specifikus pufferek resetelése
-    if (currentMode == 1 || (currentMode != 1 && Rpeak[0] != 0)) {  // Alacsony felb. spektrum
+    if (currentMode == DisplayMode::SpectrumLowRes || (currentMode != DisplayMode::SpectrumLowRes && Rpeak[0] != 0)) {
         memset(Rpeak, 0, sizeof(Rpeak));
     }
-    if (currentMode == 3 || (currentMode != 3 && osciSamples[0] != 2048)) {  // Oszcilloszkóp
+    if (currentMode == DisplayMode::Oscilloscope || (currentMode != DisplayMode::Oscilloscope && osciSamples[0] != 2048)) {
         for (int i = 0; i < MiniAudioFftConstants::MAX_INTERNAL_WIDTH; ++i) osciSamples[i] = 2048;
     }
-    if (currentMode == 4 || currentMode == 5 || (currentMode < 4 && !wabuf.empty() && !wabuf[0].empty() && wabuf[0][0] != 0)) {  // Vízesés/Burkoló
+    if (currentMode == DisplayMode::Waterfall || currentMode == DisplayMode::Envelope ||
+        (currentMode < DisplayMode::Waterfall && !wabuf.empty() && !wabuf[0].empty() && wabuf[0][0] != 0)) {
         for (auto& row : wabuf) std::fill(row.begin(), row.end(), 0);
     }
     highResOffset = 0;  // Magas felbontású spektrum eltolásának resetelése
@@ -80,7 +102,7 @@ void MiniAudioFft::clearArea() {
     int frameOuterX = posX - frameThickness;
     int frameOuterY = posY - frameThickness;
     int frameOuterW = width + (frameThickness * 2);
-    int frameOuterH = height + (frameThickness * 2)+1;
+    int frameOuterH = height + (frameThickness * 2) + 1;
     tft.drawRect(frameOuterX, frameOuterY, frameOuterW, frameOuterH, TFT_SILVER);  // Külső keret kitöltése
 }
 
@@ -127,26 +149,26 @@ void MiniAudioFft::drawModeIndicator() {
 
     String modeText = "";
     switch (currentMode) {
-        case 0:
+        case DisplayMode::Off:
             modeText = "Off";
             break;
-        case 1:
+        case DisplayMode::SpectrumLowRes:
             modeText = "FFT LowRes";
             break;
-        case 2:
+        case DisplayMode::SpectrumHighRes:
             modeText = "FFT HighRes";
             break;
-        case 3:
+        case DisplayMode::Oscilloscope:
             modeText = "Scope";
             break;
-        case 4:
+        case DisplayMode::Waterfall:
             modeText = "WaterFall";
             break;
-        case 5:
+        case DisplayMode::Envelope:
             modeText = "Envelope";
             break;
         default:
-            modeText = "Unknown";
+            modeText = "Unk";  // Rövidebb, ha valamiért érvénytelen lenne
             break;
     }
 
@@ -224,30 +246,30 @@ void MiniAudioFft::loop() {
     }
 
     // Ha a mód "Ki" (0), akkor nincs dinamikus tartalom, amit frissíteni kellene.
-    // A `cycleMode` vagy `forceRedraw` már kirajzolta az "Off" feliratot.
-    if (currentMode == 0) {
+    // A `cycleMode` vagy `forceRedraw` már kirajzolta az "Off" feliratot a `drawModeIndicator` hívásával.
+    if (currentMode == DisplayMode::Off) {
         return;
     }
 
     // FFT mintavételezés és számítás (az oszcilloszkóp módhoz gyűjtünk extra mintákat)
-    performFFT(currentMode == 3);
+    performFFT(currentMode == DisplayMode::Oscilloscope);
 
     // Grafikonok kirajzolása a nekik szánt (csökkentett) területre
     // Ezek a függvények csak a `posY`-tól `posY + getGraphHeight() - 1`-ig rajzolnak.
     switch (currentMode) {
-        case 1:
+        case DisplayMode::SpectrumLowRes:
             drawSpectrumLowRes();
             break;
-        case 2:
+        case DisplayMode::SpectrumHighRes:
             drawSpectrumHighRes();
             break;
-        case 3:
+        case DisplayMode::Oscilloscope:
             drawOscilloscope();
             break;
-        case 4:
+        case DisplayMode::Waterfall:
             drawWaterfall();
             break;
-        case 5:
+        case DisplayMode::Envelope:
             drawEnvelope();
             break;
     }
@@ -290,28 +312,29 @@ void MiniAudioFft::forceRedraw() {
     if (rtv::muteStat) {
         drawMuted();
 
-    } else if (currentMode == 0) {
+    } else if (currentMode == DisplayMode::Off) {
         drawModeIndicator();  // "Off" kirajzolása
 
     } else {
         // Módok 1-5: grafikon kirajzolása
-        performFFT(currentMode == 3);  // Szükséges az adatokhoz
+        performFFT(currentMode == DisplayMode::Oscilloscope);  // Szükséges az adatokhoz
         switch (currentMode) {
-            case 1:
+            case DisplayMode::SpectrumLowRes:
                 drawSpectrumLowRes();
                 break;
-            case 2:
+            case DisplayMode::SpectrumHighRes:
                 drawSpectrumHighRes();
                 break;
-            case 3:
+            case DisplayMode::Oscilloscope:
                 drawOscilloscope();
                 break;
-            case 4:
+            case DisplayMode::Waterfall:
                 drawWaterfall();
                 break;
-            case 5:
+            case DisplayMode::Envelope:
                 drawEnvelope();
                 break;
+                // Nincs szükség default-ra, ha minden enum értéket lefedünk
         }
         drawModeIndicator();  // És a módkijelző kirajzolása
     }

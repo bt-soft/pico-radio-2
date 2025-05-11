@@ -3,6 +3,7 @@
 
 #include "DebugDataInspector.h"  // Szükséges a debug kiíratáshoz
 #include "StoreBase.h"
+#include "MiniAudioFft.h" // Szükséges a MiniAudioFft::DisplayMode enumhoz
 
 // TFT háttérvilágítás max érték
 #define TFT_BACKGROUND_LED_MAX_BRIGHTNESS 255
@@ -53,6 +54,10 @@ struct Config_t {
     bool tftDigitLigth;                 // Inaktív szegmens látszódjon?
     uint8_t screenSaverTimeoutMinutes;  // Képernyővédő ideje percekben (1-30)
     bool beeperEnabled;                 // Hangjelzés engedélyezése
+
+    // MiniAudioFft módok
+    uint8_t miniAudioFftModeAm;         // MiniAudioFft módja AM képernyőn
+    uint8_t miniAudioFftModeFm;         // MiniAudioFft módja FM képernyőn
 };
 
 // Alapértelmezett konfigurációs adatok (readonly, const)

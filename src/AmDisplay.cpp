@@ -32,10 +32,13 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
 
     // MiniAudioFft komponens elhelyezése
     int mini_fft_x = 260;
-    int mini_fft_y = 80;
-    int mini_fft_w = 100;
+    int mini_fft_y = 50;
+    int mini_fft_w = 140;
     int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
-    pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h);
+    // Átadjuk a config.data.miniAudioFftModeAm referenciáját
+    pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm);
+    // Beállítjuk a kezdeti módot a configból
+    pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
 }
 
 /**

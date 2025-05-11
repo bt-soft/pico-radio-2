@@ -54,6 +54,16 @@ constexpr int MAX_WATERFALL_COLOR_INPUT_VALUE = 20000;  // Maximális bemeneti �
 }  // namespace MiniAudioFftConstants
 
 class MiniAudioFft {
+   public: // Publikus enum a könnyebb elérhetőségért, ha külsőleg is hivatkoznánk rá
+    // Megjelenítési módok enum definíciója
+    enum class DisplayMode : uint8_t {
+        Off = 0,
+        SpectrumLowRes,
+        SpectrumHighRes,
+        Oscilloscope,
+        Waterfall,
+        Envelope
+    };
    public:
     /**
      * @brief Konstruktor.
@@ -62,10 +72,12 @@ class MiniAudioFft {
      * @param y A komponens bal felső sarkának Y koordinátája.
      * @param w A komponens szélessége.
      * @param h A komponens magassága.
+     * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
      */
-    MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h);
+    MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configModeField);
     ~MiniAudioFft() = default;  // Alapértelmezett destruktor
 
+    void setInitialMode(DisplayMode mode); // Kezdeti mód beállítása
     /**
      * @brief A komponens fő ciklusfüggvénye, kezeli az FFT mintavételezést és a rajzolást.
      */
@@ -87,8 +99,9 @@ class MiniAudioFft {
     TFT_eSPI& tft;                  // Referencia a TFT objektumra
     int posX, posY, width, height;  // Komponens pozíciója és méretei
 
-    uint8_t currentMode;  // Aktuális megjelenítési mód (0:ki, 1:low-res, 2:high-res, 3:osci, 4:waterfall, 5:envelope)
+    DisplayMode currentMode;  // Aktuális megjelenítési mód
     bool prevMuteState;   // Előző némítási állapot a változások érzékeléséhez
+    uint8_t& configModeFieldRef; // Referencia a Config mezőre a mód mentéséhez
 
     ArduinoFFT<double> FFT;                             // FFT objektum
     double vReal[MiniAudioFftConstants::FFT_SAMPLES];   // Valós rész az FFT bemenetéhez/kimenetéhez

@@ -62,6 +62,8 @@ void DebugDataInspector::printConfigData(const Config_t& configData) {
     DEBUG("  tftBackgroundBrightness: %u\n", configData.tftBackgroundBrightness);
     DEBUG("  tftDigitLigth: %s\n", configData.tftDigitLigth ? "true" : "false");
     DEBUG("  screenSaverTimeoutMinutes: %u\n", configData.screenSaverTimeoutMinutes);
+    DEBUG("  miniAudioFftModeAm: %u\n", configData.miniAudioFftModeAm);
+    DEBUG("  miniAudioFftModeFm: %u\n", configData.miniAudioFftModeFm);
     DEBUG("====================\n");
 #endif
 }
