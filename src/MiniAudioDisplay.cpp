@@ -139,8 +139,7 @@ void MiniAudioDisplay::FFTSampleMini(bool collectOsciSamples) {
         double averaged_sample = sum / 4.0;
         if (collectOsciSamples) {
             // Minden N-edik mintát mentünk az oszcilloszkóphoz
-            // Például minden 2. mintát:
-            if (i % 2 == 0 && osci_sample_idx < MINI_OSCI_SAMPLES_TO_DRAW) {
+            if (i % MINI_OSCI_SAMPLE_DECIMATION_FACTOR == 0 && osci_sample_idx < MINI_OSCI_SAMPLES_TO_DRAW) {
                 osciSamples[osci_sample_idx] = static_cast<int>(averaged_sample);
                 osci_sample_idx++;
             }
@@ -177,11 +176,11 @@ void MiniAudioDisplay::drawMiniSpectrumLowRes() {
             int xPos = actual_start_x_low_res + 5 * band_idx;
             // Az y_erase_start a törlő téglalap tetejének Y koordinátája
             int y_erase_start = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - Rpeak[band_idx];
-            
+
             // Biztosítjuk, hogy a törlés ne lógjon ki a MINI_DISPLAY_AREA_H területből
             // A maximális Y koordináta, amire még rajzolhatunk a fekete területen belül:
             int max_y_drawable_within_area = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - 1;
-            int erase_height = 2; // Alapértelmezett törlési magasság
+            int erase_height = 2;  // Alapértelmezett törlési magasság
             if (y_erase_start + erase_height - 1 > max_y_drawable_within_area) {
                 erase_height = max_y_drawable_within_area - y_erase_start + 1;
             }
@@ -277,7 +276,10 @@ void MiniAudioDisplay::drawMiniOscilloscope() {
 
     for (int i = 0; i < MINI_OSCI_SAMPLES_TO_DRAW; i++) {
         int raw_sample = osciSamples[i];
+        // ADC érték (0-4095) középre igazítása (-2048 to +2047)
         double centered_sample = static_cast<double>(raw_sample) - 2048.0;
+        // Érzékenységi faktor alkalmazása
+        centered_sample *= MINI_OSCI_SENSITIVITY_FACTOR;
         double scaled_to_half_height = centered_sample * (static_cast<double>(MINI_DISPLAY_AREA_H) / 2.0 - 2.0) / 2048.0;
 
         int y_pos = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H / 2 - static_cast<int>(round(scaled_to_half_height));
@@ -329,9 +331,9 @@ void MiniAudioDisplay::drawMiniWaterfall() {
 
     // A vízesés Y pozíciójának kiszámítása, hogy a terület aljára kerüljön
     // Ha MINI_WF_HEIGHT helyett MINI_DISPLAY_AREA_H-t használunk, a base_y MINI_DISPLAY_AREA_Y lesz.
-    int waterfall_base_y = MINI_DISPLAY_AREA_Y; // + MINI_DISPLAY_AREA_H - MINI_DISPLAY_AREA_H;
+    int waterfall_base_y = MINI_DISPLAY_AREA_Y;  // + MINI_DISPLAY_AREA_H - MINI_DISPLAY_AREA_H;
 
-    for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {     // Y koordináta a kijelzőn (sor)
+    for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {      // Y koordináta a kijelzőn (sor)
         for (int j = 0; j < MINI_DISPLAY_AREA_W; j++) {  // X koordináta a kijelzőn (oszlop)
             uint16_t color = valueToMiniWaterfallColor(MINI_WF_GRADIENT * wabuf[i][j]);
             // Az Y koordináta módosítva, hogy a vízesés alulra kerüljön
@@ -361,7 +363,9 @@ void MiniAudioDisplay::drawMiniEnvelope() {
             wabuf[i][MINI_DISPLAY_AREA_W - 1] = 0;  // Ha túllépnénk, nullázzuk
         } else {
             double scaled_val = RvReal[fft_bin_to_use] / MINI_AMPLITUDE_SCALE;
-            wabuf[i][MINI_DISPLAY_AREA_W - 1] = static_cast<int>(constrain(scaled_val, 0.0, 255.0));
+            // Alkalmazzuk a burkológörbe-specifikus erősítést
+            double gained_val = scaled_val * MINI_ENVELOPE_INPUT_GAIN;
+            wabuf[i][MINI_DISPLAY_AREA_W - 1] = static_cast<int>(constrain(gained_val, 0.0, 255.0));
         }
     }
 
@@ -381,9 +385,9 @@ void MiniAudioDisplay::drawMiniEnvelope() {
 
     // 4. Burkológörbe kirajzolása
     for (int j = 0; j < MINI_DISPLAY_AREA_W; j++) {  // Minden oszlopra
-        int env_idx_for_col_j = half_h;        // Az aktuális oszlopban a max. értékű bin indexe, középről indulva
-        int max_val_in_col = 0;                // Az aktuális oszlopban talált maximális érték
-        bool column_has_signal = false;        // Jelzi, ha van pozitív jel az oszlopban
+        int env_idx_for_col_j = half_h;              // Az aktuális oszlopban a max. értékű bin indexe, középről indulva
+        int max_val_in_col = 0;                      // Az aktuális oszlopban talált maximális érték
+        bool column_has_signal = false;              // Jelzi, ha van pozitív jel az oszlopban
 
         // Domináns frekvencia (max. magnitúdójú bin indexének) keresése az aktuális oszlopban
         for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {
@@ -411,11 +415,11 @@ void MiniAudioDisplay::drawMiniEnvelope() {
         if (column_has_signal) {  // Csak akkor rajzolunk, ha volt jel az oszlopban
             // A burkológörbe vizuális "vastagsága" a simított domináns bin indexétől függ
             // Minél magasabb a domináns frekvencia indexe, annál "vastagabb" a görbe
-            for (int i = 0; i <= smoothed_env_idx; i++) {
-                // Az 'i' itt a "vastagságot" szabályozza, 0-tól a smoothed_env_idx-ig.
-                // A /2 azért van, hogy szimmetrikus legyen a half_h körül.
-                int yUpper = actual_draw_y_start + half_h - i / 2;
-                int yLower = actual_draw_y_start + half_h + i / 2;
+            for (int i = 0; i <= smoothed_env_idx; i++) { // smoothed_env_idx továbbra is a domináns bin indexe
+                // A függőleges kitérést az új skálázóval számoljuk
+                int y_offset = static_cast<int>(static_cast<float>(i) * MINI_ENVELOPE_THICKNESS_SCALER);
+                int yUpper = actual_draw_y_start + half_h - y_offset;
+                int yLower = actual_draw_y_start + half_h + y_offset;
 
                 // Biztosítjuk, hogy a pixelek a kijelölt területen belül maradjanak
                 yUpper = constrain(yUpper, actual_draw_y_start, actual_draw_y_start + MINI_DISPLAY_AREA_H - 1);
@@ -435,19 +439,19 @@ void MiniAudioDisplay::drawMiniEnvelope() {
 // Egyedi színskála a mini vízeséshez, hogy a háttér biztosan fekete legyen
 namespace MiniWaterfallColors {
 const uint16_t miniColors0[16] = {
-    0x0000,                                 // TFT_BLACK (index 0)
-    0x0000,                                 // TFT_BLACK (index 1)
-    0x0000,                                 // TFT_BLACK (index 2) - Még egy fekete szint a tisztább háttérért
-    0x001F,                                 // Nagyon sötét kék
-    0x081F,                                 // Sötét kék
-    0x0810,                                 // Sötét zöldeskék
-    0x0800,                                 // Sötétzöld
-    0x0C00,                                 // Közepes zöld
-    0x1C00,                                 // Világosabb zöld
-    0xFC00,                                 // Narancs
-    0xFDE0,                                 // Világos sárga
-    0xFFE0,                                 // Sárga
-    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF          // Fehér a csúcsokhoz
+    0x0000,                         // TFT_BLACK (index 0)
+    0x0000,                         // TFT_BLACK (index 1)
+    0x0000,                         // TFT_BLACK (index 2) - Még egy fekete szint a tisztább háttérért
+    0x001F,                         // Nagyon sötét kék
+    0x081F,                         // Sötét kék
+    0x0810,                         // Sötét zöldeskék
+    0x0800,                         // Sötétzöld
+    0x0C00,                         // Közepes zöld
+    0x1C00,                         // Világosabb zöld
+    0xFC00,                         // Narancs
+    0xFDE0,                         // Világos sárga
+    0xFFE0,                         // Sárga
+    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF  // Fehér a csúcsokhoz
 };
 }
 

@@ -15,14 +15,11 @@ constexpr float MINI_AMPLITUDE_SCALE = 200.0;  // Skálázási faktor a mini kij
 
 // Mini kijelző területének definíciója
 constexpr int MINI_DISPLAY_AREA_X = 20;
-constexpr int MINI_DISPLAY_AREA_Y = 50;   // Státuszsor és cím alatt
+constexpr int MINI_DISPLAY_AREA_Y = 50;  // Státuszsor és cím alatt
 constexpr int MINI_DISPLAY_AREA_W = 86;  // Visszaállítás: Maximális szélesség a grafikus elemek közül
 constexpr int MINI_DISPLAY_AREA_H = 24;  // Visszaállítás: A vízesés magasságához igazítva
 
-// Mini vízeséshez és burkológörbéhez (FFT.ino alapján)
-constexpr int MINI_WF_GRADIENT = 100; // Ez a konstans megmarad a színátmenethez
-
-// Alacsony felbontású spektrumhoz (FFT.ino alapján)
+// Alacsony felbontású spektrumhoz
 constexpr int LOW_RES_BANDS = 16;
 constexpr int LOW_RES_PEAK_MAX_HEIGHT = 23;  // dmax az FFT.ino-ban
 
@@ -30,7 +27,19 @@ constexpr int LOW_RES_PEAK_MAX_HEIGHT = 23;  // dmax az FFT.ino-ban
 constexpr int HIGH_RES_BINS_TO_DISPLAY = 85;  // SAMPLES / 3 az FFT.ino-ban
 
 // Oszcilloszkóphoz
-constexpr int MINI_OSCI_SAMPLES_TO_DRAW = 86;  // Az FFT.ino-ban ennyit rajzol
+constexpr int MINI_OSCI_SAMPLES_TO_DRAW = 86;           // Az FFT.ino-ban ennyit rajzol
+constexpr int MINI_OSCI_SAMPLE_DECIMATION_FACTOR = 3;  // Mintavételi decimációs faktor: 1 = kevesebb idő, több részlet. 2 = több idő.
+// Max: floor(FFT_SAMPLES / MINI_OSCI_SAMPLES_TO_DRAW) -> 32
+
+constexpr float MINI_OSCI_SENSITIVITY_FACTOR = 8.0f;  // Érzékenységi faktor: >1.0 érzékenyebb, <1.0 kevésbé érzékeny. Pl. 1.5f vagy 2.0f
+
+// Mini vízeséshez és burkológörbéhez
+constexpr int MINI_WF_GRADIENT = 100;  // Ez a konstans megmarad a színátmenethez
+
+// Envelope
+constexpr float MINI_ENVELOPE_INPUT_GAIN = 50.0f;        // Erősítési faktor a burkológörbe bemenetéhez, kísérletezz ezzel az értékkel (pl. 1.0f-től felfelé)
+constexpr float MINI_ENVELOPE_THICKNESS_SCALER = 0.95f;  // Vastagság skálázó: 0.5f az eredeti i/2-nek felel meg. Nagyobb érték = vastagabb.
+
 }  // namespace MiniAudioDisplayConstants
 
 class MiniAudioDisplay : public DisplayBase {
