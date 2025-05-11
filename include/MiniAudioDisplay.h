@@ -16,13 +16,11 @@ constexpr float MINI_AMPLITUDE_SCALE = 200.0;  // Skálázási faktor a mini kij
 // Mini kijelző területének definíciója
 constexpr int MINI_DISPLAY_AREA_X = 20;
 constexpr int MINI_DISPLAY_AREA_Y = 50;   // Státuszsor és cím alatt
-constexpr int MINI_DISPLAY_AREA_W = 86;  // Maximális szélesség a grafikus elemek közül
-constexpr int MINI_DISPLAY_AREA_H = 24;  // A vízesés magasságához igazítva (MINI_WF_HEIGHT)
+constexpr int MINI_DISPLAY_AREA_W = 86;  // Visszaállítás: Maximális szélesség a grafikus elemek közül
+constexpr int MINI_DISPLAY_AREA_H = 24;  // Visszaállítás: A vízesés magasságához igazítva
 
-// Mini vízeséshez (FFT.ino alapján)
-constexpr int MINI_WF_WIDTH = 84;
-constexpr int MINI_WF_HEIGHT = 24;
-constexpr int MINI_WF_GRADIENT = 100;
+// Mini vízeséshez és burkológörbéhez (FFT.ino alapján)
+constexpr int MINI_WF_GRADIENT = 100; // Ez a konstans megmarad a színátmenethez
 
 // Alacsony felbontású spektrumhoz (FFT.ino alapján)
 constexpr int LOW_RES_BANDS = 16;
@@ -67,7 +65,7 @@ class MiniAudioDisplay : public DisplayBase {
     int Rpeak[MiniAudioDisplayConstants::LOW_RES_BANDS + 1];  // Peak hold értékek
 
     // Mini vízeséshez és burkológörbéhez (mode 4, 5)
-    int wabuf[MiniAudioDisplayConstants::MINI_WF_HEIGHT][MiniAudioDisplayConstants::MINI_WF_WIDTH];
+    int wabuf[MiniAudioDisplayConstants::MINI_DISPLAY_AREA_H][MiniAudioDisplayConstants::MINI_DISPLAY_AREA_W];
 
     // Magas felbontású spektrumhoz (mode 2)
     int highResOffset;  // Az FFT.ino 'offset' változója

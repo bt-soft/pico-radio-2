@@ -175,8 +175,19 @@ void MiniAudioDisplay::drawMiniSpectrumLowRes() {
     for (byte band_idx = 0; band_idx <= LOW_RES_BANDS; band_idx++) {
         if (Rpeak[band_idx] > 0) {
             int xPos = actual_start_x_low_res + 5 * band_idx;
-            int yPos = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - Rpeak[band_idx];
-            tft.fillRect(xPos, yPos, 3, 2, TFT_BLACK);  // Előző csúcs törlése a háttérszínnel
+            // Az y_erase_start a törlő téglalap tetejének Y koordinátája
+            int y_erase_start = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - Rpeak[band_idx];
+            
+            // Biztosítjuk, hogy a törlés ne lógjon ki a MINI_DISPLAY_AREA_H területből
+            // A maximális Y koordináta, amire még rajzolhatunk a fekete területen belül:
+            int max_y_drawable_within_area = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - 1;
+            int erase_height = 2; // Alapértelmezett törlési magasság
+            if (y_erase_start + erase_height - 1 > max_y_drawable_within_area) {
+                erase_height = max_y_drawable_within_area - y_erase_start + 1;
+            }
+            if (erase_height > 0 && y_erase_start <= max_y_drawable_within_area) {
+                tft.fillRect(xPos, y_erase_start, 3, erase_height, TFT_BLACK);
+            }
         }
         if (Rpeak[band_idx] >= 1) {
             Rpeak[band_idx] -= 1;
@@ -288,17 +299,17 @@ void MiniAudioDisplay::drawMiniWaterfall() {
     using namespace MiniAudioDisplayConstants;
 
     // 1. Adatok shiftelése balra
-    for (int j = 0; j < MINI_WF_WIDTH - 1; j++) {
-        for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+    for (int j = 0; j < MINI_DISPLAY_AREA_W - 1; j++) {
+        for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {
             wabuf[i][j] = wabuf[i][j + 1];
         }
     }
 
     // 2. Új adatok betöltése a jobb szélre
-    for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+    for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {
         int fft_bin_to_use = i + 2;  // Kezdjük a 2. bintől, mint az FFT.ino-ban
         if (fft_bin_to_use >= FFT_SAMPLES / 2) {
-            wabuf[i][MINI_WF_WIDTH - 1] = 0;  // Ha túllépnénk, nullázzuk
+            wabuf[i][MINI_DISPLAY_AREA_W - 1] = 0;  // Ha túllépnénk, nullázzuk
         } else {
             // Az RvReal értékeit skálázzuk. A MINI_AMPLITUDE_SCALE-t úgy kell beállítani,
             // hogy az eredmény értelmes tartományban legyen a valueToMiniWaterfallColor számára.
@@ -308,26 +319,23 @@ void MiniAudioDisplay::drawMiniWaterfall() {
             // Korlátozzuk az értéket, hogy ne legyen túl nagy a színkonverzióhoz
             // Az FFT.ino-ban a wabuf értékei nem voltak expliciten korlátozva a betöltéskor.
             // Itt a wabuf tárolja a skálázott értéket, amit a gradienttel szorzunk a színfüggvényben.
-            wabuf[i][MINI_WF_WIDTH - 1] = static_cast<int>(constrain(scaled_fft_val * 50.0, 0.0, 255.0));  // *50.0 egy kísérleti szorzó, hogy a wabuf értékei nagyobbak legyenek
+            wabuf[i][MINI_DISPLAY_AREA_W - 1] = static_cast<int>(constrain(scaled_fft_val * 50.0, 0.0, 255.0));  // *50.0 egy kísérleti szorzó
         }
     }
 
     // 3. Pixelek kirajzolása
-    // X pozíció középre igazítása, ha a terület szélesebb, mint a vízesés
-    int x_pixel_offset_wf = 0;
-    if (MINI_DISPLAY_AREA_W > MINI_WF_WIDTH) {
-        x_pixel_offset_wf = (MINI_DISPLAY_AREA_W - MINI_WF_WIDTH) / 2;
-    }
-    int actual_start_x_wf = MINI_DISPLAY_AREA_X + x_pixel_offset_wf;
+    // Mivel MINI_WF_WIDTH helyett MINI_DISPLAY_AREA_W-t használunk, nincs szükség x eltolásra
+    int actual_start_x_wf = MINI_DISPLAY_AREA_X;
 
     // A vízesés Y pozíciójának kiszámítása, hogy a terület aljára kerüljön
-    int waterfall_base_y = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - MINI_WF_HEIGHT;
+    // Ha MINI_WF_HEIGHT helyett MINI_DISPLAY_AREA_H-t használunk, a base_y MINI_DISPLAY_AREA_Y lesz.
+    int waterfall_base_y = MINI_DISPLAY_AREA_Y; // + MINI_DISPLAY_AREA_H - MINI_DISPLAY_AREA_H;
 
-    for (int i = 0; i < MINI_WF_HEIGHT; i++) {     // Y koordináta a kijelzőn (sor)
-        for (int j = 0; j < MINI_WF_WIDTH; j++) {  // X koordináta a kijelzőn (oszlop)
+    for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {     // Y koordináta a kijelzőn (sor)
+        for (int j = 0; j < MINI_DISPLAY_AREA_W; j++) {  // X koordináta a kijelzőn (oszlop)
             uint16_t color = valueToMiniWaterfallColor(MINI_WF_GRADIENT * wabuf[i][j]);
             // Az Y koordináta módosítva, hogy a vízesés alulra kerüljön
-            int pixel_y_pos = waterfall_base_y + (MINI_WF_HEIGHT - 1 - i);  // Fordított Y továbbra is, de az új alaphoz képest
+            int pixel_y_pos = waterfall_base_y + (MINI_DISPLAY_AREA_H - 1 - i);  // Fordított Y
             tft.drawPixel(actual_start_x_wf + j, pixel_y_pos, color);
         }
     }
@@ -337,8 +345,8 @@ void MiniAudioDisplay::drawMiniEnvelope() {
     using namespace MiniAudioDisplayConstants;
 
     // 1. Adatok shiftelése balra (megegyezik a vízeséssel)
-    for (int j = 0; j < MINI_WF_WIDTH - 1; j++) {
-        for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+    for (int j = 0; j < MINI_DISPLAY_AREA_W - 1; j++) {
+        for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {
             wabuf[i][j] = wabuf[i][j + 1];
         }
     }
@@ -347,27 +355,24 @@ void MiniAudioDisplay::drawMiniEnvelope() {
     // Az RvReal közvetlen FFT magnitúdókat tartalmaz.
     // A MINI_AMPLITUDE_SCALE-t használjuk a skálázáshoz, hogy a wabuf értékei
     // kezelhető tartományban legyenek (pl. 0-255).
-    for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+    for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {
         int fft_bin_to_use = i + 2;  // Kezdjük a 2. bintől, mint az FFT.ino-ban
         if (fft_bin_to_use >= FFT_SAMPLES / 2) {
-            wabuf[i][MINI_WF_WIDTH - 1] = 0;  // Ha túllépnénk, nullázzuk
+            wabuf[i][MINI_DISPLAY_AREA_W - 1] = 0;  // Ha túllépnénk, nullázzuk
         } else {
             double scaled_val = RvReal[fft_bin_to_use] / MINI_AMPLITUDE_SCALE;
-            wabuf[i][MINI_WF_WIDTH - 1] = static_cast<int>(constrain(scaled_val, 0.0, 255.0));
+            wabuf[i][MINI_DISPLAY_AREA_W - 1] = static_cast<int>(constrain(scaled_val, 0.0, 255.0));
         }
     }
 
     // 3. Rajzolási paraméterek
-    int x_pixel_offset_env = 0;
-    if (MINI_DISPLAY_AREA_W > MINI_WF_WIDTH) {
-        x_pixel_offset_env = (MINI_DISPLAY_AREA_W - MINI_WF_WIDTH) / 2;  // Vízszintes középre igazítás
-    }
-    int actual_start_x_env = MINI_DISPLAY_AREA_X + x_pixel_offset_env;
+    // Mivel MINI_WF_WIDTH helyett MINI_DISPLAY_AREA_W-t használunk, nincs szükség x eltolásra
+    int actual_start_x_env = MINI_DISPLAY_AREA_X;
 
-    // A burkológörbe Y pozíciója. Mivel MINI_DISPLAY_AREA_H == MINI_WF_HEIGHT,
+    // A burkológörbe Y pozíciója. Mivel MINI_DISPLAY_AREA_H == (volt MINI_WF_HEIGHT),
     // a MINI_DISPLAY_AREA_Y-tól indulunk.
     int actual_draw_y_start = MINI_DISPLAY_AREA_Y;
-    const int half_h = MINI_WF_HEIGHT / 2;
+    const int half_h = MINI_DISPLAY_AREA_H / 2;
 
     // Az FFT.ino-ban a 'prev' lokális volt a rajzoló cikluson belül,
     // ami azt jelenti, hogy a simítás csak az aktuális képkocka oszlopai között történik.
@@ -375,13 +380,13 @@ void MiniAudioDisplay::drawMiniEnvelope() {
     static constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;
 
     // 4. Burkológörbe kirajzolása
-    for (int j = 0; j < MINI_WF_WIDTH; j++) {  // Minden oszlopra
+    for (int j = 0; j < MINI_DISPLAY_AREA_W; j++) {  // Minden oszlopra
         int env_idx_for_col_j = half_h;        // Az aktuális oszlopban a max. értékű bin indexe, középről indulva
         int max_val_in_col = 0;                // Az aktuális oszlopban talált maximális érték
         bool column_has_signal = false;        // Jelzi, ha van pozitív jel az oszlopban
 
         // Domináns frekvencia (max. magnitúdójú bin indexének) keresése az aktuális oszlopban
-        for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+        for (int i = 0; i < MINI_DISPLAY_AREA_H; i++) {
             if (wabuf[i][j] > 0) {
                 column_has_signal = true;
             }
@@ -401,7 +406,7 @@ void MiniAudioDisplay::drawMiniEnvelope() {
         int col_x_on_screen = actual_start_x_env + j;
 
         // Oszlop törlése
-        tft.drawFastVLine(col_x_on_screen, actual_draw_y_start, MINI_WF_HEIGHT, TFT_BLACK);
+        tft.drawFastVLine(col_x_on_screen, actual_draw_y_start, MINI_DISPLAY_AREA_H, TFT_BLACK);
 
         if (column_has_signal) {  // Csak akkor rajzolunk, ha volt jel az oszlopban
             // A burkológörbe vizuális "vastagsága" a simított domináns bin indexétől függ
@@ -413,8 +418,8 @@ void MiniAudioDisplay::drawMiniEnvelope() {
                 int yLower = actual_draw_y_start + half_h + i / 2;
 
                 // Biztosítjuk, hogy a pixelek a kijelölt területen belül maradjanak
-                yUpper = constrain(yUpper, actual_draw_y_start, actual_draw_y_start + MINI_WF_HEIGHT - 1);
-                yLower = constrain(yLower, actual_draw_y_start, actual_draw_y_start + MINI_WF_HEIGHT - 1);
+                yUpper = constrain(yUpper, actual_draw_y_start, actual_draw_y_start + MINI_DISPLAY_AREA_H - 1);
+                yLower = constrain(yLower, actual_draw_y_start, actual_draw_y_start + MINI_DISPLAY_AREA_H - 1);
 
                 if (yUpper <= yLower) {  // Csak akkor rajzolunk, ha van értelme (pl. i/2 ne legyen túl nagy)
                     tft.drawPixel(col_x_on_screen, yUpper, TFT_WHITE);
@@ -431,7 +436,8 @@ void MiniAudioDisplay::drawMiniEnvelope() {
 namespace MiniWaterfallColors {
 const uint16_t miniColors0[16] = {
     0x0000,                                 // TFT_BLACK (index 0)
-    0x0000,                                 // TFT_BLACK (index 1) - Még egy fekete szint a tisztább háttérért
+    0x0000,                                 // TFT_BLACK (index 1)
+    0x0000,                                 // TFT_BLACK (index 2) - Még egy fekete szint a tisztább háttérért
     0x001F,                                 // Nagyon sötét kék
     0x081F,                                 // Sötét kék
     0x0810,                                 // Sötét zöldeskék
@@ -441,18 +447,17 @@ const uint16_t miniColors0[16] = {
     0xFC00,                                 // Narancs
     0xFDE0,                                 // Világos sárga
     0xFFE0,                                 // Sárga
-    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF  // Fehér a csúcsokhoz
+    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF          // Fehér a csúcsokhoz
 };
 }
 
 uint16_t MiniAudioDisplay::valueToMiniWaterfallColor(int scaled_value) {
     // scaled_value = gradient * wabuf_value
     // Tegyük fel, hogy a wabuf értékei (RvReal[i+2] / MINI_AMPLITUDE_SCALE * 50.0) kb. 0-255 közöttiek.
-    // Ha MINI_WF_GRADIENT = 100, akkor scaled_value max kb. 25500.
+    // Ha MINI_WF_GRADIENT = 80 (a konstansokból), akkor scaled_value max kb. 80 * 255 = 20400.
     // Ezt kell 0-15 indexre skálázni.
-    const int MAX_COLOR_INPUT_VALUE = 15000;  // Kísérletezést igényel! Ez legyen a színskála vége.
-                                              // Ha a gradient 100, és a wabuf max 255, akkor 25500.
-                                              // Ha a wabuf max 150 (gradient*150 = 15000), akkor ez jó.
+    const int MAX_COLOR_INPUT_VALUE = 20000;  // Közelebb a tényleges maximumhoz (20400)
+                                              // Ha a gradient*150 = 15000), akkor ez jó.
     float normalized = static_cast<float>(constrain(scaled_value, 0, MAX_COLOR_INPUT_VALUE)) / static_cast<float>(MAX_COLOR_INPUT_VALUE);
 
     const uint16_t* colors = MiniWaterfallColors::miniColors0;  // Az egyedi palettát használjuk
