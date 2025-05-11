@@ -52,6 +52,7 @@ constexpr int StatusLineStepX = 220;
 constexpr int StatusLineAntCapX = 260;
 constexpr int StatusLineTempX = 300;
 constexpr int StatusLineVbusX = 340;
+constexpr int StatusLineMemoX = 380; // Új pozíció a memória indikátornak
 
 // Gombok méretei és margói (ezeket használja az AudioAnalyzerDisplay is)
 constexpr uint8_t MaxButtonsInRow = 6;
@@ -59,6 +60,9 @@ constexpr uint8_t ButtonWidth = 39;
 constexpr uint8_t ButtonHeight = 16;
 constexpr uint8_t ButtonMargin = 5;
 }  // namespace DisplayConstants
+namespace StatusColors { // Külön névtér a státusz színeknek
+    constexpr uint16_t MemoryIndicatorColor = TFT_GREEN; // Memória indikátor színe
+}
 
 /**
  * DisplayBase base osztály
@@ -87,6 +91,9 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 
     // A dialógban megnyomott gomb adatai
     TftButton::ButtonTouchEvent dialogButtonResponse = TftButton::noTouchEvent;
+
+    // Memória indikátorhoz
+    bool prevIsInMemo = false;
 
     /**
      * Megkeresi a gombot a label alapján a megadott tömbben
@@ -172,6 +179,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
     void drawAntCapStatus(bool initFont = false);
     void drawTemperatureStatus(bool initFont = false, bool forceRedraw = false);
     void drawVbusStatus(bool initFont = false, bool forceRedraw = false);
+    void drawMemoryIndicatorStatus(bool isInMemo, bool initFont = false);
 
     void dawStatusLine();
 
@@ -202,6 +210,8 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
      * @return A TftButton pointere, vagy nullptr, ha nincs ilyen gomb
      */
     TftButton *findButtonById(uint8_t id);
+
+    bool checkIfCurrentStationIsInMemo();
 
     /**
      * Közös gombok touch handlere

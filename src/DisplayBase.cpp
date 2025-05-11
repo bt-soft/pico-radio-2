@@ -2,6 +2,7 @@
 
 #include "FrequencyInputDialog.h"
 #include "PicoSensorUtils.h"
+#include "StationStore.h"  // Hiányzó include hozzáadása
 #include "ValueChangeDialog.h"
 
 namespace DisplayConstants {
@@ -37,6 +38,7 @@ constexpr uint16_t StatusLineAntCapDefaultColor = TFT_SILVER;  //  Alapértelmez
 constexpr uint16_t StatusLineAntCapChangedColor = TFT_GREEN;   // Megváltozott AntCap szín (világoszöld)
 constexpr uint16_t StatusLineTempColor = TFT_YELLOW;           // Hőmérséklet színe
 constexpr uint16_t StatusLineVbusColor = TFT_GREENYELLOW;      // Vbus színe
+// A MemoryIndicatorColor a DisplayBase.h-ban van definiálva a StatusColors névtérben
 
 // Egyéb
 constexpr int VolumeMin = 0;
@@ -230,6 +232,37 @@ void DisplayBase::drawVbusStatus(bool initFont, bool forceRedraw) {
 }
 
 /**
+ * Memória indikátor ("M") kirajzolása.
+ * Ha az állomás a memóriában van, zölden jelenik meg kerettel.
+ * Ha nincs a memóriában, halványan (ezüst) jelenik meg
+ * @param isInMemo Igaz, ha az aktuális állomás a memóriában van.
+ * @param initFont Ha true, akkor a betűtípus inicializálása történik.
+ */ // Az initFont paraméter eltávolítva a robusztusság érdekében
+void DisplayBase::drawMemoryIndicatorStatus(bool isInMemo, bool /* initFont */) {
+    using namespace DisplayConstants;
+    using namespace StatusColors;
+
+    // Mindig beállítjuk a fontot, méretet és igazítást a konzisztens megjelenésért
+    tft.setFreeFont();
+    tft.setTextSize(1);
+    tft.setTextDatum(BC_DATUM);
+
+    int rectX = StatusLineMemoX - (StatusLineRectWidth / 2);
+    // Terület törlése
+    tft.fillRect(rectX, 0, StatusLineRectWidth, StatusLineHeight, TFT_COLOR_BACKGROUND);
+
+    uint16_t color = TFT_SILVER;
+    if (isInMemo) {
+        color = MemoryIndicatorColor;  // Bent van a memóriában
+    }
+    tft.setTextColor(color, TFT_COLOR_BACKGROUND);
+    tft.drawRect(rectX, 2, StatusLineRectWidth, StatusLineHeight, color);  // Keret magasságának korrekciója
+
+    // Az "Memo" szöveg kirajzolása
+    tft.drawString("Memo", StatusLineMemoX, StatusLineHeight - 1);  // Y pozíció a StatusLineHeight aljához igazítva
+}
+
+/**
  * Státusz sor a képernyő tetején
  * @param initFont Ha true, akkor a betűtípus inicializálása történik
  */
@@ -278,6 +311,9 @@ void DisplayBase::dawStatusLine() {
 
     // Vbus
     drawVbusStatus(false, true);  // Force redraw, hogy a keret is megjelenjen
+
+    // Memória indikátor
+    drawMemoryIndicatorStatus(checkIfCurrentStationIsInMemo(), false);  // initFont false, mert már beállítottuk
 }
 
 /**
@@ -1129,6 +1165,13 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
     if (!pDialog and (displayType == DisplayBase::DisplayType::fm or displayType == DisplayBase::DisplayType::am)) {
         // Szenzor adatok frissítése
         updateSensorReadings();
+
+        // Memória indikátor állapotának ellenőrzése és frissítése
+        bool currentIsInMemo = checkIfCurrentStationIsInMemo();
+        if (currentIsInMemo != prevIsInMemo) {
+            drawMemoryIndicatorStatus(currentIsInMemo);  // initFont false, mert a dawStatusLine már beállította
+            prevIsInMemo = currentIsInMemo;
+        }
     }
 
     // Touch adatok változói
@@ -1212,4 +1255,30 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
     }
 
     return touched;
+}
+
+/**
+ * @brief Ellenőrzi, hogy az aktuálisan behangolt állomás szerepel-e a memóriában.
+ * @return true, ha az állomás a memóriában van, egyébként false.
+ */
+bool DisplayBase::checkIfCurrentStationIsInMemo() {
+    BandTable &currentBandData = band.getCurrentBand();
+    uint16_t freq = currentBandData.varData.currFreq;
+    uint8_t bandIdx = config.data.bandIdx;  // Az aktuális sáv indexe a configból
+    uint8_t mod = currentBandData.varData.currMod;
+    int16_t bfo = 0;
+
+    if (mod == LSB || mod == USB || mod == CW) {
+        bfo = currentBandData.varData.lastBFO;
+    }
+
+    bool isFm = (band.getCurrentBandType() == FM_BAND_TYPE);
+    int memoIdx = -1;
+
+    if (isFm) {
+        memoIdx = fmStationStore.findStation(freq, bandIdx, bfo);
+    } else {
+        memoIdx = amStationStore.findStation(freq, bandIdx, bfo);
+    }
+    return (memoIdx != -1);
 }
