@@ -12,10 +12,6 @@ AudioAnalyzerDisplay::AudioAnalyzerDisplay(TFT_eSPI& tft_ref, SI4735& si4735_ref
     // miután a képernyő méretei és a DisplayBase inicializálása megtörtént.
 }
 
-/**
- * Az AudioAnalyzerDisplay osztály destruktora
- */
-AudioAnalyzerDisplay::~AudioAnalyzerDisplay() { DEBUG("AudioAnalyzerDisplay::~AudioAnalyzerDisplay\n"); }
 
 /**
  *
@@ -71,10 +67,12 @@ void AudioAnalyzerDisplay::displayLoop() {
     for (int x_coord = 0; x_coord < tft.width(); x_coord++) {
         // Képernyő x-koordináta leképezése FFT bin indexre
         // Az FFT_START_BIN_OFFSET-től indulunk (kb. 100Hz) az FFT_SAMPLES/2 - 1 bin-ig (Nyquist).
-
         constexpr int start_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET;
-        constexpr int end_display_bin = AudioAnalyzerConstants::FFT_SAMPLES / 2 - 1;
-        constexpr int num_displayable_bins = end_display_bin - start_display_bin + 1;
+        // Az end_display_bin mostantól az ANALYZER_DISPLAY_NUM_BINS alapján számolódik
+        int end_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET + AudioAnalyzerConstants::ANALYZER_DISPLAY_NUM_BINS - 1;
+        // Biztosítjuk, hogy ne lépjük túl a maximális elérhető bin indexet
+        end_display_bin = constrain(end_display_bin, start_display_bin, AudioAnalyzerConstants::FFT_SAMPLES / 2 - 1);
+        int num_displayable_bins = end_display_bin - start_display_bin + 1;
 
         int fft_bin_index;
         if (num_displayable_bins <= 1) {  // Elkerüljük az osztást nullával vagy negatívval, ha a tartomány túl szűk
@@ -177,10 +175,15 @@ void AudioAnalyzerDisplay::audioScaleAnalyzer(uint16_t occupiedBottomHeight) {
     tft.setTextSize(1);                                  // Kisebb betűméret a skálához
     tft.setFreeFont();                                   // Standard font
 
-    // Kiszámítja a ténylegesen megjelenített kezdő és végfrekvenciát kHz-ben
+    // A skála kezdő frekvenciája
     float actual_start_freq_for_scale_kHz =
         (float)AudioAnalyzerConstants::FFT_START_BIN_OFFSET * (AudioAnalyzerConstants::SAMPLING_FREQUENCY / (float)AudioAnalyzerConstants::FFT_SAMPLES) / 1000.0f;
-    float max_freq_for_scale_kHz = (AudioAnalyzerConstants::SAMPLING_FREQUENCY / 2.0f) / 1000.0f;
+    // A skála végfrekvenciája a szűkített tartomány alapján
+    int actual_end_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET + AudioAnalyzerConstants::ANALYZER_DISPLAY_NUM_BINS - 1;
+    actual_end_display_bin = constrain(actual_end_display_bin, AudioAnalyzerConstants::FFT_START_BIN_OFFSET, AudioAnalyzerConstants::FFT_SAMPLES / 2 - 1);
+    float max_freq_for_scale_kHz = (float)actual_end_display_bin * (AudioAnalyzerConstants::SAMPLING_FREQUENCY / (float)AudioAnalyzerConstants::FFT_SAMPLES) / 1000.0f;
+
+
     float displayed_freq_span_kHz = max_freq_for_scale_kHz - actual_start_freq_for_scale_kHz;
     if (displayed_freq_span_kHz < 0) displayed_freq_span_kHz = 0;  // Negatív tartomány elkerülése
 

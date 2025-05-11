@@ -58,8 +58,8 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
 
     // MiniAudioFft komponens elhelyezése
     int mini_fft_x = 260;
-    int mini_fft_y = 80;
-    int mini_fft_w = 100;
+    int mini_fft_y = 100;
+    int mini_fft_w = 140;
     int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
     pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h);
 }

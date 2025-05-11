@@ -24,6 +24,7 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h)
       prevMuteState(rtv::muteStat),  // Némítás előző állapotának inicializálása
       FFT(),                         // FFT objektum inicializálása
       highResOffset(0) {
+
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
     if (this->height > 0 && this->width > 0) {
@@ -71,7 +72,17 @@ void MiniAudioFft::cycleMode() {
 /**
  * @brief Letörli a komponens teljes rajzolási területét feketére.
  */
-void MiniAudioFft::clearArea() { tft.fillRect(posX, posY, width, height, TFT_BLACK); }
+void MiniAudioFft::clearArea() {
+    tft.fillRect(posX, posY, width, height, TFT_BLACK);
+
+    // Mini kijelző területének vastagabb és világosabb körvonala
+    constexpr int frameThickness = 1;  // Keret vastagsága
+    int frameOuterX = posX - frameThickness;
+    int frameOuterY = posY - frameThickness;
+    int frameOuterW = width + (frameThickness * 2);
+    int frameOuterH = height + (frameThickness * 2)+1;
+    tft.drawRect(frameOuterX, frameOuterY, frameOuterW, frameOuterH, TFT_SILVER);  // Külső keret kitöltése
+}
 
 /**
  * @brief Kiszámítja és visszaadja a módkijelző területének magasságát.

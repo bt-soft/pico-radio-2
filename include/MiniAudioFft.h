@@ -8,7 +8,11 @@
 
 #include "defines.h"  // AUDIO_INPUT_PIN és színek eléréséhez
 
-// Konstansok a MiniAudioFft komponenshez (a MiniAudioDisplayConstants alapján)
+// A 10kHz-es SAMPLING_FREQUENCY miatt az FFT eljárás 0 Hz-től 5 kHz-ig terjedő sávszélességben képes mérni a frekvenciakomponenseket.
+// A grafikus megjelenítők ebből tipikusan a kb. 78 Hz-től 4.96 kHz-ig terjedő tartományt ábrázolják.
+
+
+// Konstansok a MiniAudioFft komponenshez 
 namespace MiniAudioFftConstants {
 constexpr uint16_t FFT_SAMPLES = 256;         // Minták száma az FFT-hez (2 hatványának kell lennie)
 constexpr double SAMPLING_FREQUENCY = 10000;  // Mintavételezési frekvencia Hz-ben

@@ -834,8 +834,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         processed = true;
 
     } else if (STREQ("FFT", event.label)) {  // FFT
-        //::newDisplay = DisplayBase::DisplayType::audioAnalyzer;
-        ::newDisplay = DisplayBase::DisplayType::miniAudioAnalyzer;
+        ::newDisplay = DisplayBase::DisplayType::audioAnalyzer;
         processed = true;
     }
 
