@@ -1,12 +1,6 @@
 #include "AudioAnalyzerDisplay.h"
 
-#include "rtVars.h"  // Szükséges a ::newDisplay globális változóhoz
-
-// Színprofilok
-namespace FftDisplayConstants {
-const uint16_t colors0[16] = {0x0000, 0x000F, 0x001F, 0x081F, 0x0810, 0x0800, 0x0C00, 0x1C00, 0xFC00, 0xFDE0, 0xFFE0, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};  // Cold
-const uint16_t colors1[16] = {0x0000, 0x1000, 0x2000, 0x4000, 0x8000, 0xC000, 0xF800, 0xF8A0, 0xF9C0, 0xFD20, 0xFFE0, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};  // Hot
-};  // namespace FftDisplayConstants
+#include "FftBase.h"
 
 /**
  * Az AudioAnalyzerDisplay osztály konstruktora
@@ -77,13 +71,13 @@ void AudioAnalyzerDisplay::displayLoop() {
     for (int x_coord = 0; x_coord < tft.width(); x_coord++) {
         // Képernyő x-koordináta leképezése FFT bin indexre
         // Az FFT_START_BIN_OFFSET-től indulunk (kb. 100Hz) az FFT_SAMPLES/2 - 1 bin-ig (Nyquist).
-        
+
         constexpr int start_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET;
         constexpr int end_display_bin = AudioAnalyzerConstants::FFT_SAMPLES / 2 - 1;
         constexpr int num_displayable_bins = end_display_bin - start_display_bin + 1;
 
         int fft_bin_index;
-        if (num_displayable_bins <= 1) { // Elkerüljük az osztást nullával vagy negatívval, ha a tartomány túl szűk
+        if (num_displayable_bins <= 1) {  // Elkerüljük az osztást nullával vagy negatívval, ha a tartomány túl szűk
             fft_bin_index = start_display_bin;
         } else {
             fft_bin_index = start_display_bin + static_cast<int>(roundf(((float)x_coord / (tft.width() - 1.0f)) * (num_displayable_bins - 1.0f)));
@@ -184,22 +178,23 @@ void AudioAnalyzerDisplay::audioScaleAnalyzer(uint16_t occupiedBottomHeight) {
     tft.setFreeFont();                                   // Standard font
 
     // Kiszámítja a ténylegesen megjelenített kezdő és végfrekvenciát kHz-ben
-    float actual_start_freq_for_scale_kHz = (float)AudioAnalyzerConstants::FFT_START_BIN_OFFSET * (AudioAnalyzerConstants::SAMPLING_FREQUENCY / (float)AudioAnalyzerConstants::FFT_SAMPLES) / 1000.0f;
+    float actual_start_freq_for_scale_kHz =
+        (float)AudioAnalyzerConstants::FFT_START_BIN_OFFSET * (AudioAnalyzerConstants::SAMPLING_FREQUENCY / (float)AudioAnalyzerConstants::FFT_SAMPLES) / 1000.0f;
     float max_freq_for_scale_kHz = (AudioAnalyzerConstants::SAMPLING_FREQUENCY / 2.0f) / 1000.0f;
     float displayed_freq_span_kHz = max_freq_for_scale_kHz - actual_start_freq_for_scale_kHz;
-    if (displayed_freq_span_kHz < 0) displayed_freq_span_kHz = 0; // Negatív tartomány elkerülése
+    if (displayed_freq_span_kHz < 0) displayed_freq_span_kHz = 0;  // Negatív tartomány elkerülése
 
-    for (int i = 0; i <= 4; i++) {                       // 5 címkét rajzol (0, 1/4, 1/2, 3/4, 1 * max_freq)
+    for (int i = 0; i <= 4; i++) {  // 5 címkét rajzol (0, 1/4, 1/2, 3/4, 1 * max_freq)
         float freq_k = actual_start_freq_for_scale_kHz + (displayed_freq_span_kHz * (i / 4.0f));
         int x_pos = (tft.width() / 4) * i;
         char label[10];
 
         // dtostrf(freq_k, 3, (freq_k < 10 && freq_k != 0 ? 1 : 0), label);  // 3 karakter összesen, 1 tizedesjegy ha < 10 és nem 0
         // Robusztusabb formázás:
-        if (freq_k < 0.001f && i == 0) { // Ha az első címke nagyon közel van a 0-hoz (de nem 0), írjuk ki pontosabban, vagy kerekítsük
-             dtostrf(freq_k, 4, 2, label); // pl. "0.10"
+        if (freq_k < 0.001f && i == 0) {   // Ha az első címke nagyon közel van a 0-hoz (de nem 0), írjuk ki pontosabban, vagy kerekítsük
+            dtostrf(freq_k, 4, 2, label);  // pl. "0.10"
         } else {
-            dtostrf(freq_k, 4, (freq_k < 1.0f && i > 0 ? 2 : (freq_k < 10.0f ? 1 : 0)), label); // pl. "0.97", "1.2", "12"
+            dtostrf(freq_k, 4, (freq_k < 1.0f && i > 0 ? 2 : (freq_k < 10.0f ? 1 : 0)), label);  // pl. "0.97", "1.2", "12"
         }
         strcat(label, "k");
 

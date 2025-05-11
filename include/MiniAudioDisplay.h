@@ -38,7 +38,7 @@ constexpr int MINI_OSCI_SAMPLES_TO_DRAW = 86;  // Az FFT.ino-ban ennyit rajzol
 class MiniAudioDisplay : public DisplayBase {
    public:
     MiniAudioDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band);
-    ~MiniAudioDisplay() override;
+    ~MiniAudioDisplay() {};
 
     void drawScreen() override;
     void displayLoop() override;

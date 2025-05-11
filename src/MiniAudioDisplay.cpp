@@ -1,12 +1,6 @@
 #include "MiniAudioDisplay.h"
 
-#include "rtVars.h"  // ::newDisplay
-
-// Színprofilok
-namespace FftDisplayConstants {
-extern const uint16_t colors0[16];  // Cold
-extern const uint16_t colors1[16];  // Hot
-};  // namespace FftDisplayConstants
+#include "FftBase.h"
 
 /**
  *
@@ -17,14 +11,13 @@ MiniAudioDisplay::MiniAudioDisplay(TFT_eSPI& tft_ref, SI4735& si4735_ref, Band& 
       audioMutedState(false),    // Kezdetben nincs némítva
       FFT(),                     // FFT objektum inicializálása
       highResOffset(0) {
+
     DEBUG("MiniAudioDisplay::MiniAudioDisplay\n");
+
     memset(Rpeak, 0, sizeof(Rpeak));
     memset(osciSamples, 0, sizeof(osciSamples));  // Oszcilloszkóp buffer inicializálása
     memset(wabuf, 0, sizeof(wabuf));
-    // A gombokat a drawScreen-ben hozzuk létre
 }
-
-MiniAudioDisplay::~MiniAudioDisplay() { DEBUG("MiniAudioDisplay::~MiniAudioDisplay\n"); }
 
 /**
  *
@@ -51,17 +44,25 @@ void MiniAudioDisplay::drawScreen() {
 
     drawScreenButtons();  // Minden horizontális gomb kirajzolása
 
-    clearMiniDisplayArea();
-    drawModeIndicator();
+    // Mini kijelző területének vastagabb és világosabb körvonala
+    constexpr int frameThickness = 1;  // Keret vastagsága
+    uint16_t frameColor = TFT_RED;  // Világosabb szürke a jobb láthatóságért
 
-    // Mini kijelző területének körvonala
-    tft.drawRect(MiniAudioDisplayConstants::MINI_DISPLAY_AREA_X - 1, MiniAudioDisplayConstants::MINI_DISPLAY_AREA_Y - 1, MiniAudioDisplayConstants::MINI_DISPLAY_AREA_W + 2,
-                 MiniAudioDisplayConstants::MINI_DISPLAY_AREA_H + 2, TFT_DARKGREY);
+    int frameOuterX = MiniAudioDisplayConstants::MINI_DISPLAY_AREA_X - frameThickness;
+    int frameOuterY = MiniAudioDisplayConstants::MINI_DISPLAY_AREA_Y - frameThickness;
+    int frameOuterW = MiniAudioDisplayConstants::MINI_DISPLAY_AREA_W + (frameThickness * 2);
+    int frameOuterH = MiniAudioDisplayConstants::MINI_DISPLAY_AREA_H + (frameThickness * 2);
+
+    tft.fillRect(frameOuterX, frameOuterY, frameOuterW, frameOuterH, frameColor);  // Külső keret kitöltése
+    // A belső területet (ahol a grafikonok vannak) a clearMiniDisplayArea() és a rajzoló függvények kezelik TFT_BLACK színnel.
+
+    clearMiniDisplayArea();  // Most a SILVER keret után töröljük a belső részt feketére
+    drawModeIndicator();
 }
 
 void MiniAudioDisplay::clearMiniDisplayArea() {
     tft.fillRect(MiniAudioDisplayConstants::MINI_DISPLAY_AREA_X, MiniAudioDisplayConstants::MINI_DISPLAY_AREA_Y, MiniAudioDisplayConstants::MINI_DISPLAY_AREA_W,
-                 MiniAudioDisplayConstants::MINI_DISPLAY_AREA_H, TFT_NAVY);  // Sötétkék háttér, mint az FFT.ino-ban
+                 MiniAudioDisplayConstants::MINI_DISPLAY_AREA_H, TFT_BLACK);  // Fekete háttér
 }
 
 void MiniAudioDisplay::drawModeIndicator() {
@@ -175,7 +176,7 @@ void MiniAudioDisplay::drawMiniSpectrumLowRes() {
         if (Rpeak[band_idx] > 0) {
             int xPos = actual_start_x_low_res + 5 * band_idx;
             int yPos = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - Rpeak[band_idx];
-            tft.fillRect(xPos, yPos, 3, 2, TFT_NAVY);
+            tft.fillRect(xPos, yPos, 3, 2, TFT_BLACK);  // Előző csúcs törlése a háttérszínnel
         }
         if (Rpeak[band_idx] >= 1) {
             Rpeak[band_idx] -= 1;
@@ -230,7 +231,7 @@ void MiniAudioDisplay::drawMiniSpectrumHighRes() {
         int screen_x = actual_start_x_high_res + (i - 2);
         if (screen_x >= actual_start_x_high_res + HIGH_RES_BINS_TO_DISPLAY) continue;
 
-        tft.drawFastVLine(screen_x, MINI_DISPLAY_AREA_Y, MINI_DISPLAY_AREA_H, TFT_NAVY);
+        tft.drawFastVLine(screen_x, MINI_DISPLAY_AREA_Y, MINI_DISPLAY_AREA_H, TFT_BLACK);  // Oszlop törlése háttérszínnel
 
         int scaled_magnitude = (int)(RvReal[i] / MINI_AMPLITUDE_SCALE);
         scaled_magnitude = constrain(scaled_magnitude, 0, MINI_DISPLAY_AREA_H - 1);
@@ -256,10 +257,10 @@ void MiniAudioDisplay::drawMiniOscilloscope() {
     }
     int actual_start_x_osci = MINI_DISPLAY_AREA_X + x_pixel_offset_osci;
 
-    // Előző jelalak törlése a háttérszínnel (TFT_NAVY)
+    // Előző jelalak törlése a háttérszínnel (TFT_BLACK)
     // Optimalizáció: Csak akkor töröljünk, ha volt mit.
     // De egyszerűbb minden ciklusban törölni a jelalak területét.
-    tft.fillRect(actual_start_x_osci, MINI_DISPLAY_AREA_Y, MINI_OSCI_SAMPLES_TO_DRAW, MINI_DISPLAY_AREA_H, TFT_NAVY);
+    tft.fillRect(actual_start_x_osci, MINI_DISPLAY_AREA_Y, MINI_OSCI_SAMPLES_TO_DRAW, MINI_DISPLAY_AREA_H, TFT_BLACK);
 
     int prev_x = -1, prev_y = -1;
 
@@ -283,15 +284,86 @@ void MiniAudioDisplay::drawMiniOscilloscope() {
     }
 }
 
-void MiniAudioDisplay::drawMiniWaterfall() { /* TODO */ }
+void MiniAudioDisplay::drawMiniWaterfall() {
+    using namespace MiniAudioDisplayConstants;
+
+    // 1. Adatok shiftelése balra
+    for (int j = 0; j < MINI_WF_WIDTH - 1; j++) {
+        for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+            wabuf[i][j] = wabuf[i][j + 1];
+        }
+    }
+
+    // 2. Új adatok betöltése a jobb szélre
+    for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+        int fft_bin_to_use = i + 2;  // Kezdjük a 2. bintől, mint az FFT.ino-ban
+        if (fft_bin_to_use >= FFT_SAMPLES / 2) {
+            wabuf[i][MINI_WF_WIDTH - 1] = 0;  // Ha túllépnénk, nullázzuk
+        } else {
+            // Az RvReal értékeit skálázzuk. A MINI_AMPLITUDE_SCALE-t úgy kell beállítani,
+            // hogy az eredmény értelmes tartományban legyen a valueToMiniWaterfallColor számára.
+            // Az FFT.ino-ban az amplitude kb. 200-300 volt.
+            // A wabuf értékei legyenek pl. 0-255 között.
+            double scaled_fft_val = RvReal[fft_bin_to_use] / MINI_AMPLITUDE_SCALE;
+            // Korlátozzuk az értéket, hogy ne legyen túl nagy a színkonverzióhoz
+            // Az FFT.ino-ban a wabuf értékei nem voltak expliciten korlátozva a betöltéskor.
+            // Itt a wabuf tárolja a skálázott értéket, amit a gradienttel szorzunk a színfüggvényben.
+            wabuf[i][MINI_WF_WIDTH - 1] = static_cast<int>(constrain(scaled_fft_val * 50.0, 0.0, 255.0));  // *50.0 egy kísérleti szorzó, hogy a wabuf értékei nagyobbak legyenek
+        }
+    }
+
+    // 3. Pixelek kirajzolása
+    // X pozíció középre igazítása, ha a terület szélesebb, mint a vízesés
+    int x_pixel_offset_wf = 0;
+    if (MINI_DISPLAY_AREA_W > MINI_WF_WIDTH) {
+        x_pixel_offset_wf = (MINI_DISPLAY_AREA_W - MINI_WF_WIDTH) / 2;
+    }
+    int actual_start_x_wf = MINI_DISPLAY_AREA_X + x_pixel_offset_wf;
+
+    // A vízesés Y pozíciójának kiszámítása, hogy a terület aljára kerüljön
+    int waterfall_base_y = MINI_DISPLAY_AREA_Y + MINI_DISPLAY_AREA_H - MINI_WF_HEIGHT;
+
+    for (int i = 0; i < MINI_WF_HEIGHT; i++) {     // Y koordináta a kijelzőn (sor)
+        for (int j = 0; j < MINI_WF_WIDTH; j++) {  // X koordináta a kijelzőn (oszlop)
+            uint16_t color = valueToMiniWaterfallColor(MINI_WF_GRADIENT * wabuf[i][j]);
+            // Az Y koordináta módosítva, hogy a vízesés alulra kerüljön
+            int pixel_y_pos = waterfall_base_y + (MINI_WF_HEIGHT - 1 - i);  // Fordított Y továbbra is, de az új alaphoz képest
+            tft.drawPixel(actual_start_x_wf + j, pixel_y_pos, color);
+        }
+    }
+}
 
 void MiniAudioDisplay::drawMiniEnvelope() { /* TODO */ }
 
-uint16_t MiniAudioDisplay::valueToMiniWaterfallColor(int scaled_value) {
-    float normalized = (float)scaled_value / (float)(MiniAudioDisplayConstants::MINI_WF_GRADIENT * MiniAudioDisplayConstants::MINI_WF_HEIGHT);
-    normalized = constrain(normalized, 0.0f, 1.0f);
+// Egyedi színskála a mini vízeséshez, hogy a háttér biztosan fekete legyen
+namespace MiniWaterfallColors {
+const uint16_t miniColors0[16] = {
+    0x0000,                                 // TFT_BLACK (index 0)
+    0x0000,                                 // TFT_BLACK (index 1) - Még egy fekete szint a tisztább háttérért
+    0x001F,                                 // Nagyon sötét kék
+    0x081F,                                 // Sötét kék
+    0x0810,                                 // Sötét zöldeskék
+    0x0800,                                 // Sötétzöld
+    0x0C00,                                 // Közepes zöld
+    0x1C00,                                 // Világosabb zöld
+    0xFC00,                                 // Narancs
+    0xFDE0,                                 // Világos sárga
+    0xFFE0,                                 // Sárga
+    0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF  // Fehér a csúcsokhoz
+};
+}
 
-    const uint16_t* colors = FftDisplayConstants::colors0;
+uint16_t MiniAudioDisplay::valueToMiniWaterfallColor(int scaled_value) {
+    // scaled_value = gradient * wabuf_value
+    // Tegyük fel, hogy a wabuf értékei (RvReal[i+2] / MINI_AMPLITUDE_SCALE * 50.0) kb. 0-255 közöttiek.
+    // Ha MINI_WF_GRADIENT = 100, akkor scaled_value max kb. 25500.
+    // Ezt kell 0-15 indexre skálázni.
+    const int MAX_COLOR_INPUT_VALUE = 15000;  // Kísérletezést igényel! Ez legyen a színskála vége.
+                                              // Ha a gradient 100, és a wabuf max 255, akkor 25500.
+                                              // Ha a wabuf max 150 (gradient*150 = 15000), akkor ez jó.
+    float normalized = static_cast<float>(constrain(scaled_value, 0, MAX_COLOR_INPUT_VALUE)) / static_cast<float>(MAX_COLOR_INPUT_VALUE);
+
+    const uint16_t* colors = MiniWaterfallColors::miniColors0;  // Az egyedi palettát használjuk
     byte color_size = 16;
 
     int index = (int)(normalized * (color_size - 1));
