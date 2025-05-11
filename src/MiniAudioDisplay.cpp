@@ -46,7 +46,7 @@ void MiniAudioDisplay::drawScreen() {
 
     // Mini kijelző területének vastagabb és világosabb körvonala
     constexpr int frameThickness = 1;  // Keret vastagsága
-    uint16_t frameColor = TFT_RED;  // Világosabb szürke a jobb láthatóságért
+    uint16_t frameColor = TFT_SILVER;  // Világosabb szürke a jobb láthatóságért
 
     int frameOuterX = MiniAudioDisplayConstants::MINI_DISPLAY_AREA_X - frameThickness;
     int frameOuterY = MiniAudioDisplayConstants::MINI_DISPLAY_AREA_Y - frameThickness;
@@ -333,7 +333,99 @@ void MiniAudioDisplay::drawMiniWaterfall() {
     }
 }
 
-void MiniAudioDisplay::drawMiniEnvelope() { /* TODO */ }
+void MiniAudioDisplay::drawMiniEnvelope() {
+    using namespace MiniAudioDisplayConstants;
+
+    // 1. Adatok shiftelése balra (megegyezik a vízeséssel)
+    for (int j = 0; j < MINI_WF_WIDTH - 1; j++) {
+        for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+            wabuf[i][j] = wabuf[i][j + 1];
+        }
+    }
+
+    // 2. Új adatok betöltése a jobb szélre
+    // Az RvReal közvetlen FFT magnitúdókat tartalmaz.
+    // A MINI_AMPLITUDE_SCALE-t használjuk a skálázáshoz, hogy a wabuf értékei
+    // kezelhető tartományban legyenek (pl. 0-255).
+    for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+        int fft_bin_to_use = i + 2;  // Kezdjük a 2. bintől, mint az FFT.ino-ban
+        if (fft_bin_to_use >= FFT_SAMPLES / 2) {
+            wabuf[i][MINI_WF_WIDTH - 1] = 0;  // Ha túllépnénk, nullázzuk
+        } else {
+            double scaled_val = RvReal[fft_bin_to_use] / MINI_AMPLITUDE_SCALE;
+            wabuf[i][MINI_WF_WIDTH - 1] = static_cast<int>(constrain(scaled_val, 0.0, 255.0));
+        }
+    }
+
+    // 3. Rajzolási paraméterek
+    int x_pixel_offset_env = 0;
+    if (MINI_DISPLAY_AREA_W > MINI_WF_WIDTH) {
+        x_pixel_offset_env = (MINI_DISPLAY_AREA_W - MINI_WF_WIDTH) / 2;  // Vízszintes középre igazítás
+    }
+    int actual_start_x_env = MINI_DISPLAY_AREA_X + x_pixel_offset_env;
+
+    // A burkológörbe Y pozíciója. Mivel MINI_DISPLAY_AREA_H == MINI_WF_HEIGHT,
+    // a MINI_DISPLAY_AREA_Y-tól indulunk.
+    int actual_draw_y_start = MINI_DISPLAY_AREA_Y;
+    const int half_h = MINI_WF_HEIGHT / 2;
+
+    // Az FFT.ino-ban a 'prev' lokális volt a rajzoló cikluson belül,
+    // ami azt jelenti, hogy a simítás csak az aktuális képkocka oszlopai között történik.
+    int prev_smoothed_env_idx = half_h;  // Előző simított index a simításhoz az oszlopok között
+    static constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;
+
+    // 4. Burkológörbe kirajzolása
+    for (int j = 0; j < MINI_WF_WIDTH; j++) {  // Minden oszlopra
+        int env_idx_for_col_j = half_h;        // Az aktuális oszlopban a max. értékű bin indexe, középről indulva
+        int max_val_in_col = 0;                // Az aktuális oszlopban talált maximális érték
+        bool column_has_signal = false;        // Jelzi, ha van pozitív jel az oszlopban
+
+        // Domináns frekvencia (max. magnitúdójú bin indexének) keresése az aktuális oszlopban
+        for (int i = 0; i < MINI_WF_HEIGHT; i++) {
+            if (wabuf[i][j] > 0) {
+                column_has_signal = true;
+            }
+            if (wabuf[i][j] > max_val_in_col) {
+                max_val_in_col = wabuf[i][j];
+                env_idx_for_col_j = i;  // Ez az 'i' (bin index) lesz az alapja a burkológörbe magasságának
+            }
+        }
+        // Ha egyáltalán nem volt jel az oszlopban, env_idx_for_col_j marad half_h (középen)
+        // és max_val_in_col 0 lesz. A column_has_signal jelzi ezt.
+
+        // Az 'env_idx_for_col_j' (domináns bin indexének) simítása
+        // Az FFT.ino ezt az indexet simítja, nem a magnitúdót.
+        int smoothed_env_idx = static_cast<int>(ENVELOPE_SMOOTH_FACTOR * prev_smoothed_env_idx + (1.0f - ENVELOPE_SMOOTH_FACTOR) * env_idx_for_col_j);
+        prev_smoothed_env_idx = smoothed_env_idx;  // Elmentjük a következő oszlophoz
+
+        int col_x_on_screen = actual_start_x_env + j;
+
+        // Oszlop törlése
+        tft.drawFastVLine(col_x_on_screen, actual_draw_y_start, MINI_WF_HEIGHT, TFT_BLACK);
+
+        if (column_has_signal) {  // Csak akkor rajzolunk, ha volt jel az oszlopban
+            // A burkológörbe vizuális "vastagsága" a simított domináns bin indexétől függ
+            // Minél magasabb a domináns frekvencia indexe, annál "vastagabb" a görbe
+            for (int i = 0; i <= smoothed_env_idx; i++) {
+                // Az 'i' itt a "vastagságot" szabályozza, 0-tól a smoothed_env_idx-ig.
+                // A /2 azért van, hogy szimmetrikus legyen a half_h körül.
+                int yUpper = actual_draw_y_start + half_h - i / 2;
+                int yLower = actual_draw_y_start + half_h + i / 2;
+
+                // Biztosítjuk, hogy a pixelek a kijelölt területen belül maradjanak
+                yUpper = constrain(yUpper, actual_draw_y_start, actual_draw_y_start + MINI_WF_HEIGHT - 1);
+                yLower = constrain(yLower, actual_draw_y_start, actual_draw_y_start + MINI_WF_HEIGHT - 1);
+
+                if (yUpper <= yLower) {  // Csak akkor rajzolunk, ha van értelme (pl. i/2 ne legyen túl nagy)
+                    tft.drawPixel(col_x_on_screen, yUpper, TFT_WHITE);
+                    if (yUpper != yLower) {  // Ne rajzoljuk kétszer ugyanazt a pixelt, ha i=0
+                        tft.drawPixel(col_x_on_screen, yLower, TFT_WHITE);
+                    }
+                }
+            }
+        }
+    }
+}
 
 // Egyedi színskála a mini vízeséshez, hogy a háttér biztosan fekete legyen
 namespace MiniWaterfallColors {
