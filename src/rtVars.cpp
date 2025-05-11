@@ -1,7 +1,5 @@
 #include "rtVars.h"
 
-#include "defaults.h"
-
 namespace rtv {
 
 // Némítás
@@ -20,8 +18,8 @@ uint16_t freqstep = 1000;  // A frekvencia lépés értéke Hz-ben
 int16_t freqDec = 0;       // A frekvencia változtatásának mértéke és iránya
 
 // BFO
-bool bfoOn = false;     // BFO mód kezdetben inaktív
-bool bfoTr = false;     // BFO kijelző animáció trigger
+bool bfoOn = false;  // BFO mód kezdetben inaktív
+bool bfoTr = false;  // BFO kijelző animáció trigger
 // int16_t currentBFOmanu = 0; // Ezt a configban tároljuk
 // uint8_t currentBFOStep = 25; // Ezt a configban tároljuk
 

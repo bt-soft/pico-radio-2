@@ -30,12 +30,12 @@ FreqScanDisplay::FreqScanDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : Di
     buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), false);
 
     // "Back" gomb megkeresése és jobbra igazítása
-    TftButton* backButton = findButtonByLabel("Back");
+    TftButton *backButton = findButtonByLabel("Back");
     if (backButton != nullptr) {
         // Új X pozíció kiszámítása (jobbra igazítva)
-        uint16_t backButtonX = tft.width() - SCREEN_HBTNS_X_START - SCRN_BTN_W; // Jobb szélhez igazítva
+        uint16_t backButtonX = tft.width() - SCREEN_HBTNS_X_START - SCRN_BTN_W;  // Jobb szélhez igazítva
         // Y pozíció lekérdezése (az automatikus elrendezés már beállította)
-        uint16_t backButtonY = getAutoButtonPosition(ButtonOrientation::Horizontal, ARRAY_ITEM_COUNT(horizontalButtonsData) - 1, false); // Y pozíció lekérése az utolsó elemhez
+        uint16_t backButtonY = getAutoButtonPosition(ButtonOrientation::Horizontal, ARRAY_ITEM_COUNT(horizontalButtonsData) - 1, false);  // Y pozíció lekérése az utolsó elemhez
         backButton->setPosition(backButtonX, backButtonY);
     }
 
@@ -129,7 +129,6 @@ void FreqScanDisplay::displayLoop() {
 
     if (scanning && !scanPaused) {
         // --- Szkennelési logika ---
-        int d = 0;
 
         // Következő pozíció kiszámítása
         // A frekvencia képlete: F(n) = startFrequency + (n - spectrumWidth/2 + deltaScanLine) * scanStep
@@ -279,36 +278,36 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
             Utils::beepTick();
             // ... (a signalScale számításának logikája) ...
             float tmpMid = 0;
-            int tmpMax = spectrumEndY; // FIX 1: Helyes inicializálás (leggyengébb jel Y-ja)
+            int tmpMax = spectrumEndY;  // FIX 1: Helyes inicializálás (leggyengébb jel Y-ja)
             int count = 0;
             for (int i = 0; i < spectrumWidth; i++) {
                 if (scanValueRSSI[i] < spectrumEndY) {
                     tmpMid += (spectrumEndY - scanValueRSSI[i]);
-                    if (scanValueRSSI[i] < tmpMax) tmpMax = scanValueRSSI[i]; // Keresi a legkisebb Y értéket (legerősebb jel)
+                    if (scanValueRSSI[i] < tmpMax) tmpMax = scanValueRSSI[i];  // Keresi a legkisebb Y értéket (legerősebb jel)
                     count++;
                 }
             }
             if (count > 0) {
-                tmpMid = (spectrumHeight * 0.7f) / (tmpMid / count); // tmpMid mostantól a szorzófaktor
+                tmpMid = (spectrumHeight * 0.7f) / (tmpMid / count);  // tmpMid mostantól a szorzófaktor
                 if ((spectrumEndY - ((spectrumEndY - tmpMax) * tmpMid)) < (spectrumY + spectrumHeight * 0.1f)) {
                     tmpMid = (spectrumHeight * 0.9f) / float(spectrumEndY - tmpMax);
                 }
 
-                float old_signalScale_val = signalScale; // Régi érték mentése az összehasonlításhoz
+                float old_signalScale_val = signalScale;  // Régi érték mentése az összehasonlításhoz
 
                 // tmpMid (szorzófaktor) beállítása úgy, hogy az új signalScale (signalScale * tmpMid) a korlátok között maradjon
                 // Fontos, hogy a signalScale itt még a régi értékét tartalmazza.
-                if (old_signalScale_val > 0) { // Osztás nullával elkerülése (bár a signalScale korlátozva van)
+                if (old_signalScale_val > 0) {  // Osztás nullával elkerülése (bár a signalScale korlátozva van)
                     if ((old_signalScale_val * tmpMid) > 10.0f) {
                         tmpMid = 10.0f / old_signalScale_val;
-                    } else if ((old_signalScale_val * tmpMid) < 0.1f) { // 'else if' használata, mert csak az egyik korlát lehet aktív
+                    } else if ((old_signalScale_val * tmpMid) < 0.1f) {  // 'else if' használata, mert csak az egyik korlát lehet aktív
                         tmpMid = 0.1f / old_signalScale_val;
                     }
-                } else { // Elvileg nem fordulhat elő
+                } else {  // Elvileg nem fordulhat elő
                     tmpMid = 1.0f;
                 }
 
-                signalScale = old_signalScale_val * tmpMid; // Új signalScale alkalmazása
+                signalScale = old_signalScale_val * tmpMid;  // Új signalScale alkalmazása
 
                 // Csak akkor rajzolunk újra, ha a signalScale ténylegesen megváltozott
                 if (std::abs(signalScale - old_signalScale_val) > 0.001f) {
@@ -323,7 +322,7 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
                     drawScanGraph(false);
                     drawScanText(true);
                 } else {
-                    signalScale = old_signalScale_val; // Visszaállítás, ha nem volt szignifikáns változás
+                    signalScale = old_signalScale_val;  // Visszaállítás, ha nem volt szignifikáns változás
                 }
             }
         }
@@ -367,7 +366,6 @@ bool FreqScanDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
                     // Csak akkor pásztázunk, ha ténylegesen volt elmozdulás (dx != 0)
                     if (dx != 0) {
                         // --- Pásztázás (Panning) ---
-                        float oldDelta = deltaScanLine;  // <<<--- DEBUG: Régi érték
                         deltaScanLine -= static_cast<float>(dx);
 
                         // Opcionális: deltaScanLine korlátozása, hogy ne "fusson ki" a képből túlságosan
@@ -636,8 +634,6 @@ void FreqScanDisplay::changeScanScale() {
         scanPaused = true;
     }
 
-    float oldScanStep = scanStep;
-
     // Új scanStep kiszámítása
     scanStep *= 2.0f;
     if (scanStep > maxScanStep) scanStep = minScanStep;
@@ -696,7 +692,6 @@ void FreqScanDisplay::changeScanScale() {
  * @param erase Törölje a korábbi adatokat?
  */
 void FreqScanDisplay::drawScanGraph(bool erase) {
-    int d = 0;  // screenV itt nem releváns
 
     if (erase) {
         tft.fillRect(spectrumX, spectrumY, spectrumWidth, spectrumHeight, TFT_BLACK);  // Háttér törlése
@@ -750,7 +745,6 @@ void FreqScanDisplay::drawScanLine(int xPos) {
     // A frekvencia képlete: F(n) = startFrequency + (n - spectrumWidth/2 + deltaScanLine) * scanStep
     double freq_double =
         static_cast<double>(startFrequency) + (static_cast<double>(n) - (static_cast<double>(spectrumWidth) / 2.0) + deltaScanLine) * static_cast<double>(scanStep);
-    uint16_t frq = static_cast<uint16_t>(round(freq_double));
 
     int16_t colf = TFT_NAVY;
     int16_t colb = TFT_BLACK;
@@ -966,7 +960,6 @@ void FreqScanDisplay::drawScanText(bool all) {
  * Aktuális RSSI/SNR kiírása a spektrum fölé
  */
 void FreqScanDisplay::displayScanSignal() {
-    int d = 0;  // screenV nem releváns
     int xPos = static_cast<int>(currentScanLine);
     int n = xPos - spectrumX;
 

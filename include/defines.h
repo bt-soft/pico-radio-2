@@ -6,6 +6,12 @@
 //---- Pinouts ------------------------------------------
 // TFT (A TFT_eSPI_User_Setup.h-ban a pinout)
 
+// Feszültségmérés
+#define PIN_VBUS_INPUT A0  // A0/GPIO26 a VBUS bemenethez
+
+// Audio FFT bemenet
+#define AUDIO_INPUT_PIN A1  // A1/GPIO27 az audio bemenethez
+
 // I2C si4735
 #define PIN_SI4735_I2C_SDA 8
 #define PIN_SI4735_I2C_SCL 9

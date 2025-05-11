@@ -5,26 +5,26 @@
 #include "ValueChangeDialog.h"
 
 namespace DisplayConstants {
-// Status line méretek és pozíciók
-constexpr int StatusLineRectWidth = 39;
-constexpr int StatusLineHeight = 16;
-constexpr int StatusLineWidth = 240;
+// // Status line méretek és pozíciók
+// constexpr int StatusLineRectWidth = 39;
+// constexpr int StatusLineHeight = 16;
+// constexpr int StatusLineWidth = 240;
 
-constexpr int StatusLineBfoX = 20;
-constexpr int StatusLineAgcX = 60;
-constexpr int StatusLineModX = 95;
-constexpr int StatusLineBandWidthX = 135;
-constexpr int StatusLineBandNameX = 180;
-constexpr int StatusLineStepX = 220;
-constexpr int StatusLineAntCapX = 260;
-constexpr int StatusLineTempX = 300;  // Új pozíció a hőmérsékletnek
-constexpr int StatusLineVbusX = 340;  // Új pozíció a Vbus-nak
+// constexpr int StatusLineBfoX = 20;
+// constexpr int StatusLineAgcX = 60;
+// constexpr int StatusLineModX = 95;
+// constexpr int StatusLineBandWidthX = 135;
+// constexpr int StatusLineBandNameX = 180;
+// constexpr int StatusLineStepX = 220;
+// constexpr int StatusLineAntCapX = 260;
+// constexpr int StatusLineTempX = 300;  // Új pozíció a hőmérsékletnek
+// constexpr int StatusLineVbusX = 340;  // Új pozíció a Vbus-nak
 
-// Gombok méretei és margói
-constexpr uint8_t MaxButtonsInRow = 6;
-constexpr uint8_t ButtonWidth = 39;
-constexpr uint8_t ButtonHeight = 16;
-constexpr uint8_t ButtonMargin = 5;
+// // Gombok méretei és margói
+// constexpr uint8_t MaxButtonsInRow = 6;
+// constexpr uint8_t ButtonWidth = 39;
+// constexpr uint8_t ButtonHeight = 16;
+// constexpr uint8_t ButtonMargin = 5;
 
 // Színek
 constexpr uint16_t BfoStepColor = TFT_ORANGE;
@@ -518,6 +518,8 @@ void DisplayBase::buildVerticalScreenButtons(BuildButtonData screenVButtonsData[
         {"Freq", TftButton::ButtonType::Pushable},
         {"Setup", TftButton::ButtonType::Pushable},
         {"Memo", TftButton::ButtonType::Pushable},
+        {"FFT", TftButton::ButtonType::Pushable},  // Seek Up
+
     };
     uint8_t mandatoryVButtonsLength = ARRAY_ITEM_COUNT(mandatoryVButtons);
 
@@ -739,9 +741,8 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                     DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("RF Attenuator"), F("Value:"), &config.data.currentAGCgain, (uint8_t)1,
                                                                  (uint8_t)maxValue, (uint8_t)1,
                                                                  [this](double currentAGCgain_double) {  // Callback double-t vár
-                                                                     uint8_t currentAGCgain = static_cast<uint8_t>(currentAGCgain_double);
-
                                                                      // Itt már Manual módban vagyunk, csak a szintet kell állítani
+                                                                     // uint8_t currentAGCgain = static_cast<uint8_t>(currentAGCgain_double);
                                                                      // si4735.setAutomaticGainControl(1, currentAGCgain);  // AGC disabled, manual index set
                                                                      Si4735Utils::checkAGC();              // Chip beállítása
                                                                      DisplayBase::drawAgcAttStatus(true);  // Státuszsor frissítése
@@ -824,17 +825,23 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         processed = true;  // Jelöljük, hogy kezeltük az eseményt
     }
 
-    else if (STREQ("Setup", event.label)) {              // Beállítások
-        ::newDisplay = DisplayBase::DisplayType::setup;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
+    else if (STREQ("Setup", event.label)) {  // Beállítások
+        ::newDisplay = DisplayBase::DisplayType::setup;
         processed = true;
 
-    } else if (STREQ("Memo", event.label)) {              // Beállítások
-        ::newDisplay = DisplayBase::DisplayType::memory;  // <<<--- ITT HÍVJUK MEG A changeDisplay-t!
+    } else if (STREQ("Memo", event.label)) {  // memory
+        ::newDisplay = DisplayBase::DisplayType::memory;
+        processed = true;
+
+    } else if (STREQ("FFT", event.label)) {  // FFT
+        ::newDisplay = DisplayBase::DisplayType::audioAnalyzer;
         processed = true;
     }
+
     //
     //--- Kötelező vízszintes gombok vizsgálata
     //
+
     else if (STREQ("Ham", event.label)) {
 
         // Kigyűjtjük a HAM sávok neveit
@@ -853,7 +860,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBand().pConstData->bandName);
         processed = true;
-
     } else if (STREQ("Band", event.label)) {
         // Kigyűjtjük az összes NEM HAM sáv nevét
         uint8_t bandCount;
@@ -871,7 +877,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBand().pConstData->bandName);
         processed = true;
-
     } else if (STREQ("DeMod", event.label)) {
 
         // Kigyűjtjük az összes NEM HAM sáv nevét
@@ -905,7 +910,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             band.getCurrentBandModeDesc());
         processed = true;
-
     } else if (STREQ("AFWdt", event.label)) {
 
         uint8_t currMod = band.getCurrentBand().varData.currMod;  // Demodulációs mód
@@ -956,10 +960,9 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             },
             currentBandWidthLabel);  // Az aktuális sávszélesség felirata
         processed = true;
-
     } else if (STREQ("Step", event.label)) {
 
-        uint8_t currentBandType = band.getCurrentBandType();      // Kikeressük az aktuális Band típust
+        // uint8_t currentBandType = band.getCurrentBandType();      // Kikeressük az aktuális Band típust
         uint8_t currMod = band.getCurrentBand().varData.currMod;  // Demodulációs mód
 
         // Megállapítjuk a lehetséges lépések méretét
@@ -1021,7 +1024,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
             currentStepStr);  // Az aktuális lépés felirata
 
         processed = true;
-
     } else if (STREQ("BFO", event.label)) {
 
         // Csak SSB/CW módban engedélyezzük
@@ -1054,7 +1056,6 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
         } else {
             Utils::beepError();  // Hiba hangjelzés, ha nem támogatott módban nyomják meg
         }
-
     } else if (STREQ("Scan", event.label)) {
         // Képernyő váltás !!!
         ::newDisplay = DisplayBase::DisplayType::freqScan;

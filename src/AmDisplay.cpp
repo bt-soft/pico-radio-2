@@ -22,7 +22,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Hozzáadjuk az AM-specifikus gombokat ÉS a AFWdt, BFO gombokat.
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"BFO", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off},  // Beat Frequency Oscillator
-        {"AFWdt", TftButton::ButtonType::Pushable},                                //
+        {"AFWdt", TftButton::ButtonType::Pushable},                               //
         {"AntC", TftButton::ButtonType::Pushable},                                //
     };
 
@@ -254,7 +254,7 @@ void AmDisplay::displayLoop() {
     }
 
     BandTable &currentBand = band.getCurrentBand();
-    uint8_t currMod = currentBand.varData.currMod;  // Aktuális mód lekérdezése
+    // uint8_t currMod = currentBand.varData.currMod;  // Aktuális mód lekérdezése
 
     // Néhány adatot csak ritkábban frissítünk
     static uint32_t elapsedTimedValues = 0;  // Kezdőérték nulla

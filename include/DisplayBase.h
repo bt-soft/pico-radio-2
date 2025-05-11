@@ -36,6 +36,30 @@
 // Vertical gombok definíciói
 #define SCREEN_VBTNS_X_MARGIN 0  // A vertikális gombok jobb oldali margója
 
+// DisplayConstants névtér a globális UI konstansokhoz
+namespace DisplayConstants {
+// Status line méretek és pozíciók
+constexpr int StatusLineRectWidth = 39;
+constexpr int StatusLineHeight = 16;
+constexpr int StatusLineWidth = 240;  // Teljes szélesség, ha releváns
+
+constexpr int StatusLineBfoX = 20;
+constexpr int StatusLineAgcX = 60;
+constexpr int StatusLineModX = 95;
+constexpr int StatusLineBandWidthX = 135;
+constexpr int StatusLineBandNameX = 180;
+constexpr int StatusLineStepX = 220;
+constexpr int StatusLineAntCapX = 260;
+constexpr int StatusLineTempX = 300;
+constexpr int StatusLineVbusX = 340;
+
+// Gombok méretei és margói (ezeket használja az AudioAnalyzerDisplay is)
+constexpr uint8_t MaxButtonsInRow = 6;
+constexpr uint8_t ButtonWidth = 39;
+constexpr uint8_t ButtonHeight = 16;
+constexpr uint8_t ButtonMargin = 5;
+}  // namespace DisplayConstants
+
 /**
  * DisplayBase base osztály
  */
@@ -43,7 +67,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 
    public:
     // Lehetséges képernyő típusok
-    enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory };
+    enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory, audioAnalyzer };
 
     // Gombok orientációja
     enum ButtonOrientation { Horizontal, Vertical };
@@ -146,8 +170,8 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
     void drawAgcAttStatus(bool initFont = false);
     void drawStepStatus(bool initFont = false);
     void drawAntCapStatus(bool initFont = false);
-    void drawTemperatureStatus(bool initFont = false, bool forceRedraw  = false);
-    void drawVbusStatus(bool initFont = false, bool forceRedraw  = false);
+    void drawTemperatureStatus(bool initFont = false, bool forceRedraw = false);
+    void drawVbusStatus(bool initFont = false, bool forceRedraw = false);
 
     void dawStatusLine();
 

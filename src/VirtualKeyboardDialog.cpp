@@ -5,25 +5,26 @@
 #include "utils.h"        // Szükséges a Utils::beepError()-hez
 
 namespace VirtualKeyboardConstants {
-    // Dialógus méretei
-    constexpr uint16_t DIALOG_WIDTH = 456;
-    constexpr uint16_t DIALOG_HEIGHT = 260;
+// Dialógus méretei
+constexpr uint16_t DIALOG_WIDTH = 456;
+constexpr uint16_t DIALOG_HEIGHT = 260;
 
-    // Billentyűzet elrendezés
-    constexpr uint16_t KEY_WIDTH = 40;
-    constexpr uint16_t KEY_HEIGHT = 30;
-    constexpr uint16_t KEY_GAP_X = 3;
-    constexpr uint16_t KEY_GAP_Y = 3;
-    constexpr uint16_t INPUT_DISPLAY_HEIGHT = 40;
-    constexpr uint16_t INPUT_DISPLAY_MARGIN_X = 10;
-    constexpr uint16_t INPUT_DISPLAY_MARGIN_Y = 5;
-    constexpr uint16_t INPUT_BORDER_WIDTH = 1;
-    constexpr uint16_t INPUT_TEXT_PADDING_X = 5;
-    constexpr uint16_t KEYBOARD_START_Y_OFFSET = INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y * 2;
-    constexpr uint16_t CURSOR_Y_OFFSET = 6; // Felső/alsó margó a kurzornak a beviteli mezőn belül
-    constexpr uint16_t CURSOR_HEIGHT_REDUCTION = CURSOR_Y_OFFSET * 2; // Mennyivel rövidebb a kurzor, mint a mező
+// Billentyűzet elrendezés
+constexpr uint16_t KEY_WIDTH = 40;
+constexpr uint16_t KEY_HEIGHT = 30;
+constexpr uint16_t KEY_GAP_X = 3;
+constexpr uint16_t KEY_GAP_Y = 3;
+constexpr uint16_t INPUT_DISPLAY_HEIGHT = 40;
+constexpr uint16_t INPUT_DISPLAY_MARGIN_X = 10;
+constexpr uint16_t INPUT_DISPLAY_MARGIN_Y = 5;
+constexpr uint16_t INPUT_BORDER_WIDTH = 1;
+constexpr uint16_t INPUT_TEXT_PADDING_X = 5;
+constexpr uint16_t KEYBOARD_START_Y_OFFSET = INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y * 2;
+constexpr uint16_t CURSOR_Y_OFFSET = 6;                            // Felső/alsó margó a kurzornak a beviteli mezőn belül
+constexpr uint16_t CURSOR_HEIGHT_REDUCTION = CURSOR_Y_OFFSET * 2;  // Mennyivel rövidebb a kurzor, mint a mező
 
-} // namespace VirtualKeyboardConstants
+}  // namespace VirtualKeyboardConstants
+
 #define MAX_INPUT_LEN STATION_NAME_BUFFER_SIZE - 1  // Maximális bemeneti hossz (a StationData.h-ból)
 #define SPACE_BTN_WIDTH 120                         // Space gomb szélessége (ha szükséges)
 
@@ -84,7 +85,7 @@ void VirtualKeyboardDialog::buildKeyboard() {
     inputDisplayH = INPUT_DISPLAY_HEIGHT;
 
     // Billentyűzet kezdő pozíciója
-    uint16_t keyboardStartY = inputDisplayY + INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y; // Közvetlenül az input mező alá
+    uint16_t keyboardStartY = inputDisplayY + INPUT_DISPLAY_HEIGHT + INPUT_DISPLAY_MARGIN_Y;  // Közvetlenül az input mező alá
 
     // Karakter gombok létrehozása a keyLayout alapján
     uint16_t currentY = keyboardStartY;
@@ -97,9 +98,9 @@ void VirtualKeyboardDialog::buildKeyboard() {
         uint16_t startX = x + (w - totalRowWidth) / 2;  // Sor középre igazítása
 
         for (uint8_t c = 0; c < rowLen; ++c) {
-            char keyChar[2] = {rowLayout[c], '\0'};  // Gomb felirata (1 karakter + null terminátor)
-            // Nagybetűs kezdőállapot, ha a shift aktív (bár a konstruktorban még nem az)
-            // A redrawKeyboardKeys majd beállítja a helyeset a drawDialog előtt/alatt
+            // char keyChar[2] = {rowLayout[c], '\0'};  // Gomb felirata (1 karakter + null terminátor)
+            //  Nagybetűs kezdőállapot, ha a shift aktív (bár a konstruktorban még nem az)
+            //  A redrawKeyboardKeys majd beállítja a helyeset a drawDialog előtt/alatt
             char displayChar = shiftActive ? toupper(rowLayout[c]) : rowLayout[c];
             char displayKeyStr[2] = {displayChar, '\0'};
             TftButton* keyButton =
@@ -111,8 +112,8 @@ void VirtualKeyboardDialog::buildKeyboard() {
 
     // Speciális gombok létrehozása (OK, Cancel, <--, Clear)
     // Ezeket a karakter gombok alá helyezzük el
-    uint16_t specialBtnY = currentY + KEY_GAP_Y;           // Egy kis extra rés
-    uint16_t btnWidthSpecialBase = 60;                     // Alap speciális gomb szélesség
+    uint16_t specialBtnY = currentY + KEY_GAP_Y;            // Egy kis extra rés
+    uint16_t btnWidthSpecialBase = 60;                      // Alap speciális gomb szélesség
     uint16_t backspaceBtnWidth = btnWidthSpecialBase - 15;  // <-- gomb keskenyebb
     uint16_t cancelBtnWidth = btnWidthSpecialBase + 15;     // Cancel gomb szélesebb
     // Teljes szélesség: Shift + Clear + <-- + Space + Cancel + OK + 5 rés
@@ -179,7 +180,7 @@ void VirtualKeyboardDialog::drawDialog() {
  */
 void VirtualKeyboardDialog::updateInputDisplay(bool redrawCursorOnly) {
     using namespace VirtualKeyboardConstants;
-    if (!redrawCursorOnly) { // Csak akkor rajzoljuk újra a szöveget, ha nem csak a kurzor változott
+    if (!redrawCursorOnly) {  // Csak akkor rajzoljuk újra a szöveget, ha nem csak a kurzor változott
         // Terület törlése
         tft.fillRect(inputDisplayX + 1, inputDisplayY + 1, inputDisplayW - 2, inputDisplayH - 2, TFT_BLACK);
 

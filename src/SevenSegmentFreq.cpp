@@ -283,7 +283,6 @@ void SevenSegmentFreq::displaySsbCwFrequency(uint16_t currentFrequency, const Se
     using namespace SevenSegmentConstants;
 
     BandTable& currentBand = band.getCurrentBand();
-    uint8_t currDemod = currentBand.varData.currMod;
 
     // Kiszámítjuk a pontos frekvenciát Hz-ben a BFO eltolással
     uint32_t bfoOffset = simpleMode ? 0 : currentBand.varData.lastBFO;

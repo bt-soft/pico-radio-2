@@ -98,7 +98,7 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
     using namespace SetupListConstants;
     uint16_t bgColor = isSelected ? SELECTED_ITEM_BG_COLOR : ITEM_BG_COLOR;
     uint16_t textColor = isSelected ? SELECTED_ITEM_TEXT_COLOR : ITEM_TEXT_COLOR;
-    uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
+    //uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
 
     // 1. Terület törlése a háttérszínnel
     tft_ref.fillRect(x, y, w, h, bgColor);  // A kapott x, y, w, h használata

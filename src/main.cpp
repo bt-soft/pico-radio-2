@@ -1,13 +1,14 @@
 #include <Arduino.h>
 
+#include "AudioAnalyzerDisplay.h"
 #include "PicoSensorUtils.h"
 #include "defines.h"
 #include "rtVars.h"
 #include "utils.h"
 
 //------------------ TFT
-#include <TFT_eSPI.h>                    // TFT_eSPI könyvtár
-TFT_eSPI tft;                            // TFT objektum
+#include <TFT_eSPI.h>  // TFT_eSPI könyvtár
+TFT_eSPI tft;          // TFT objektum
 
 //------------------- Rotary Encoder
 #define __USE_ROTARY_ENCODER_IN_HW_TIMER
@@ -116,6 +117,12 @@ void changeDisplay() {
 
             case DisplayBase::DisplayType::memory:
                 ::pDisplay = new MemoryDisplay(tft, si4735, band);
+                // Beállítjuk a képernyőnek, hogy hova térjen vissza
+                ::pDisplay->setPrevDisplayType(::currentDisplay);
+                break;
+
+            case DisplayBase::DisplayType::audioAnalyzer:  // Új case
+                ::pDisplay = new AudioAnalyzerDisplay(tft, si4735, band);
                 // Beállítjuk a képernyőnek, hogy hova térjen vissza
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
