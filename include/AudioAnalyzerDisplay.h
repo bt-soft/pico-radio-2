@@ -12,7 +12,7 @@ constexpr uint16_t FFT_SAMPLES = 512;         // Minták száma az FFT-hez (2 ha
 constexpr double SAMPLING_FREQUENCY = 10000;  // Mintavételezési frekvencia Hz-ben
 
 constexpr int FFT_START_BIN_OFFSET = 5;     // Kb. 100Hz-től induljon a kijelzés (5 * (10000/512) = ~97.6Hz)
-constexpr float AMPLITUDE_SCALE = 10000.0;  // PRÓBÁLD KI EZT AZ ÉRTÉKET (vagy nagyobbat/kisebbet kísérletezve)
+constexpr float AMPLITUDE_SCALE = 100.0;    // Jelentősen csökkentett érték, kísérletezz ezzel (pl. 50.0 - 500.0 tartományban)
 constexpr int ANALYZER_BOTTOM_MARGIN = 20;  // Hely a képernyő alján a frekvencia skálának
 constexpr int WATERFALL_TOP_Y = 20;         // A vízesés rajzolásának felső Y koordinátája (a státuszsor alatt)
 }  // namespace AudioAnalyzerConstants
