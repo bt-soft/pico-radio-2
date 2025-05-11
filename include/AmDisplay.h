@@ -2,8 +2,8 @@
 #define __AMDISPLAY_H
 
 #include "DisplayBase.h"
+#include "MiniAudioFft.h"
 #include "SMeter.h"
-#include "MiniAudioFft.h" // Hozzáadva
 #include "SevenSegmentFreq.h"
 
 /**
@@ -14,7 +14,7 @@ class AmDisplay : public DisplayBase {
    private:
     SMeter *pSMeter;
     SevenSegmentFreq *pSevenSegmentFreq;
-    MiniAudioFft *pMiniAudioFft; // Hozzáadva
+    MiniAudioFft *pMiniAudioFft;
 
    protected:
     /**

@@ -30,16 +30,12 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
 
-    // MiniAudioFft komponens elhelyezése (ugyanaz a logika, mint FmDisplay-nél)
-    // S-Meter (y=80, height=kb.70) -> S-Meter alja kb. 150
-    int mini_fft_y = 80 + 70 + 5;  // S-Meter (80) + S-Meter magassága (kb 70) + margó (5)
-    int mini_fft_x = 5;
-    int verticalButtonAreaStartX = tft.width() - SCREEN_VBTNS_X_MARGIN - SCRN_BTN_W;
-    int mini_fft_w = verticalButtonAreaStartX - mini_fft_x - 5;   // 5px margó jobbra
-    int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;  // Pl. 24
-    if (mini_fft_w > 0 && mini_fft_h > 0) {
-        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h);
-    }
+    // MiniAudioFft komponens elhelyezése
+    int mini_fft_x = 260;
+    int mini_fft_y = 80;
+    int mini_fft_w = 100;
+    int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
+    pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h);
 }
 
 /**
