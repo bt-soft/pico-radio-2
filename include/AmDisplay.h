@@ -3,6 +3,7 @@
 
 #include "DisplayBase.h"
 #include "SMeter.h"
+#include "MiniAudioFft.h" // Hozzáadva
 #include "SevenSegmentFreq.h"
 
 /**
@@ -13,6 +14,7 @@ class AmDisplay : public DisplayBase {
    private:
     SMeter *pSMeter;
     SevenSegmentFreq *pSevenSegmentFreq;
+    MiniAudioFft *pMiniAudioFft; // Hozzáadva
 
    protected:
     /**

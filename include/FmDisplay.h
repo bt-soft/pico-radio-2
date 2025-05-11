@@ -4,6 +4,7 @@
 #include "DisplayBase.h"
 #include "Rds.h"
 #include "SMeter.h"
+#include "MiniAudioFft.h" // Hozzáadva
 #include "SevenSegmentFreq.h"
 
 /**
@@ -14,6 +15,7 @@ class FmDisplay : public DisplayBase {
     Rds *pRds;
     SMeter *pSMeter;
     SevenSegmentFreq *pSevenSegmentFreq;
+    MiniAudioFft *pMiniAudioFft; // Hozzáadva
 
     /**
      * Mono/Stereó felirat megjelenítése

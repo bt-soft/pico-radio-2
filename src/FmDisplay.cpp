@@ -18,7 +18,8 @@ static volatile bool seekStoppedByUser = false;       // Flag a keresés megszak
 /**
  * Konstruktor
  */
-FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tft, si4735, band), pSMeter(nullptr), pRds(nullptr), pSevenSegmentFreq(nullptr) {
+FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
+    : DisplayBase(tft, si4735, band), pSMeter(nullptr), pRds(nullptr), pSevenSegmentFreq(nullptr), pMiniAudioFft(nullptr) {
 
     DEBUG("FmDisplay::FmDisplay\n");
 
@@ -54,6 +55,18 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat (amiből kivettük a AFWdt, BFO-t) az FM-specifikus gombokkal.
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
+
+    // MiniAudioFft komponens elhelyezése
+    // S-Meter (y=110, height=kb.70) -> S-Meter alja kb. 180
+    // Függőleges gombok X kezdete: tft.width() - SCREEN_VBTNS_X_MARGIN - SCRN_BTN_W
+    int mini_fft_y = 110 + 70 + 5;  // S-Meter (110) + S-Meter magassága (kb 70) + margó (5)
+    int mini_fft_x = 5;
+    int verticalButtonAreaStartX = tft.width() - SCREEN_VBTNS_X_MARGIN - SCRN_BTN_W;
+    int mini_fft_w = verticalButtonAreaStartX - mini_fft_x - 5;   // 5px margó jobbra
+    int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;  // Pl. 24
+    if (mini_fft_w > 0 && mini_fft_h > 0) {                       // Csak akkor hozzuk létre, ha van értelmes mérete
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h);
+    }
 }
 
 /**
@@ -74,6 +87,11 @@ FmDisplay::~FmDisplay() {
     // Frekvencia kijelző törlése
     if (pSevenSegmentFreq) {
         delete pSevenSegmentFreq;
+    }
+
+    // MiniAudioFft törlése
+    if (pMiniAudioFft) {
+        delete pMiniAudioFft;
     }
 }
 
@@ -145,6 +163,11 @@ void FmDisplay::drawScreen() {
 
     // Gombok kirajzolása
     DisplayBase::drawScreenButtons();
+
+    // MiniAudioFft kirajzolása (kezdeti)
+    if (pMiniAudioFft) {
+        pMiniAudioFft->forceRedraw();
+    }
 }
 
 /**
@@ -218,7 +241,13 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  * Touch (nem képrnyő button) esemény lekezelése
  * A további gui elemek vezérléséhez
  */
-bool FmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) { return false; }
+bool FmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
+    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {
+        return true;
+    }
+    // Itt jöhetne más, nem gombhoz kötött érintéskezelés, ha lenne.
+    return false;
+}
 
 /**
  * Mono/Stereo vétel megjelenítése
@@ -324,5 +353,10 @@ void FmDisplay::displayLoop() {
     if (DisplayBase::frequencyChanged) {
         pSevenSegmentFreq->freqDispl(currentBand.varData.currFreq);
         DisplayBase::frequencyChanged = false;  // Reset
+    }
+
+    // MiniAudioFft ciklus futtatása
+    if (pMiniAudioFft) {
+        pMiniAudioFft->loop();
     }
 }
