@@ -1,5 +1,7 @@
 #include "MiniAudioFft.h"
 
+#include <cmath>  // std::round, std::max, std::min
+
 #include "rtVars.h"  // rtv::muteStat eléréséhez
 
 // Konstans a módkijelző láthatósági idejéhez (ms)
@@ -28,6 +30,7 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
       prevMuteState(rtv::muteStat),         // Némítás előző állapotának inicializálása
       modeIndicatorShowUntil(0),            // Kezdetben nem látható (setInitialMode állítja)
       isIndicatorCurrentlyVisible(true),    // Kezdetben látható (setInitialMode állítja)
+      lastTouchProcessTime(0),              // Debounce időzítő nullázása
       configModeFieldRef(configModeField),  // Referencia elmentése
       FFT(),                                // FFT objektum inicializálása
       highResOffset(0) {
@@ -70,8 +73,8 @@ void MiniAudioFft::cycleMode() {
     // Az enum értékének növelése és körbejárás
     uint8_t modeValue = static_cast<uint8_t>(currentMode);
     modeValue++;
-    if (modeValue > static_cast<uint8_t>(DisplayMode::Envelope)) {  // Az utolsó érvényes mód az Envelope
-        modeValue = static_cast<uint8_t>(DisplayMode::Off);         // Visszaugrás az Off-ra
+    if (modeValue > static_cast<uint8_t>(DisplayMode::TuningAid)) {  // Az utolsó érvényes mód most a TuningAid
+        modeValue = static_cast<uint8_t>(DisplayMode::Off);          // Visszaugrás az Off-ra
     }
     currentMode = static_cast<DisplayMode>(modeValue);
 
@@ -89,8 +92,8 @@ void MiniAudioFft::cycleMode() {
     if (currentMode == DisplayMode::Oscilloscope || (currentMode != DisplayMode::Oscilloscope && osciSamples[0] != 2048)) {
         for (int i = 0; i < MiniAudioFftConstants::MAX_INTERNAL_WIDTH; ++i) osciSamples[i] = 2048;
     }
-    if (currentMode == DisplayMode::Waterfall || currentMode == DisplayMode::Envelope ||
-        (currentMode < DisplayMode::Waterfall && !wabuf.empty() && !wabuf[0].empty() && wabuf[0][0] != 0)) {
+    if (currentMode == DisplayMode::Waterfall || currentMode == DisplayMode::Envelope || currentMode == DisplayMode::TuningAid ||  // TuningAid is használja a wabuf-ot
+        (currentMode < DisplayMode::Waterfall && !wabuf.empty() && !wabuf[0].empty() && wabuf[0][0] != 0)) {                       // Ha korábbi módból váltunk, ami nem használta
         for (auto& row : wabuf) std::fill(row.begin(), row.end(), 0);
     }
     highResOffset = 0;  // Magas felbontású spektrum eltolásának resetelése
@@ -112,7 +115,7 @@ void MiniAudioFft::clearArea() {
     int maxOuterX = posX - frameThickness;
     int maxOuterY = posY - frameThickness;
     int maxOuterW = width + (frameThickness * 2);
-    int maxOuterH_forClear = height + (frameThickness * 2); // A komponens maximális magasságát használjuk a törléshez
+    int maxOuterH_forClear = height + (frameThickness * 2);  // A komponens maximális magasságát használjuk a törléshez
 
     // Teljes maximális terület törlése feketére
     tft.fillRect(maxOuterX, maxOuterY, maxOuterW, maxOuterH_forClear, TFT_BLACK);
@@ -121,7 +124,7 @@ void MiniAudioFft::clearArea() {
     int currentFrameOuterX = posX - frameThickness;
     int currentFrameOuterY = posY - frameThickness;
     int currentFrameOuterW = width + (frameThickness * 2);
-    int currentFrameOuterH_forNewFrame = effectiveH + (frameThickness * 2); // Keret az aktuális effektív magassághoz
+    int currentFrameOuterH_forNewFrame = effectiveH + (frameThickness * 2);  // Keret az aktuális effektív magassághoz
 
     tft.drawRect(currentFrameOuterX, currentFrameOuterY, currentFrameOuterW, currentFrameOuterH_forNewFrame, TFT_COLOR(80, 80, 80));
 }
@@ -209,6 +212,9 @@ void MiniAudioFft::drawModeIndicator() {
             break;
         case DisplayMode::Envelope:
             modeText = "Envelope";
+            break;
+        case DisplayMode::TuningAid:
+            modeText = "Tune CW";  // Vagy általánosabb "Tune Aid"
             break;
         default:
             modeText = "Unk";
@@ -324,6 +330,9 @@ void MiniAudioFft::loop() {
         case DisplayMode::Envelope:
             drawEnvelope();
             break;
+        case DisplayMode::TuningAid:
+            drawTuningAid();
+            break;
             // Nem kell default, mert a currentMode mindig érvényes DisplayMode érték.
     }
     // A drawModeIndicator() metódust NEM hívjuk itt minden ciklusban,
@@ -343,8 +352,15 @@ void MiniAudioFft::loop() {
  */
 bool MiniAudioFft::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
     if (touched && (tx >= posX && tx < (posX + width) && ty >= posY && ty < (posY + height))) {
-        cycleMode();  // Ez beállítja az isIndicatorCurrentlyVisible-t, a timert, és hívja a forceRedraw-t
-        return true;
+        // Debounce logika: Csak akkor dolgozzuk fel, ha elegendő idő telt el az utolsó feldolgozás óta
+        if (millis() - lastTouchProcessTime > MiniAudioFftConstants::TOUCH_DEBOUNCE_MS) {
+            lastTouchProcessTime = millis(); // Időbélyeg frissítése
+            cycleMode();  // Ez beállítja az isIndicatorCurrentlyVisible-t, a timert, és hívja a forceRedraw-t
+            return true;  // Kezeltük az érintést
+        }
+        // Ha túl gyorsan jött az érintés, akkor is jelezzük, hogy a komponens területén volt,
+        // de nem váltunk módot, hogy más ne kezelje le.
+        return true; 
     }
     return false;
 }
@@ -379,6 +395,9 @@ void MiniAudioFft::forceRedraw() {
                 break;
             case DisplayMode::Envelope:
                 drawEnvelope();
+                break;
+            case DisplayMode::TuningAid:
+                drawTuningAid();
                 break;
         }
         drawModeIndicator();  // És a módkijelző kirajzolása (ha látható)
@@ -697,6 +716,84 @@ void MiniAudioFft::drawEnvelope() {
 }
 
 /**
+ * @brief Hangolási segéd mód kirajzolása (szűkített vízesés célvonallal).
+ *
+ * A `getGraphHeight()` által visszaadott magasságot használja a rajzoláshoz.
+ * A `wabuf` feltöltése a TUNING_AID_DISPLAY_MIN_FREQ_HZ és MAX_FREQ_HZ közötti FFT bin-ek alapján történik.
+ */
+void MiniAudioFft::drawTuningAid() {
+    using namespace MiniAudioFftConstants;
+    int graphH = getGraphHeight();  // A grafikon tényleges rajzolási magassága
+    if (width == 0 || height == 0 || wabuf.empty() || wabuf[0].empty() || graphH <= 0) return;
+
+    // 1. Adatok eltolása "lefelé" a `wabuf`-ban (időbeli léptetés)
+    // Csak a grafikon magasságáig (`graphH`) használjuk a `wabuf` sorait.
+    for (int r = graphH - 1; r > 0; --r) {  // Utolsó sortól a másodikig
+        for (int c = 0; c < width; ++c) {   // Minden oszlop (frekvencia bin)
+            wabuf[r][c] = wabuf[r - 1][c];
+        }
+    }
+
+    // 2. Új adatok betöltése a `wabuf[0]` sorába (legfrissebb spektrum)
+    //    a hangolási tartományból.
+    const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
+    const int min_fft_bin_for_tuning = std::max(2, static_cast<int>(std::round(TUNING_AID_DISPLAY_MIN_FREQ_HZ / binWidthHz)));
+    const int max_fft_bin_for_tuning = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(TUNING_AID_DISPLAY_MAX_FREQ_HZ / binWidthHz)));
+    const int num_bins_in_tuning_range = std::max(1, max_fft_bin_for_tuning - min_fft_bin_for_tuning + 1);
+
+    for (int c_col = 0; c_col < width; ++c_col) {  // c_col a képernyő X pozíciója / wabuf oszlop indexe
+        // Képernyő oszlop (c_col) leképezése egy FFT bin indexre a kívánt tartományon belül
+        float ratio_in_display_width = (width == 1) ? 0.0f : (static_cast<float>(c_col) / (width - 1));
+        int fft_bin_index = min_fft_bin_for_tuning + static_cast<int>(std::round(ratio_in_display_width * (num_bins_in_tuning_range - 1)));
+        // Biztosítjuk, hogy az index a számított és az abszolút érvényes tartományon belül maradjon
+        fft_bin_index = constrain(fft_bin_index, min_fft_bin_for_tuning, max_fft_bin_for_tuning);
+        fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(FFT_SAMPLES / 2 - 1));
+
+        double scaled_fft_val = RvReal[fft_bin_index] / AMPLITUDE_SCALE;
+
+        // Érzékenység beállítása a hangolási segédhez.
+        // Legyen ugyanaz, mint a normál vízesésnél, ami a felhasználó szerint "egész jó".
+        wabuf[0][c_col] = static_cast<int>(constrain(scaled_fft_val * 50.0f, 0.0, 255.0));
+    }
+
+    // 3. Pixelek kirajzolása a grafikon területére
+    // A sorok (r) az időt, az oszlopok (c) a frekvenciát jelentik.
+    for (int r_time = 0; r_time < graphH; ++r_time) {     // Y koordináta a képernyőn (idő)
+        for (int c_freq = 0; c_freq < width; ++c_freq) {  // X koordináta a képernyőn (frekvencia)
+            // A wabuf[r_time][c_freq] tartalmazza a színerősséget
+            uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[r_time][c_freq]);
+            tft.drawPixel(posX + c_freq, posY + r_time, color);
+        }
+    }
+
+    // 4. Célfrekvencia vonalának kirajzolása (FÜGGŐLEGES vonal)
+    // A ténylegesen megjelenített frekvenciatartomány alsó és felső határa Hz-ben
+
+    float min_freq_displayed_actual = static_cast<float>(min_fft_bin_for_tuning) * binWidthHz;
+    float max_freq_displayed_actual = static_cast<float>(max_fft_bin_for_tuning) * binWidthHz;
+    float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;
+
+    // Csak akkor rajzoljuk a vonalat, ha a célfrekvencia a megjelenített tartományon belül van
+    if (displayed_span_hz > 0 && TUNING_AID_TARGET_FREQ_HZ >= min_freq_displayed_actual && TUNING_AID_TARGET_FREQ_HZ <= max_freq_displayed_actual) {
+
+        // Arány kiszámítása: hol helyezkedik el a célfrekvencia a megjelenített sávon belül
+        float ratio = (TUNING_AID_TARGET_FREQ_HZ - min_freq_displayed_actual) / displayed_span_hz;
+
+        // X pozíció kiszámítása a komponens szélességén
+        int line_x_on_graph = static_cast<int>(std::round(ratio * (width - 1)));
+        int final_line_x = posX + line_x_on_graph;  // Abszolút X pozíció a képernyőn
+
+        // Függőleges vonal kirajzolása a grafikon teljes magasságában
+        tft.drawFastVLine(final_line_x, posY, graphH, TUNING_AID_TARGET_LINE_COLOR);
+
+        // Opcionálisan egy második vonal a jobb láthatóságért
+        if (final_line_x + 1 < posX + width) {  // Biztosítjuk, hogy a komponensen belül maradjon
+            tft.drawFastVLine(final_line_x + 1, posY, graphH, TUNING_AID_TARGET_LINE_COLOR);
+        }
+    }
+}
+
+/**
  * @brief Kirajzolja a "MUTED" feliratot a komponens aktuális effektív magasságának közepére.
  */
 void MiniAudioFft::drawMuted() {
@@ -705,10 +802,11 @@ void MiniAudioFft::drawMuted() {
 
     // A `clearArea` már törölte a hátteret az `effectiveH` magasságig.
     // Ide rajzoljuk a "MUTED" feliratot.
-    tft.setCursor(posX + width / 2, posY + effectiveH / 2);  // Középre az effektív magasságon belül
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_YELLOW);
     tft.setFreeFont();
     tft.setTextSize(1);
-    tft.print("-- Muted --");
+    // A drawString használata a setCursor + print helyett a pontosabb középre igazításért MC_DATUM mellett.
+    // A háttérszínt a clearArea már beállította.
+    tft.drawString("-- Muted --", posX + width / 2, posY + effectiveH / 2);
 }

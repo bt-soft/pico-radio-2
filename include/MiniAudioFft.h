@@ -11,8 +11,7 @@
 // A 10kHz-es SAMPLING_FREQUENCY miatt az FFT eljárás 0 Hz-től 5 kHz-ig terjedő sávszélességben képes mérni a frekvenciakomponenseket.
 // A grafikus megjelenítők ebből tipikusan a kb. 78 Hz-től 4.96 kHz-ig terjedő tartományt ábrázolják.
 
-
-// Konstansok a MiniAudioFft komponenshez 
+// Konstansok a MiniAudioFft komponenshez
 namespace MiniAudioFftConstants {
 constexpr uint16_t FFT_SAMPLES = 256;         // Minták száma az FFT-hez (2 hatványának kell lennie)
 constexpr double SAMPLING_FREQUENCY = 10000;  // Mintavételezési frekvencia Hz-ben
@@ -32,6 +31,13 @@ constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burko
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
 constexpr float OSCI_SENSITIVITY_FACTOR = 3.0f;     // Oszcilloszkóp érzékenységi faktora
 constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;    // Oszcilloszkóp mintavételi decimációs faktora
+
+constexpr uint32_t TOUCH_DEBOUNCE_MS = 300; // Érintés "debounce" ideje milliszekundumban
+// Konstansok a hangolási segéd módhoz
+constexpr float TUNING_AID_TARGET_FREQ_HZ = 700.0f;           // Célfrekvencia CW-hez (Hz)
+constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 200.0f;      // Megjelenített tartomány minimuma (Hz) - Kérésnek megfelelően
+constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 1200.0f;     // Megjelenített tartomány maximuma (Hz) - 1kHz sávszélesség, 700Hz középen
+constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;  // Célvonal színe
 
 // Színek a vízeséshez
 const uint16_t WATERFALL_COLORS[16] = {
@@ -54,7 +60,7 @@ constexpr int MAX_WATERFALL_COLOR_INPUT_VALUE = 20000;  // Maximális bemeneti �
 }  // namespace MiniAudioFftConstants
 
 class MiniAudioFft {
-   public: // Publikus enum a könnyebb elérhetőségért, ha külsőleg is hivatkoznánk rá
+   public:  // Publikus enum a könnyebb elérhetőségért, ha külsőleg is hivatkoznánk rá
     // Megjelenítési módok enum definíciója
     enum class DisplayMode : uint8_t {
         Off = 0,
@@ -62,8 +68,10 @@ class MiniAudioFft {
         SpectrumHighRes,
         Oscilloscope,
         Waterfall,
-        Envelope
+        Envelope,
+        TuningAid  // Új mód a hangolási segédhez
     };
+
    public:
     /**
      * @brief Konstruktor.
@@ -77,7 +85,7 @@ class MiniAudioFft {
     MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configModeField);
     ~MiniAudioFft() = default;  // Alapértelmezett destruktor
 
-    void setInitialMode(DisplayMode mode); // Kezdeti mód beállítása
+    void setInitialMode(DisplayMode mode);  // Kezdeti mód beállítása
     /**
      * @brief A komponens fő ciklusfüggvénye, kezeli az FFT mintavételezést és a rajzolást.
      */
@@ -99,11 +107,12 @@ class MiniAudioFft {
     TFT_eSPI& tft;                  // Referencia a TFT objektumra
     int posX, posY, width, height;  // Komponens pozíciója és méretei
 
-    DisplayMode currentMode;  // Aktuális megjelenítési mód
-    bool prevMuteState;   // Előző némítási állapot a változások érzékeléséhez
-    uint32_t modeIndicatorShowUntil; // Időbélyeg, meddig látható a módkijelző
-    bool isIndicatorCurrentlyVisible; // A módkijelző aktuálisan látható-e
-    uint8_t& configModeFieldRef; // Referencia a Config mezőre a mód mentéséhez
+    DisplayMode currentMode;           // Aktuális megjelenítési mód
+    bool prevMuteState;                // Előző némítási állapot a változások érzékeléséhez
+    uint32_t modeIndicatorShowUntil;   // Időbélyeg, meddig látható a módkijelző
+    bool isIndicatorCurrentlyVisible;  // A módkijelző aktuálisan látható-e
+    uint32_t lastTouchProcessTime;     // Utolsó érintésfeldolgozás ideje a debounce-hoz
+    uint8_t& configModeFieldRef;       // Referencia a Config mezőre a mód mentéséhez
 
     ArduinoFFT<double> FFT;                             // FFT objektum
     double vReal[MiniAudioFftConstants::FFT_SAMPLES];   // Valós rész az FFT bemenetéhez/kimenetéhez
@@ -140,6 +149,7 @@ class MiniAudioFft {
     void drawSpectrumHighRes();
     void drawOscilloscope();
     void drawWaterfall();
+    void drawTuningAid();  // Hangolást segítő mód kirajzolása
     void drawEnvelope();
 
     // Segédfüggvények az alacsony felbontású spektrumhoz

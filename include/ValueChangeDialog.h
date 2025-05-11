@@ -197,7 +197,6 @@ class ValueChangeDialog : public MessageDialog {
 
             if (useEncoderValue) {
                 tempVal += encoderState.value;  // Közvetlenül az encoder értékével növelünk/csökkentünk
-                DEBUG("ValueChangeDialog::handleRotary(long long) -> encoderState.value: %d\n", encoderState.value);
             } else {
                 if (encoderState.direction == RotaryEncoder::Direction::Up) {
                     tempVal += static_cast<long long>(step);
