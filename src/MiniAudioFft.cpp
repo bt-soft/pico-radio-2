@@ -22,9 +22,9 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
       width(w),
       height(h),
       // currentMode itt nem kap explicit kezdőértéket, a setInitialMode állítja be
-      prevMuteState(rtv::muteStat),              // Némítás előző állapotának inicializálása
-      configModeFieldRef(configModeField),       // Referencia elmentése
-      FFT(),                                     // FFT objektum inicializálása
+      prevMuteState(rtv::muteStat),         // Némítás előző állapotának inicializálása
+      configModeFieldRef(configModeField),  // Referencia elmentése
+      FFT(),                                // FFT objektum inicializálása
       highResOffset(0) {
 
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
@@ -97,13 +97,13 @@ void MiniAudioFft::cycleMode() {
 void MiniAudioFft::clearArea() {
     tft.fillRect(posX, posY, width, height, TFT_BLACK);
 
-    // Mini kijelző területének vastagabb és világosabb körvonala
+    // Mini kijelző területének kerete
     constexpr int frameThickness = 1;  // Keret vastagsága
     int frameOuterX = posX - frameThickness;
     int frameOuterY = posY - frameThickness;
     int frameOuterW = width + (frameThickness * 2);
     int frameOuterH = height + (frameThickness * 2) + 1;
-    tft.drawRect(frameOuterX, frameOuterY, frameOuterW, frameOuterH, TFT_SILVER);  // Külső keret kitöltése
+    tft.drawRect(frameOuterX, frameOuterY, frameOuterW, frameOuterH, TFT_DARKGREY);  // Külső keret rajzolása
 }
 
 /**
