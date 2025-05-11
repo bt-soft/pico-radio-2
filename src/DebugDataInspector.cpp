@@ -64,6 +64,8 @@ void DebugDataInspector::printConfigData(const Config_t& configData) {
     DEBUG("  screenSaverTimeoutMinutes: %u\n", configData.screenSaverTimeoutMinutes);
     DEBUG("  miniAudioFftModeAm: %u\n", configData.miniAudioFftModeAm);
     DEBUG("  miniAudioFftModeFm: %u\n", configData.miniAudioFftModeFm);
+    DEBUG("  showMiniAudioFftAm: %s\n", configData.showMiniAudioFftAm ? "true" : "false");
+    DEBUG("  showMiniAudioFftFm: %s\n", configData.showMiniAudioFftFm ? "true" : "false");
     DEBUG("====================\n");
 #endif
 }

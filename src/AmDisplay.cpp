@@ -35,10 +35,12 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     int mini_fft_y = 50;
     int mini_fft_w = 140;
     int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
-    // Átadjuk a config.data.miniAudioFftModeAm referenciáját
-    pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm);
-    // Beállítjuk a kezdeti módot a configból
-    pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
+    if (config.data.showMiniAudioFftAm) { // Csak akkor példányosítjuk, ha engedélyezve van
+        // Átadjuk a config.data.miniAudioFftModeAm referenciáját
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm);
+        // Beállítjuk a kezdeti módot a configból
+        pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
+    }
 }
 
 /**
@@ -88,7 +90,7 @@ void AmDisplay::drawScreen() {
     DisplayBase::drawScreenButtons();
 
     // MiniAudioFft kirajzolása (kezdeti)
-    if (pMiniAudioFft) {
+    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
         pMiniAudioFft->forceRedraw();
     }
 }
@@ -130,7 +132,7 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  */
 bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
-    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {
+    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) { // Ellenőrizzük, hogy létezik-e
         return true;
     }
 
@@ -301,7 +303,7 @@ void AmDisplay::displayLoop() {
     }
 
     // MiniAudioFft ciklus futtatása
-    if (pMiniAudioFft) {
+    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
         pMiniAudioFft->loop();
     }
 }

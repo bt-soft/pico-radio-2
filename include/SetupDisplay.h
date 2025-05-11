@@ -6,7 +6,7 @@
 #include "ScrollableListComponent.h"
 
 namespace SetupList {
-enum class ItemAction { BRIGHTNESS, INFO, SQUELCH_BASIS, SAVER_TIMEOUT, INACTIVE_DIGIT_LIGHT, BEEPER_ENABLED, FACTORY_RESET, NONE };
+enum class ItemAction { BRIGHTNESS, INFO, SQUELCH_BASIS, SAVER_TIMEOUT, INACTIVE_DIGIT_LIGHT, BEEPER_ENABLED, TOGGLE_MINI_FFT_AM, TOGGLE_MINI_FFT_FM, FACTORY_RESET, NONE };
 
 struct SettingItem {
     const char *label;
@@ -20,7 +20,7 @@ class SetupDisplay : public DisplayBase, public IScrollableListDataSource {
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;
 
     // Lista alapú menühöz
-    static const int MAX_SETTINGS = 7;  // Maximális beállítási elemek száma (5 + 2 új)
+    static const int MAX_SETTINGS = 9;
     SetupList::SettingItem settingItems[MAX_SETTINGS];
     ScrollableListComponent scrollListComponent;
 

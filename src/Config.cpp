@@ -51,4 +51,8 @@ const Config_t DEFAULT_CONFIG = {
     // MiniAudioFft módok (kezdetben SpectrumLowRes)
     .miniAudioFftModeAm = static_cast<uint8_t>(MiniAudioFft::DisplayMode::SpectrumLowRes),
     .miniAudioFftModeFm = static_cast<uint8_t>(MiniAudioFft::DisplayMode::SpectrumLowRes),
+
+    // MiniAudioFft láthatósága (kezdetben bekapcsolva)
+    .showMiniAudioFftAm = true,
+    .showMiniAudioFftFm = true,
 };

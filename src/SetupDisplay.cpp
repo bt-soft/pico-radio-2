@@ -37,8 +37,10 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref
     settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};                    // Képernyővédő idő
     settingItems[3] = {"Inactive Digit Segments", ItemAction::INACTIVE_DIGIT_LIGHT};  // Inaktív szegmensek
     settingItems[4] = {"Beeper", ItemAction::BEEPER_ENABLED};                         // Beeper engedélyezése (4)
-    settingItems[5] = {"Info", ItemAction::INFO};                                     // Információ
-    settingItems[6] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása (5)
+    settingItems[5] = {"Mini FFT (AM Screen)", ItemAction::TOGGLE_MINI_FFT_AM};       // AM módban a mini FFT
+    settingItems[6] = {"Mini FFT (FM Screen)", ItemAction::TOGGLE_MINI_FFT_FM};       // FM módban a mini FFT
+    settingItems[7] = {"Info", ItemAction::INFO};                                     // Információ
+    settingItems[8] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása (5)
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -98,10 +100,22 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
     using namespace SetupListConstants;
     uint16_t bgColor = isSelected ? SELECTED_ITEM_BG_COLOR : ITEM_BG_COLOR;
     uint16_t textColor = isSelected ? SELECTED_ITEM_TEXT_COLOR : ITEM_TEXT_COLOR;
-    //uint16_t listAreaW = tft.width() - (LIST_AREA_X_START * 2);
 
     // 1. Terület törlése a háttérszínnel
-    tft_ref.fillRect(x, y, w, h, bgColor);  // A kapott x, y, w, h használata
+    // A kiválasztott elem háttérrajzolási paramétereinek módosítása a 2px-es margóhoz
+    int bgX = x;
+    int bgY = y;
+    int bgW = w;
+    int bgH = h;
+
+    // Kis margót hagyunk a kiválasztott elem körül
+    if (isSelected) {
+        bgX += 4;
+        bgY += 4;
+        bgW -= 4;
+        bgH -= 4;
+    }
+    tft_ref.fillRect(bgX, bgY, bgW, bgH, bgColor);
 
     // 2. Szöveg tulajdonságainak beállítása
     tft_ref.setFreeFont(&FreeSansBold9pt7b);
@@ -129,6 +143,12 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
             break;
         case SetupList::ItemAction::BEEPER_ENABLED:
             valueStr = config.data.beeperEnabled ? "ON" : "OFF";  // Flash string
+            break;
+        case SetupList::ItemAction::TOGGLE_MINI_FFT_AM:
+            valueStr = config.data.showMiniAudioFftAm ? "ON" : "OFF";
+            break;
+        case SetupList::ItemAction::TOGGLE_MINI_FFT_FM:
+            valueStr = config.data.showMiniAudioFftFm ? "ON" : "OFF";
             break;
         case SetupList::ItemAction::INFO:
         case SetupList::ItemAction::NONE:
@@ -229,6 +249,20 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
                     if (newValue) {
                         Utils::beepTick();
                     }
+                });
+            break;
+
+        case SetupList::ItemAction::TOGGLE_MINI_FFT_AM:
+            DisplayBase::pDialog =
+                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Mini FFT (AM)"), F("Show:"), &config.data.showMiniAudioFftAm, false, true, true, [this](bool newValue) {
+                    // Nincs szükség további műveletre, a ValueChangeDialog kezeli a config.data frissítését.
+                });
+            break;
+
+        case SetupList::ItemAction::TOGGLE_MINI_FFT_FM:
+            DisplayBase::pDialog =
+                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Mini FFT (FM)"), F("Show:"), &config.data.showMiniAudioFftFm, false, true, true, [this](bool newValue) {
+                    // Nincs szükség további műveletre.
                 });
             break;
 

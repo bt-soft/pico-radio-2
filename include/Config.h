@@ -2,8 +2,8 @@
 #define __CONFIG_H
 
 #include "DebugDataInspector.h"  // Szükséges a debug kiíratáshoz
+#include "MiniAudioFft.h"        // Szükséges a MiniAudioFft::DisplayMode enumhoz
 #include "StoreBase.h"
-#include "MiniAudioFft.h" // Szükséges a MiniAudioFft::DisplayMode enumhoz
 
 // TFT háttérvilágítás max érték
 #define TFT_BACKGROUND_LED_MAX_BRIGHTNESS 255
@@ -56,8 +56,12 @@ struct Config_t {
     bool beeperEnabled;                 // Hangjelzés engedélyezése
 
     // MiniAudioFft módok
-    uint8_t miniAudioFftModeAm;         // MiniAudioFft módja AM képernyőn
-    uint8_t miniAudioFftModeFm;         // MiniAudioFft módja FM képernyőn
+    uint8_t miniAudioFftModeAm;  // MiniAudioFft módja AM képernyőn
+    uint8_t miniAudioFftModeFm;  // MiniAudioFft módja FM képernyőn
+
+    // MiniAudioFft láthatósága
+    bool showMiniAudioFftAm;  // MiniAudioFft megjelenítése AM képernyőn
+    bool showMiniAudioFftFm;  // MiniAudioFft megjelenítése FM képernyőn
 };
 
 // Alapértelmezett konfigurációs adatok (readonly, const)

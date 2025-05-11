@@ -61,10 +61,12 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     int mini_fft_y = 50;
     int mini_fft_w = 140;
     int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
-    // Átadjuk a config.data.miniAudioFftModeFm referenciáját
-    pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeFm);
-    // Beállítjuk a kezdeti módot a configból
-    pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeFm));
+    if (config.data.showMiniAudioFftFm) { // Csak akkor példányosítjuk, ha engedélyezve van
+        // Átadjuk a config.data.miniAudioFftModeFm referenciáját
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeFm);
+        // Beállítjuk a kezdeti módot a configból
+        pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeFm));
+    }
 }
 
 /**
@@ -163,7 +165,7 @@ void FmDisplay::drawScreen() {
     DisplayBase::drawScreenButtons();
 
     // MiniAudioFft kirajzolása (kezdeti)
-    if (pMiniAudioFft) {
+    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
         pMiniAudioFft->forceRedraw();
     }
 }
@@ -240,7 +242,7 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  * A további gui elemek vezérléséhez
  */
 bool FmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
-    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {
+    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) { // Ellenőrizzük, hogy létezik-e
         return true;
     }
     // Itt jöhetne más, nem gombhoz kötött érintéskezelés, ha lenne.
@@ -354,7 +356,7 @@ void FmDisplay::displayLoop() {
     }
 
     // MiniAudioFft ciklus futtatása
-    if (pMiniAudioFft) {
+    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
         pMiniAudioFft->loop();
     }
 }
