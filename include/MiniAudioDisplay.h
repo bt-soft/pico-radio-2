@@ -4,7 +4,7 @@
 #include <ArduinoFFT.h>  // FFT könyvtár
 
 #include "DisplayBase.h"
-#include "defines.h"  // PIN_AUDIO_INPUT_PIN
+#include "defines.h"  // AUDIO_INPUT_PIN (a defines.h-ból)
 
 // Konstansok a mini kijelzőhöz és az FFT-hez
 namespace MiniAudioDisplayConstants {
@@ -72,24 +72,27 @@ class MiniAudioDisplay : public DisplayBase {
     // Magas felbontású spektrumhoz (mode 2)
     int highResOffset;  // Az FFT.ino 'offset' változója
 
+    // Oszcilloszkóphoz (mode 3)
+    int osciSamples[MiniAudioDisplayConstants::MINI_OSCI_SAMPLES_TO_DRAW];
+
     // Segédfüggvények
     void cycleMiniWindowMode();
     void drawModeIndicator();
     void clearMiniDisplayArea();
 
-    void FFTSampleMini(bool drawOsci);  // Adaptált FFT mintavételező
+    void FFTSampleMini(bool collectOsciSamples);  // Adaptált FFT mintavételező (paraméter átnevezve)
 
     // Az egyes módok kirajzoló függvényei
     void drawMiniSpectrumLowRes();
     void drawMiniSpectrumHighRes();
-    void drawMiniOscilloscope();  // Az FFTSampleMini-n belül is lehet
+    void drawMiniOscilloscope();
     void drawMiniWaterfall();
     void drawMiniEnvelope();
 
     // Segédfüggvények az FFT.ino-ból (adaptálva)
     uint8_t getBandValMini(int fft_bin_index);
-    void displayBandMini(int band_index, int magnitude, int actual_start_x); // Harmadik paraméter hozzáadva
-    uint16_t valueToMiniWaterfallColor(int scaled_value);  // A normalizált bemenetű helyett
+    void displayBandMini(int band_index, int magnitude, int actual_start_x);
+    uint16_t valueToMiniWaterfallColor(int scaled_value);
 };
 
 #endif  // MINI_AUDIO_DISPLAY_H
