@@ -55,6 +55,13 @@ void Si4735Utils::manageSquelch() {
  */
 void Si4735Utils::checkAGC() {
 
+    // AGC beállítások nem relevánsak FM módban.
+    // Az FM AGC-t általában a setFM() vagy más FM-specifikus parancsok kezelik.
+    if (band.getCurrentBandType() == FM_BAND_TYPE) {
+        DEBUG("Si4735Utils::checkAGC() -> FM mode, AGC settings skipped.\n");
+        return;
+    }
+
     // Először lekérdezzük az SI4735 chip aktuális AGC állapotát.
     //  Ez a hívás frissíti az SI4735 objektum belső állapotát az AGC-vel kapcsolatban (pl. hogy engedélyezve van-e vagy sem).
     si4735.getAutomaticGainControl();
