@@ -5,7 +5,7 @@
 /**
  * Konstruktor
  */
-AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr) {
+AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band, CwDecoder *cwDecoder) : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr), pCwDecoderInstance(cwDecoder) {
 
     DEBUG("AmDisplay::AmDisplay\n");
 
@@ -31,16 +31,6 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
 
     // MiniAudioFft komponens elhelyezése
-    int mini_fft_x = 260;
-    int mini_fft_y = 50;
-    int mini_fft_w = 140;
-    int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
-    if (config.data.showMiniAudioFftAm) { // Csak akkor példányosítjuk, ha engedélyezve van
-        // Átadjuk a config.data.miniAudioFftModeAm referenciáját
-        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm);
-        // Beállítjuk a kezdeti módot a configból
-        pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
-    }
 }
 
 /**
@@ -90,7 +80,13 @@ void AmDisplay::drawScreen() {
     DisplayBase::drawScreenButtons();
 
     // MiniAudioFft kirajzolása (kezdeti)
-    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
+    if (config.data.showMiniAudioFftAm) {  // Csak akkor példányosítjuk, ha engedélyezve van
+        using namespace DisplayConstants;
+
+        // Átadjuk a config.data.miniAudioFftModeAm referenciáját
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm);
+        // Beállítjuk a kezdeti módot a configból
+        pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
         pMiniAudioFft->forceRedraw();
     }
 }
@@ -132,7 +128,7 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  */
 bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
-    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) { // Ellenőrizzük, hogy létezik-e
+    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {  // Ellenőrizzük, hogy létezik-e
         return true;
     }
 
@@ -303,7 +299,26 @@ void AmDisplay::displayLoop() {
     }
 
     // MiniAudioFft ciklus futtatása
-    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
+    if (pMiniAudioFft) {  // Ellenőrizzük, hogy létezik-e
         pMiniAudioFft->loop();
+    }
+
+    //------------------- CW dekóder logika áthelyezve ide ---
+    // Csak akkor futtatjuk, ha CW módban vagyunk és van CwDecoder példány
+    if (pCwDecoderInstance != nullptr /*&& currentBand.varData.currMod == CW*/) {
+        char display_buffer[CW_DECODER_BUFFER_SIZE];  // Elég nagy buffer a kiolvasáshoz
+        size_t len = pCwDecoderInstance->get_decoded_text(display_buffer, sizeof(display_buffer));
+        if (len > 0) {
+            // Itt kellene a dekódolt szöveget megjeleníteni az AM képernyőn.
+            // Mivel ez a displayLoop, a közvetlen Serial.print ide nem ideális,
+            // de a debugoláshoz ideiglenesen maradhat, vagy egy dedikált
+            // képernyő-frissítési mechanizmusba kellene integrálni.
+            // Serial.print("CW (AmDisplay): "); // Jelöljük, hogy innen jön
+            // Serial.print(display_buffer);
+            // Serial.println();
+
+            // TODO: Implementáld a dekódolt CW szöveg megjelenítését az AM képernyőn.
+            // pl. this->drawDecodedCwText(display_buffer);
+        }
     }
 }

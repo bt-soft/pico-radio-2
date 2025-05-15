@@ -53,6 +53,11 @@ AmStationStore amStationStore;
 #include "SetupDisplay.h"
 DisplayBase *pDisplay = nullptr;
 
+//---- Dekóderek
+// #define USE_MORSE_DECODER
+#include "CwDecoder.h"
+CwDecoder *pMorse_decoder = nullptr;  // Pointer a CwDecoder példányra, kezdetben nullptr
+
 /**
  * Globális változó az aktuális kijelző váltásának előjegyzése
  * Induláskor FM - módban indulunk
@@ -92,17 +97,17 @@ void changeDisplay() {
         // Ha más képernyőről váltunk egy másik képernyőre, akkor az aktuáils képernyőt töröljük
         if (::pDisplay) {
             delete ::pDisplay;
+            ::pDisplay = nullptr;  // Fontos a pointer nullázása törlés után
         }
 
         // Létrehozzuk az új képernyő példányát
         switch (::newDisplay) {
-
             case DisplayBase::DisplayType::fm:
                 ::pDisplay = new FmDisplay(tft, si4735, band);
                 break;
 
             case DisplayBase::DisplayType::am:
-                ::pDisplay = new AmDisplay(tft, si4735, band);
+                ::pDisplay = new AmDisplay(tft, si4735, band, pMorse_decoder);  // Átadjuk a pointert
                 break;
 
             case DisplayBase::DisplayType::freqScan:
@@ -111,19 +116,16 @@ void changeDisplay() {
 
             case DisplayBase::DisplayType::setup:
                 ::pDisplay = new SetupDisplay(tft, si4735, band);
-                // Elmentjük a beállítások képernyőnek, hogy hova térjen vissza
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
 
             case DisplayBase::DisplayType::memory:
                 ::pDisplay = new MemoryDisplay(tft, si4735, band);
-                // Beállítjuk a képernyőnek, hogy hova térjen vissza
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
 
             case DisplayBase::DisplayType::audioAnalyzer:
                 ::pDisplay = new AudioAnalyzerDisplay(tft, si4735, band);
-                // Beállítjuk a képernyőnek, hogy hova térjen vissza
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
         }
@@ -256,11 +258,11 @@ void setup() {
     // Kezdő mód képernyőjének megjelenítése
     changeDisplay();
 
-    // Csippantunk egyet
-    Utils::beepTick();
-
     // PICO AD inicializálása
     PicoSensorUtils::init();
+
+    // Csippantunk egyet
+    Utils::beepTick();
 }
 
 /** ----------------------------------------------------------------------------------------------------------------------------------------

@@ -55,18 +55,6 @@ FmDisplay::FmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat (amiből kivettük a AFWdt, BFO-t) az FM-specifikus gombokkal.
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
-
-    // MiniAudioFft komponens elhelyezése
-    int mini_fft_x = 260;
-    int mini_fft_y = 50;
-    int mini_fft_w = 140;
-    int mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
-    if (config.data.showMiniAudioFftFm) { // Csak akkor példányosítjuk, ha engedélyezve van
-        // Átadjuk a config.data.miniAudioFftModeFm referenciáját
-        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeFm);
-        // Beállítjuk a kezdeti módot a configból
-        pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeFm));
-    }
 }
 
 /**
@@ -164,8 +152,14 @@ void FmDisplay::drawScreen() {
     // Gombok kirajzolása
     DisplayBase::drawScreenButtons();
 
-    // MiniAudioFft kirajzolása (kezdeti)
-    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
+    // MiniAudioFft komponens elhelyezése
+    if (config.data.showMiniAudioFftFm) {  // Csak akkor példányosítjuk, ha engedélyezve van
+        using namespace DisplayConstants;
+
+        // Átadjuk a config.data.miniAudioFftModeFm referenciáját
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeFm);
+        // Beállítjuk a kezdeti módot a configból
+        pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeFm));
         pMiniAudioFft->forceRedraw();
     }
 }
@@ -242,7 +236,7 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  * A további gui elemek vezérléséhez
  */
 bool FmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
-    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) { // Ellenőrizzük, hogy létezik-e
+    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {  // Ellenőrizzük, hogy létezik-e
         return true;
     }
     // Itt jöhetne más, nem gombhoz kötött érintéskezelés, ha lenne.
@@ -356,7 +350,7 @@ void FmDisplay::displayLoop() {
     }
 
     // MiniAudioFft ciklus futtatása
-    if (pMiniAudioFft) { // Ellenőrizzük, hogy létezik-e
+    if (pMiniAudioFft) {  // Ellenőrizzük, hogy létezik-e
         pMiniAudioFft->loop();
     }
 }

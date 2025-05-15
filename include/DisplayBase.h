@@ -52,16 +52,24 @@ constexpr int StatusLineStepX = 220;
 constexpr int StatusLineAntCapX = 260;
 constexpr int StatusLineTempX = 300;
 constexpr int StatusLineVbusX = 340;
-constexpr int StatusLineMemoX = 380; // Új pozíció a memória indikátornak
+constexpr int StatusLineMemoX = 380;  // Új pozíció a memória indikátornak
 
 // Gombok méretei és margói (ezeket használja az AudioAnalyzerDisplay is)
 constexpr uint8_t MaxButtonsInRow = 6;
 constexpr uint8_t ButtonWidth = 39;
 constexpr uint8_t ButtonHeight = 16;
 constexpr uint8_t ButtonMargin = 5;
+
+// MiniAudioFft pozíció és méret konstansai
+constexpr uint16_t mini_fft_x = 260;
+constexpr uint16_t mini_fft_y = 50;
+constexpr uint16_t mini_fft_w = 140;
+constexpr uint16_t mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
+
 }  // namespace DisplayConstants
-namespace StatusColors { // Külön névtér a státusz színeknek
-    constexpr uint16_t MemoryIndicatorColor = TFT_GREEN; // Memória indikátor színe
+
+namespace StatusColors {                              // Külön névtér a státusz színeknek
+constexpr uint16_t MemoryIndicatorColor = TFT_GREEN;  // Memória indikátor színe
 }
 
 /**

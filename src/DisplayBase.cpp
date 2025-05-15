@@ -1242,9 +1242,9 @@ bool DisplayBase::loop(RotaryEncoder::EncoderState encoderState) {
  */
 bool DisplayBase::checkIfCurrentStationIsInMemo() {
     // Aktuális állomás adatainak lekérdezése
-    BandTable& currentBandData = band.getCurrentBand();
+    BandTable &currentBandData = band.getCurrentBand();
     uint16_t currentFreq = currentBandData.varData.currFreq;
-    uint8_t currentBandIndex = config.data.bandIdx; // Az aktuális sáv indexe a globális konfigurációból
+    uint8_t currentBandIndex = config.data.bandIdx;  // Az aktuális sáv indexe a globális konfigurációból
     uint8_t currentModulation = currentBandData.varData.currMod;
     int16_t currentBfoOffset = 0;
 
