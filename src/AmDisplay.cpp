@@ -128,7 +128,8 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  */
 bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 
-    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {  // Ellenőrizzük, hogy létezik-e
+    // Ha nincs dialog és van MiniAudioFft, akkor a MiniAudioFft kezelje az érintést
+    if (!DisplayBase::pDialog && pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {  // Ellenőrizzük, hogy létezik-e
         return true;
     }
 

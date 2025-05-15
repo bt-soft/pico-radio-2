@@ -236,7 +236,9 @@ void FmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
  * A további gui elemek vezérléséhez
  */
 bool FmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
-    if (pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {  // Ellenőrizzük, hogy létezik-e
+
+    // Ha nincs dialog és van MiniAudioFft, akkor a MiniAudioFft kezelje az érintést
+    if (!DisplayBase::pDialog && pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {
         return true;
     }
     // Itt jöhetne más, nem gombhoz kötött érintéskezelés, ha lenne.
