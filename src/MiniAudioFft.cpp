@@ -33,7 +33,8 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
       lastTouchProcessTime(0),              // Debounce időzítő nullázása
       configModeFieldRef(configModeField),  // Referencia elmentése
       FFT(),                                // FFT objektum inicializálása
-      highResOffset(0) {
+      highResOffset(0),
+      envelope_prev_smoothed_max_val(0.0f) { // Új tagváltozó inicializálása
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
     if (this->height > 0 && this->width > 0) {
@@ -95,6 +96,9 @@ void MiniAudioFft::cycleMode() {
     if (currentMode == DisplayMode::Waterfall || currentMode == DisplayMode::Envelope || currentMode == DisplayMode::TuningAid ||  // TuningAid is használja a wabuf-ot
         (currentMode < DisplayMode::Waterfall && !wabuf.empty() && !wabuf[0].empty() && wabuf[0][0] != 0)) {                       // Ha korábbi módból váltunk, ami nem használta
         for (auto& row : wabuf) std::fill(row.begin(), row.end(), 0);
+    }
+    if (currentMode == DisplayMode::Envelope || (currentMode != DisplayMode::Envelope && envelope_prev_smoothed_max_val != 0.0f)) {
+        envelope_prev_smoothed_max_val = 0.0f; // Envelope simítási előzmény nullázása
     }
     highResOffset = 0;  // Magas felbontású spektrum eltolásának resetelése
 
@@ -672,10 +676,10 @@ void MiniAudioFft::drawEnvelope() {
 
     // 3. Burkológörbe kirajzolása
     const int half_graph_h = graphH / 2;
-    int prev_smoothed_env_idx_wabuf_scale = height / 2;  // Simítás a `wabuf` (teljes `height`) skáláján
+    // Az 'envelope_prev_smoothed_max_val' tagváltozót használjuk a simításhoz
 
     for (int c = 0; c < width; ++c) {
-        int env_idx_for_col_wabuf = height / 2;
+        // int env_idx_for_col_wabuf = height / 2; // Erre már nincs szükség az amplitúdó alapú rajzolásnál
         int max_val_in_col = 0;
         bool column_has_signal = false;
 
@@ -683,32 +687,37 @@ void MiniAudioFft::drawEnvelope() {
             if (wabuf[r_wabuf][c] > 0) column_has_signal = true;
             if (wabuf[r_wabuf][c] > max_val_in_col) {
                 max_val_in_col = wabuf[r_wabuf][c];
-                env_idx_for_col_wabuf = r_wabuf;
+                // env_idx_for_col_wabuf = r_wabuf; // Erre már nincs szükség
             }
         }
 
-        int smoothed_env_idx_wabuf = static_cast<int>(ENVELOPE_SMOOTH_FACTOR * prev_smoothed_env_idx_wabuf_scale + (1.0f - ENVELOPE_SMOOTH_FACTOR) * env_idx_for_col_wabuf);
-        prev_smoothed_env_idx_wabuf_scale = smoothed_env_idx_wabuf;
+        // A maximális amplitúdó simítása az oszlopban
+        float current_col_max_amplitude = static_cast<float>(max_val_in_col);
+        // A tagváltozót használjuk a simításhoz az oszlopok között
+        envelope_prev_smoothed_max_val = ENVELOPE_SMOOTH_FACTOR * envelope_prev_smoothed_max_val + (1.0f - ENVELOPE_SMOOTH_FACTOR) * current_col_max_amplitude;
 
         int col_x_on_screen = posX + c;
         tft.drawFastVLine(col_x_on_screen, posY, graphH, TFT_BLACK);  // Oszlop törlése a grafikon területén
 
-        if (column_has_signal) {
-            for (int i = 0; i <= smoothed_env_idx_wabuf; ++i) {
-                int y_offset = static_cast<int>(static_cast<float>(i) * ENVELOPE_THICKNESS_SCALER);
-                y_offset = std::min(y_offset, half_graph_h - 1);
+        // Csak akkor rajzolunk, ha van jel vagy a simított érték számottevő
+       if (column_has_signal || envelope_prev_smoothed_max_val > 0.5f) {
+            // A simított amplitúdó skálázása a grafikon magasságára (0-255 -> 0-half_graph_h)
+            float y_offset_float = (envelope_prev_smoothed_max_val / 255.0f) * (half_graph_h - 1.0f);
+            int y_offset_pixels = static_cast<int>(round(y_offset_float));
+            y_offset_pixels = std::min(y_offset_pixels, half_graph_h - 1); // Biztosítjuk, hogy a határokon belül maradjon
+            if (y_offset_pixels < 0) y_offset_pixels = 0;
 
-                int yUpper = posY + half_graph_h - y_offset;
-                int yLower = posY + half_graph_h + y_offset;
+            if (y_offset_pixels >= 0) { // Ha van vastagság (akár 0 is, ami egy középvonalat jelenthet)
+                int yCenter = posY + half_graph_h;
+                int yUpper = yCenter - y_offset_pixels;
+                int yLower = yCenter + y_offset_pixels;
 
                 yUpper = constrain(yUpper, posY, posY + graphH - 1);
                 yLower = constrain(yLower, posY, posY + graphH - 1);
 
-                if (yUpper <= yLower) {
-                    tft.drawPixel(col_x_on_screen, yUpper, TFT_WHITE);
-                    if (yUpper != yLower) {
-                        tft.drawPixel(col_x_on_screen, yLower, TFT_WHITE);
-                    }
+                if (yUpper <= yLower) { // Biztosítjuk, hogy van mit rajzolni
+                    // Kitöltött burkológörbe rajzolása
+                    tft.drawFastVLine(col_x_on_screen, yUpper, yLower - yUpper + 1, TFT_WHITE);
                 }
             }
         }

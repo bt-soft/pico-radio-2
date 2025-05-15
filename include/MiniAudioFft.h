@@ -26,13 +26,13 @@ constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak 
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
 constexpr int WF_GRADIENT = 100;                    // Vízesés színátmenetének erőssége
-constexpr float ENVELOPE_INPUT_GAIN = 50.0f;        // Erősítési faktor a burkológörbe bemenetéhez
+constexpr float ENVELOPE_INPUT_GAIN = 5.0f;         // Erősítési faktor a burkológörbe bemenetéhez (tovább csökkentett érték)
 constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burkológörbéhez
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
 constexpr float OSCI_SENSITIVITY_FACTOR = 3.0f;     // Oszcilloszkóp érzékenységi faktora
 constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;    // Oszcilloszkóp mintavételi decimációs faktora
 
-constexpr uint32_t TOUCH_DEBOUNCE_MS = 300; // Érintés "debounce" ideje milliszekundumban
+constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
 // Konstansok a hangolási segéd módhoz
 constexpr float TUNING_AID_TARGET_FREQ_HZ = 700.0f;           // Célfrekvencia CW-hez (Hz)
 constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 200.0f;      // Megjelenített tartomány minimuma (Hz) - Kérésnek megfelelően
@@ -124,6 +124,7 @@ class MiniAudioFft {
     std::vector<std::vector<int>> wabuf;                         // Vízeséshez és burkológörbéhez, méretezése a konstruktorban történik
     int osciSamples[MiniAudioFftConstants::MAX_INTERNAL_WIDTH];  // Oszcilloszkóp minták
     int highResOffset;                                           // Magas felbontású spektrum eltolásához (FFT.ino 'offset')
+    float envelope_prev_smoothed_max_val;                        // Előző simított maximális amplitúdó az Envelope módhoz
 
     // Belső segédfüggvények
     /**
