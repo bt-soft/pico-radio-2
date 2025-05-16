@@ -51,6 +51,7 @@ class Rds {
 
     // Sprite a villogásmentes görgetéshez
     TFT_eSprite scrollSprite;
+    uint16_t rdsInfoTextWidth; // Cached text width for rdsInfo
 
     // Görgetés szélessége (karakterekben)
     uint8_t maxScrollWidth;
