@@ -149,8 +149,9 @@ void SevenSegmentFreq::drawStepUnderline(const SegmentColors& colors) {
 
     using namespace SevenSegmentConstants;
 
-    // Töröljük a korábbi aláhúzást
-    tft.fillRect(freqDispX + DigitXStart[0], freqDispY + UnderlineYOffset, DigitWidth * 3, UnderlineHeight, TFT_COLOR_BACKGROUND);
+    // Töröljük a korábbi aláhúzást a teljes lehetséges területről
+    const int underlineAreaWidth = (DigitXStart[2] + DigitWidth) - DigitXStart[0];
+    tft.fillRect(freqDispX + DigitXStart[0], freqDispY + UnderlineYOffset, underlineAreaWidth, UnderlineHeight, TFT_COLOR_BACKGROUND);
 
     // Rajzoljuk ki az aktuális aláhúzást
     tft.fillRect(freqDispX + DigitXStart[rtv::freqstepnr], freqDispY + UnderlineYOffset, DigitWidth, UnderlineHeight, colors.indicator);
