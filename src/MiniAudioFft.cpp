@@ -426,15 +426,15 @@ void MiniAudioFft::drawSpectrumLowRes() {
 
     int actual_low_res_peak_max_height = graphH - 1;
 
-    constexpr int band_width_pixels = 3;
-    constexpr int band_gap_pixels = 2;
-    constexpr int band_total_pixels = band_width_pixels + band_gap_pixels;
+    constexpr int bar_width_pixels = 3;
+    constexpr int bar_gap_pixels = 2;
+    constexpr int bar_total_width_pixels = bar_width_pixels + bar_gap_pixels;
 
-    int num_drawable_bands = width / band_total_pixels;
-    int bands_to_process = std::min(LOW_RES_BANDS, num_drawable_bands);
+    int num_drawable_bars = width / bar_total_width_pixels;
+    int bands_to_process = std::min(LOW_RES_BANDS, num_drawable_bars);
     if (bands_to_process == 0 && LOW_RES_BANDS > 0) bands_to_process = 1;
 
-    int total_drawn_width = (bands_to_process * band_width_pixels) + (std::max(0, bands_to_process - 1) * band_gap_pixels);
+    int total_drawn_width = (bands_to_process * bar_width_pixels) + (std::max(0, bands_to_process - 1) * bar_gap_pixels);
     int x_offset = (width - total_drawn_width) / 2;
     int current_draw_x_on_screen = posX + x_offset;
 
@@ -443,11 +443,11 @@ void MiniAudioFft::drawSpectrumLowRes() {
     // Itt csak a csúcsokat töröljük.
     for (int band_idx = 0; band_idx < bands_to_process; band_idx++) {
         if (Rpeak[band_idx] > 0) {
-            int xP = current_draw_x_on_screen + band_total_pixels * band_idx;
+            int xP = current_draw_x_on_screen + bar_total_width_pixels * band_idx;
             int yP = posY + graphH - Rpeak[band_idx];  // Y a grafikon területén belül
             int erase_h = std::min(2, posY + graphH - yP);
             if (yP < posY + graphH && erase_h > 0) {  // Biztosítjuk, hogy a grafikonon belül törlünk
-                tft.fillRect(xP, yP, band_width_pixels, erase_h, TFT_BLACK);
+                tft.fillRect(xP, yP, bar_width_pixels, erase_h, TFT_BLACK);
             }
         }
         if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
@@ -457,7 +457,7 @@ void MiniAudioFft::drawSpectrumLowRes() {
         if (RvReal[i] > (AMPLITUDE_SCALE / 10.0)) {
             byte band_idx = getBandVal(i);
             if (band_idx < bands_to_process) {
-                displayBand(band_idx, (int)RvReal[i], current_draw_x_on_screen, actual_low_res_peak_max_height);
+                drawSpectrumBar(band_idx, (int)RvReal[i], current_draw_x_on_screen, actual_low_res_peak_max_height);
             }
         }
     }
@@ -476,13 +476,13 @@ uint8_t MiniAudioFft::getBandVal(int fft_bin_index) {
 }
 
 /**
- * @brief Kirajzol egyetlen sávot az alacsony felbontású spektrumhoz.
- * @param band_idx A sáv indexe.
+ * @brief Kirajzol egyetlen oszlopot/sávot (bar-t) az alacsony felbontású spektrumhoz.
+ * @param band_idx A frekvenciasáv indexe, amelyhez az oszlop tartozik.
  * @param magnitude A sáv magnitúdója.
  * @param actual_start_x_on_screen A spektrum rajzolásának kezdő X koordinátája a képernyőn.
  * @param peak_max_height_for_mode A sáv maximális magassága az adott módban.
  */
-void MiniAudioFft::displayBand(int band_idx, int magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode) {
+void MiniAudioFft::drawSpectrumBar(int band_idx, int magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode) {
     using namespace MiniAudioFftConstants;
     int graphH = getGraphHeight();
     if (graphH <= 0) return;
@@ -490,23 +490,23 @@ void MiniAudioFft::displayBand(int band_idx, int magnitude, int actual_start_x_o
     int dsize = magnitude / AMPLITUDE_SCALE;
     dsize = constrain(dsize, 0, peak_max_height_for_mode);  // peak_max_height_for_mode már graphH-1
 
-    constexpr int band_width_pixels = 3;
-    constexpr int band_gap_pixels = 2;
-    constexpr int band_total_pixels = band_width_pixels + band_gap_pixels;
-    int xPos = actual_start_x_on_screen + band_total_pixels * band_idx;
+    constexpr int bar_width_pixels = 3;
+    constexpr int bar_gap_pixels = 2;
+    constexpr int bar_total_width_pixels = bar_width_pixels + bar_gap_pixels;
+    int xPos = actual_start_x_on_screen + bar_total_width_pixels * band_idx;
 
-    if (xPos + band_width_pixels > posX + width || xPos < posX) return;
+    if (xPos + bar_width_pixels > posX + width || xPos < posX) return;
 
     if (dsize > 0) {
         int y_start_bar = posY + graphH - dsize;  // Y a grafikon területén belül
-        int bar_h = dsize;
+        int bar_h_visual = dsize; // A ténylegesen kirajzolandó magasság
         // Biztosítjuk, hogy a sáv a grafikon területén belül maradjon
         if (y_start_bar < posY) {  // Elvileg a constrain(dsize) ezt kezeli
-            bar_h -= (posY - y_start_bar);
+            bar_h_visual -= (posY - y_start_bar);
             y_start_bar = posY;
         }
-        if (bar_h > 0) {
-            tft.fillRect(xPos, y_start_bar, band_width_pixels, bar_h, TFT_YELLOW);
+        if (bar_h_visual > 0) {
+            tft.fillRect(xPos, y_start_bar, bar_width_pixels, bar_h_visual, TFT_YELLOW);
         }
     }
 

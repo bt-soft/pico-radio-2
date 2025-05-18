@@ -155,7 +155,7 @@ class MiniAudioFft {
 
     // Segédfüggvények az alacsony felbontású spektrumhoz
     uint8_t getBandVal(int fft_bin_index);
-    void displayBand(int band_idx, int magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode);
+    void drawSpectrumBar(int band_idx, int magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode);
     // Segédfüggvény a vízesés/burkológörbe színeihez
     uint16_t valueToWaterfallColor(int scaled_value);
 
