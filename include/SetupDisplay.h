@@ -13,10 +13,8 @@ enum class ItemAction {
     SAVER_TIMEOUT,
     INACTIVE_DIGIT_LIGHT,
     BEEPER_ENABLED,
-    TOGGLE_MINI_FFT_AM,
-    TOGGLE_MINI_FFT_FM,
-    FFT_GAIN_MODE,
-    FFT_MANUAL_GAIN,
+    FFT_CONFIG_AM,  // Új, összevont
+    FFT_CONFIG_FM,  // Új, összevont
     FACTORY_RESET,
     NONE
 };
@@ -33,7 +31,7 @@ class SetupDisplay : public DisplayBase, public IScrollableListDataSource {
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;
 
     // Lista alapú menühöz
-    static const int MAX_SETTINGS = 11;
+    static const int MAX_SETTINGS = 9;  // Régi FFT opciók törölve, 2 új összevont
     SetupList::SettingItem settingItems[MAX_SETTINGS];
     ScrollableListComponent scrollListComponent;
 
@@ -79,7 +77,7 @@ class SetupDisplay : public DisplayBase, public IScrollableListDataSource {
    private:
     void drawSettingsList();
     void drawSettingItem(int itemIndex, int yPos, bool isSelected);
-    void activateSetting(SetupList::ItemAction action);
+    void activateSetting(SetupList::ItemAction action, int itemIndex);  // itemIndex hozzáadva a callback-hez
     void updateSelection(int newIndex, bool fromRotary);
 };
 

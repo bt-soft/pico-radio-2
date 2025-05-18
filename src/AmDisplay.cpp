@@ -80,11 +80,11 @@ void AmDisplay::drawScreen() {
     DisplayBase::drawScreenButtons();
 
     // MiniAudioFft kirajzolása (kezdeti)
-    if (config.data.showMiniAudioFftAm) {  // Csak akkor példányosítjuk, ha engedélyezve van
+    if (config.data.miniAudioFftConfigAm >= 0.0f) {  // Csak akkor példányosítjuk, ha engedélyezve van
         using namespace DisplayConstants;
 
-        // Átadjuk a config.data.miniAudioFftModeAm referenciáját
-        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm);
+        // Átadjuk a config.data.miniAudioFftModeAm és config.data.miniAudioFftConfigAm referenciáját
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm, config.data.miniAudioFftConfigAm);
         // Beállítjuk a kezdeti módot a configból
         pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
         pMiniAudioFft->forceRedraw();

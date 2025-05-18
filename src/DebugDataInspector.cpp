@@ -64,11 +64,20 @@ void DebugDataInspector::printConfigData(const Config_t& configData) {
     DEBUG("  screenSaverTimeoutMinutes: %u\n", configData.screenSaverTimeoutMinutes);
     DEBUG("  miniAudioFftModeAm: %u\n", configData.miniAudioFftModeAm);
     DEBUG("  miniAudioFftModeFm: %u\n", configData.miniAudioFftModeFm);
-    DEBUG("  showMiniAudioFftAm: %s\n", configData.showMiniAudioFftAm ? "true" : "false");
-    DEBUG("  showMiniAudioFftFm: %s\n", configData.showMiniAudioFftFm ? "true" : "false");
-    DEBUG("  miniAudioFftGainMode: %u (%s)\n", configData.miniAudioFftGainMode,
-          configData.miniAudioFftGainMode == static_cast<uint8_t>(MiniAudioFftConstants::FftGainMode::Auto) ? "Auto" : "Manual");
-    DEBUG("  miniAudioFftManualGain: %.2f\n", configData.miniAudioFftManualGain);
+    if (configData.miniAudioFftConfigAm == -1.0f) {
+        DEBUG("  miniAudioFftConfigAm: Disabled\n");
+    } else if (configData.miniAudioFftConfigAm == 0.0f) {
+        DEBUG("  miniAudioFftConfigAm: Auto Gain\n");
+    } else {
+        DEBUG("  miniAudioFftConfigAm: Manual Gain %.1fx\n", configData.miniAudioFftConfigAm);
+    }
+    if (configData.miniAudioFftConfigFm == -1.0f) {
+        DEBUG("  miniAudioFftConfigFm: Disabled\n");
+    } else if (configData.miniAudioFftConfigFm == 0.0f) {
+        DEBUG("  miniAudioFftConfigFm: Auto Gain\n");
+    } else {
+        DEBUG("  miniAudioFftConfigFm: Manual Gain %.1fx\n", configData.miniAudioFftConfigFm);
+    }
     DEBUG("====================\n");
 #endif
 }

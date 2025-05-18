@@ -59,8 +59,7 @@ const uint16_t WATERFALL_COLORS[16] = {
 };
 constexpr int MAX_WATERFALL_COLOR_INPUT_VALUE = 20000;  // Maximális bemeneti érték a vízesés színkonverziójához
 
-// Erősítési módok
-enum class FftGainMode : uint8_t { Manual = 0, Auto = 1 };
+// Konstansok az Auto Gain módhoz
 constexpr float FFT_AUTO_GAIN_TARGET_PEAK = 1500.0f;  // Cél csúcsérték az Auto Gain módhoz (a +/-2047 tartományból)
 constexpr float FFT_AUTO_GAIN_MIN_FACTOR = 0.1f;      // Minimális erősítési faktor Auto módban
 constexpr float FFT_AUTO_GAIN_MAX_FACTOR = 10.0f;     // Maximális erősítési faktor Auto módban
@@ -89,8 +88,8 @@ class MiniAudioFft {
      * @param w A komponens szélessége.
      * @param h A komponens magassága.
      * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
-     */
-    MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configModeField);
+     * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.     */
+    MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef);
     ~MiniAudioFft();
 
     void setInitialMode(DisplayMode mode);  // Kezdeti mód beállítása
@@ -121,6 +120,7 @@ class MiniAudioFft {
     bool isIndicatorCurrentlyVisible;  // A módkijelző aktuálisan látható-e
     uint32_t lastTouchProcessTime;     // Utolsó érintésfeldolgozás ideje a debounce-hoz
     uint8_t& configModeFieldRef;       // Referencia a Config mezőre a mód mentéséhez
+    float& activeFftGainConfigRef;     // Referencia az aktív FFT erősítés konfigurációra (AM vagy FM)
 
     ArduinoFFT<double> FFT;                             // FFT objektum
     double vReal[MiniAudioFftConstants::FFT_SAMPLES];   // Valós rész az FFT bemenetéhez/kimenetéhez

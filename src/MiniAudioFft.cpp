@@ -20,20 +20,22 @@ constexpr uint32_t MODE_INDICATOR_TIMEOUT_MS = 20000;  // 20 másodperc
  * @param w A komponens szélessége pixelekben.
  * @param h A komponens magassága pixelekben.
  * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
+ * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.
  */
-MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configModeField)
+MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef)
     : tft(tft_ref),
       posX(x),
       posY(y),
       width(w),
       height(h),
       // currentMode itt nem kap explicit kezdőértéket, a setInitialMode állítja be
-      prevMuteState(rtv::muteStat),         // Némítás előző állapotának inicializálása
-      modeIndicatorShowUntil(0),            // Kezdetben nem látható (setInitialMode állítja)
-      isIndicatorCurrentlyVisible(true),    // Kezdetben látható (setInitialMode állítja)
-      lastTouchProcessTime(0),              // Debounce időzítő nullázása
-      configModeFieldRef(configModeField),  // Referencia elmentése
-      FFT(),                                // FFT objektum inicializálása
+      prevMuteState(rtv::muteStat),                   // Némítás előző állapotának inicializálása
+      modeIndicatorShowUntil(0),                      // Kezdetben nem látható (setInitialMode állítja)
+      isIndicatorCurrentlyVisible(true),              // Kezdetben látható (setInitialMode állítja)
+      lastTouchProcessTime(0),                        // Debounce időzítő nullázása
+      configModeFieldRef(configDisplayModeFieldRef),  // Referencia elmentése a kijelzési módhoz
+      activeFftGainConfigRef(fftGainConfigRef),       // Referencia elmentése az erősítés konfigurációhoz
+      FFT(),                                          // FFT objektum inicializálása
       highResOffset(0),
       envelope_prev_smoothed_max_val(0.0f),
       sprGraph(&tft_ref),  // Sprite inicializálása a TFT referenciával
@@ -284,6 +286,12 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
     int osci_sample_idx = 0;
     double max_abs_sample_for_auto_gain = 0.0;
 
+    // Ha az FFT ki van kapcsolva (-1.0f), akkor nem csinálunk semmit a mintavételezéssel és erősítéssel.
+    // Ezt a hívó loop()-nak kellene kezelnie, de biztonsági ellenőrzésként itt is lehet.
+    if (activeFftGainConfigRef == -1.0f) {
+        return;  // Vagy nullázzuk a vReal-t és RvReal-t
+    }
+
     // 1. Mintavételezés és középre igazítás, opcionális oszcilloszkóp mintagyűjtés
     for (int i = 0; i < FFT_SAMPLES; i++) {
         uint32_t sum = 0;
@@ -303,7 +311,7 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
         vReal[i] = averaged_sample - 2048.0;  // Középre igazítás (feltételezve, hogy 2048 a nulla szint)
         vImag[i] = 0.0;
 
-        if (static_cast<FftGainMode>(config.data.miniAudioFftGainMode) == FftGainMode::Auto) {
+        if (activeFftGainConfigRef == 0.0f) {  // Auto Gain
             if (std::abs(vReal[i]) > max_abs_sample_for_auto_gain) {
                 max_abs_sample_for_auto_gain = std::abs(vReal[i]);
             }
@@ -311,11 +319,12 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
     }
 
     // 2. Erősítés alkalmazása (manuális vagy automatikus)
-    if (static_cast<FftGainMode>(config.data.miniAudioFftGainMode) == FftGainMode::Manual) {
+    if (activeFftGainConfigRef > 0.0f) {  // Manual Gain
         for (int i = 0; i < FFT_SAMPLES; i++) {
-            vReal[i] *= config.data.miniAudioFftManualGain;
+            vReal[i] *= activeFftGainConfigRef;  // A config érték a manuális faktor
         }
-    } else {                                         // Auto Gain (normalizálás)
+    } else if (activeFftGainConfigRef == 0.0f) {  // Auto Gain (normalizálás)
+
         if (max_abs_sample_for_auto_gain > 0.001) {  // Elkerüljük a nullával való osztást és a túl kicsi jelek extrém erősítését
             float auto_gain_factor = FFT_AUTO_GAIN_TARGET_PEAK / max_abs_sample_for_auto_gain;
             auto_gain_factor = constrain(auto_gain_factor, FFT_AUTO_GAIN_MIN_FACTOR, FFT_AUTO_GAIN_MAX_FACTOR);
@@ -324,7 +333,7 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
             }
         }
         // Ha max_abs_sample_for_auto_gain nagyon kicsi vagy nulla, nem alkalmazunk erősítést
-    }
+    }  // Ha -1.0f (Disabled), akkor ide el sem jutunk, vagy a vReal érintetlen marad
 
     // 3. Ablakozás, FFT számítás, magnitúdó
     FFT.windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
@@ -378,8 +387,17 @@ void MiniAudioFft::loop() {
         return;  // A "MUTED" felirat már kint van a forceRedraw miatt
     }
 
-    // Ha a mód "Ki" (és nem most változott az állapota)
-    if (currentMode == DisplayMode::Off) {
+    // Ellenőrizzük az FFT konfigurációt (Disabled, Auto, Manual)
+    // Az activeFftGainConfigRef már a megfelelő AM/FM configra mutat.
+    if (activeFftGainConfigRef == -1.0f) {  // FFT Disabled
+        // Ha a módkijelző látható, azt még ki kell rajzolni, de utána return
+        // A drawModeIndicator az "Off" szöveget fogja mutatni, ha currentMode == DisplayMode::Off
+        // De itt az FFT-t kapcsoltuk ki, a currentMode (pl. SpectrumLowRes) maradhat.
+        // A drawModeIndicator-t módosítani kellene, hogy az FFT kikapcsolt állapotát is jelezze,
+        // vagy a currentMode-ot DisplayMode::Off-ra állítani, amikor az FFT-t kikapcsoljuk.
+        // Egyszerűbb, ha a currentMode-ot állítjuk Off-ra.
+        // Ezt a SetupDisplay-nek kellene kezelnie.
+        // Jelenleg, ha az FFT config -1.0f, de a currentMode nem Off, akkor is rajzolna.
         return;  // Az "Off" felirat már kint van
     }
 
@@ -387,7 +405,9 @@ void MiniAudioFft::loop() {
 
     // FFT mintavételezés és számítás
     unsigned long fft_start_time = micros();
-    performFFT(currentMode == DisplayMode::Oscilloscope);
+    if (currentMode != DisplayMode::Off) {  // Csak akkor végezzük el, ha a kijelzési mód nem Off
+        performFFT(currentMode == DisplayMode::Oscilloscope);
+    }
     unsigned long fft_duration = micros() - fft_start_time;
 
     // Grafikonok kirajzolása a nekik szánt (csökkentett) területre
@@ -395,6 +415,8 @@ void MiniAudioFft::loop() {
     // A `getGraphHeight()` mindig a grafikon magasságát adja vissza, a módkijelző sávja nélkül.
     unsigned long draw_start_time = micros();
     switch (currentMode) {
+        // Csak akkor rajzolunk, ha a currentMode nem Off.
+        // Az FFT letiltását (-1.0f) a loop elején már kezeltük.
         case DisplayMode::SpectrumLowRes:
             drawSpectrumLowRes();
             break;
@@ -413,7 +435,9 @@ void MiniAudioFft::loop() {
         case DisplayMode::TuningAid:
             drawTuningAid();
             break;
-            // Nem kell default, mert a currentMode mindig érvényes DisplayMode érték.
+        case DisplayMode::Off:  // Nem csinálunk semmit
+        default:
+            break;
     }
     unsigned long draw_duration = micros() - draw_start_time;
 
@@ -421,7 +445,7 @@ void MiniAudioFft::loop() {
     // csak akkor, ha a mód/láthatóság ténylegesen megváltozik (cycleMode, forceRedraw).
 
     // Segédfüggvény a DisplayMode szöveges nevének lekérdezéséhez
-    auto getModeNameString = [](MiniAudioFft::DisplayMode mode) -> const char* {
+    static auto getModeNameString = [](MiniAudioFft::DisplayMode mode) -> const char* {
         switch (mode) {
             case MiniAudioFft::DisplayMode::Off:
                 return "Off";
@@ -493,29 +517,47 @@ void MiniAudioFft::forceRedraw() {
     if (rtv::muteStat) {
         drawMuted();  // A drawMuted-nek is az effektív magasság közepére kell rajzolnia
     } else if (currentMode == DisplayMode::Off) {
+        // Ha a currentMode Off, akkor az FFT configtól függetlenül "Off" jelenik meg.
         drawModeIndicator();  // "Off" kirajzolása (ha látható)
     } else {
-        // Aktív módok (1-5): grafikon kirajzolása
-        performFFT(currentMode == DisplayMode::Oscilloscope);
-        switch (currentMode) {
-            case DisplayMode::SpectrumLowRes:
-                drawSpectrumLowRes();
-                break;
-            case DisplayMode::SpectrumHighRes:
-                drawSpectrumHighRes();
-                break;
-            case DisplayMode::Oscilloscope:
-                drawOscilloscope();
-                break;
-            case DisplayMode::Waterfall:
-                drawWaterfall();
-                break;
-            case DisplayMode::Envelope:
-                drawEnvelope();
-                break;
-            case DisplayMode::TuningAid:
-                drawTuningAid();
-                break;
+        // Ha a currentMode nem Off, de az FFT config Disabled (-1.0f),
+        // akkor a performFFT nem csinál semmit, és a rajzoló függvények üres adatot kapnak.
+        // Ideális esetben a currentMode-ot Off-ra kellene állítani, ha az FFT config -1.0f.
+        // Ezt a SetupDisplay-nek kellene kezelnie.
+        // Jelenlegi logika: ha az FFT config -1.0f, a performFFT nem tölti fel RvReal-t,
+        // így a rajzoló függvények nem rajzolnak semmit (vagy feketét).
+        // A drawModeIndicator továbbra is a currentMode-ot írja ki.
+
+        if (activeFftGainConfigRef != -1.0f) {  // Csak akkor végezzük el az FFT-t és a rajzolást, ha nincs letiltva
+            performFFT(currentMode == DisplayMode::Oscilloscope);
+            switch (currentMode) {
+                case DisplayMode::SpectrumLowRes:
+                    drawSpectrumLowRes();
+                    break;
+                case DisplayMode::SpectrumHighRes:
+                    drawSpectrumHighRes();
+                    break;
+                case DisplayMode::Oscilloscope:
+                    drawOscilloscope();
+                    break;
+                case DisplayMode::Waterfall:
+                    drawWaterfall();
+                    break;
+                case DisplayMode::Envelope:
+                    drawEnvelope();
+                    break;
+                case DisplayMode::TuningAid:
+                    drawTuningAid();
+                    break;
+                default:
+                    break;  // DisplayMode::Off itt nem fordulhat elő az else ág miatt
+            }
+        } else {
+            // Ha az FFT le van tiltva (-1.0f), de a currentMode nem Off,
+            // akkor a grafikon területét törölhetnénk, vagy hagyhatjuk az utolsó állapotot.
+            // A clearArea már törölte a hátteret.
+            // A performFFT nem futott, RvReal üres vagy régi.
+            // A rajzoló függvények nem fognak semmit rajzolni.
         }
         drawModeIndicator();  // És a módkijelző kirajzolása (ha látható)
     }

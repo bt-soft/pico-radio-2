@@ -59,13 +59,9 @@ struct Config_t {
     uint8_t miniAudioFftModeAm;  // MiniAudioFft módja AM képernyőn
     uint8_t miniAudioFftModeFm;  // MiniAudioFft módja FM képernyőn
 
-    // MiniAudioFft láthatósága
-    bool showMiniAudioFftAm;  // MiniAudioFft megjelenítése AM képernyőn
-    bool showMiniAudioFftFm;  // MiniAudioFft megjelenítése FM képernyőn
-
     // MiniAudioFft erősítés
-    uint8_t miniAudioFftGainMode;  // 0 for Manual, 1 for Auto (maps to MiniAudioFftConstants::FftGainMode)
-    float miniAudioFftManualGain;  // Manual gain factor
+    float miniAudioFftConfigAm;  // -1.0f: Disabled, 0.0f: Auto, >0.0f: Manual Gain Factor
+    float miniAudioFftConfigFm;  // -1.0f: Disabled, 0.0f: Auto, >0.0f: Manual Gain Factor
 };
 
 // Alapértelmezett konfigurációs adatok (readonly, const)

@@ -37,12 +37,10 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref
     settingItems[2] = {"Screen Saver", ItemAction::SAVER_TIMEOUT};                    // Képernyővédő idő
     settingItems[3] = {"Inactive Digit Segments", ItemAction::INACTIVE_DIGIT_LIGHT};  // Inaktív szegmensek
     settingItems[4] = {"Beeper", ItemAction::BEEPER_ENABLED};                         // Beeper engedélyezése (4)
-    settingItems[5] = {"Mini FFT (AM Screen)", ItemAction::TOGGLE_MINI_FFT_AM};       // AM módban a mini FFT
-    settingItems[6] = {"Mini FFT (FM Screen)", ItemAction::TOGGLE_MINI_FFT_FM};       // FM módban a mini FFT
-    settingItems[7] = {"FFT Gain Mode", ItemAction::FFT_GAIN_MODE};                   // ÚJ
-    settingItems[8] = {"FFT Manual Gain", ItemAction::FFT_MANUAL_GAIN};               // ÚJ
-    settingItems[9] = {"Info", ItemAction::INFO};                                     // Információ
-    settingItems[10] = {"Factory Reset", ItemAction::FACTORY_RESET};                  // Gyári beállítások visszaállítása (5)
+    settingItems[5] = {"FFT Config (AM)", ItemAction::FFT_CONFIG_AM};                 // ÚJ, összevont
+    settingItems[6] = {"FFT Config (FM)", ItemAction::FFT_CONFIG_FM};
+    settingItems[7] = {"Info", ItemAction::INFO};                    // Információ
+    settingItems[8] = {"Factory Reset", ItemAction::FACTORY_RESET};  // Gyári beállítások visszaállítása (5)
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -146,22 +144,24 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
         case SetupList::ItemAction::BEEPER_ENABLED:
             valueStr = config.data.beeperEnabled ? "ON" : "OFF";  // Flash string
             break;
-        case SetupList::ItemAction::TOGGLE_MINI_FFT_AM:
-            valueStr = config.data.showMiniAudioFftAm ? "ON" : "OFF";
-            break;
-        case SetupList::ItemAction::TOGGLE_MINI_FFT_FM:
-            valueStr = config.data.showMiniAudioFftFm ? "ON" : "OFF";
-            break;
-        case SetupList::ItemAction::FFT_GAIN_MODE:  // ÚJ
-            valueStr = (static_cast<MiniAudioFftConstants::FftGainMode>(config.data.miniAudioFftGainMode) == MiniAudioFftConstants::FftGainMode::Auto) ? "Auto" : "Manual";
-            break;
-        case SetupList::ItemAction::FFT_MANUAL_GAIN:  // ÚJ
-            if (static_cast<MiniAudioFftConstants::FftGainMode>(config.data.miniAudioFftGainMode) == MiniAudioFftConstants::FftGainMode::Manual) {
-                valueStr = String(config.data.miniAudioFftManualGain, 1) + "x";
-            } else {
-                valueStr = "N/A";  // Vagy üresen hagyjuk, ha Auto módban van
-            }
-            break;
+        case SetupList::ItemAction::FFT_CONFIG_AM: {
+            float val = config.data.miniAudioFftConfigAm;
+            if (val == -1.0f)
+                valueStr = "Disabled";
+            else if (val == 0.0f)
+                valueStr = "Auto Gain";
+            else
+                valueStr = "Manual: " + String(val, 1) + "x";
+        } break;
+        case SetupList::ItemAction::FFT_CONFIG_FM: {
+            float val = config.data.miniAudioFftConfigFm;
+            if (val == -1.0f)
+                valueStr = "Disabled";
+            else if (val == 0.0f)
+                valueStr = "Auto Gain";
+            else
+                valueStr = "Manual: " + String(val, 1) + "x";
+        } break;
         case SetupList::ItemAction::INFO:
         case SetupList::ItemAction::FACTORY_RESET:
         case SetupList::ItemAction::NONE:
@@ -189,7 +189,7 @@ int SetupDisplay::getItemCount() const { return MAX_SETTINGS; }
 
 void SetupDisplay::activateListItem(int index) {
     if (index >= 0 && index < MAX_SETTINGS) {
-        activateSetting(settingItems[index].action);
+        activateSetting(settingItems[index].action, index);
     }
 }
 
@@ -212,7 +212,7 @@ void SetupDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &ev
 /**
  * Kiválasztott beállítás aktiválása
  */
-void SetupDisplay::activateSetting(SetupList::ItemAction action) {
+void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) {
     switch (action) {
 
         case SetupList::ItemAction::BRIGHTNESS:
@@ -265,43 +265,49 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
                 });
             break;
 
-        case SetupList::ItemAction::TOGGLE_MINI_FFT_AM:
-            DisplayBase::pDialog =
-                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Mini FFT (AM)"), F("Show:"), &config.data.showMiniAudioFftAm, false, true, true, [this](bool newValue) {
-                    // Nincs szükség további műveletre, a ValueChangeDialog kezeli a config.data frissítését.
-                });
-            break;
+        case SetupList::ItemAction::FFT_CONFIG_AM:
+        case SetupList::ItemAction::FFT_CONFIG_FM: {
+            bool isAm = (action == SetupList::ItemAction::FFT_CONFIG_AM);
+            const char *dialogTitle = isAm ? "FFT Config (AM)" : "FFT Config (FM)";
+            float *targetConfigField = isAm ? &config.data.miniAudioFftConfigAm : &config.data.miniAudioFftConfigFm;
 
-        case SetupList::ItemAction::TOGGLE_MINI_FFT_FM:
-            DisplayBase::pDialog =
-                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Mini FFT (FM)"), F("Show:"), &config.data.showMiniAudioFftFm, false, true, true, [this](bool newValue) {
-                    // Nincs szükség további műveletre.
-                });
-            break;
-
-        case SetupList::ItemAction::FFT_GAIN_MODE: {
-            const char *options[] = {"Manual", "Auto"};
-            const char *currentValue =
-                (static_cast<MiniAudioFftConstants::FftGainMode>(config.data.miniAudioFftGainMode) == MiniAudioFftConstants::FftGainMode::Auto) ? "Auto" : "Manual";
+            const char *currentActiveFFTLabel = nullptr;
+            const char *options[] = {"Disabled", "Auto G", "Manu G"};
+            if (*targetConfigField == -1.0f) {
+                currentActiveFFTLabel = options[0];  // "Disabled"
+            } else if (*targetConfigField == 0.0f) {
+                currentActiveFFTLabel = options[1];  // "Auto Gain"
+            } else if (*targetConfigField > 0.0f) {
+                currentActiveFFTLabel = options[2];  // "Set Manual..."
+            }
             DisplayBase::pDialog = new MultiButtonDialog(
-                this, DisplayBase::tft, 250, 120, F("FFT Gain Mode"), options, 2,
-                [this](TftButton::ButtonTouchEvent ev) {
-                    if (STREQ(ev.label, "Auto")) {
-                        config.data.miniAudioFftGainMode = static_cast<uint8_t>(MiniAudioFftConstants::FftGainMode::Auto);
-                    } else {
-                        config.data.miniAudioFftGainMode = static_cast<uint8_t>(MiniAudioFftConstants::FftGainMode::Manual);
+                this, DisplayBase::tft, 280, 150, F(dialogTitle), options, 3,
+                [this, targetConfigField, itemIndex](TftButton::ButtonTouchEvent ev) {  // Lambda callback
+                    if (STREQ(ev.label, "Disabled")) {
+                        *targetConfigField = -1.0f;
+                    } else if (STREQ(ev.label, "Auto G")) {
+                        *targetConfigField = 0.0f;
+                    } else if (STREQ(ev.label, "Manu G")) {
+                        // Új dialógus a manuális értékhez
+                        float currentManualGain = (*targetConfigField > 0.0f) ? *targetConfigField : 1.0f;  // Alapértelmezett, ha nem volt manuális
+                        DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Set Manual FFT Gain"), F("Factor (0.1-10.0):"),
+                                                                     &currentManualGain,                                             // float*
+                                                                     0.1f,                                                           // min
+                                                                     10.0f,                                                          // max
+                                                                     0.1f,                                                           // step
+                                                                     [this, targetConfigField, itemIndex](double newValue_double) {  // Lambda for ValueChangeDialog
+                                                                         *targetConfigField = static_cast<float>(newValue_double);
+                                                                         // A lista frissítése a ValueChangeDialog bezárása után történik
+                                                                         // a processDialogButtonResponse-ban, ami meghívja a drawScreen()-t.
+                                                                     });
+                        return;  // Ne zárja be a MultiButtonDialog-ot még, a ValueChangeDialog nyílik
                     }
+                    // A lista frissítése a MultiButtonDialog bezárása után történik
+                    // a processDialogButtonResponse-ban, ami meghívja a drawScreen()-t.
                 },
-                currentValue);
+                currentActiveFFTLabel  // currentActiveButtonLabel
+            );
         } break;
-
-        case SetupList::ItemAction::FFT_MANUAL_GAIN:
-            // Ez a dialógus csak akkor nyílik meg, ha a mód Manuális (az activateListItem-ben ellenőrizve)
-            DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("FFT Manual Gain"), F("Factor (0.1-10.0):"), &config.data.miniAudioFftManualGain, 0.1f,
-                                                         10.0f, 0.1f, [this](float newValue) {
-                                                             // Nincs szükség további műveletre.
-                                                         });
-            break;
 
         case SetupList::ItemAction::FACTORY_RESET:
             // Megerősítő dialógus megnyitása
