@@ -28,10 +28,10 @@ constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak 
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
 constexpr int WF_GRADIENT = 100;                    // Vízesés színátmenetének erőssége
-constexpr float ENVELOPE_INPUT_GAIN = 0.1f;         // Erősítési faktor a burkológörbe bemenetéhez (jelentősen csökkentve)
+constexpr float ENVELOPE_INPUT_GAIN = 0.08f;        // Erősítési faktor a burkológörbe bemenetéhez (jelentősen csökkentve)
 constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burkológörbéhez
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
-constexpr float OSCI_SENSITIVITY_FACTOR = 15.0f;     // Oszcilloszkóp érzékenységi faktora
+constexpr float OSCI_SENSITIVITY_FACTOR = 15.0f;    // Oszcilloszkóp érzékenységi faktora
 constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;    // Oszcilloszkóp mintavételi decimációs faktora
 
 constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
@@ -196,7 +196,7 @@ class MiniAudioFft {
      */
     int getEffectiveHeight() const;
     void manageSpriteForMode(DisplayMode modeToPrepareFor);
-    void drawOffStatusInCenter(); // ÚJ: "Off" státusz kirajzolása középre
+    void drawOffStatusInCenter();  // ÚJ: "Off" státusz kirajzolása középre
 
     void drawMuted();
 };
