@@ -732,6 +732,16 @@ void MiniAudioFft::drawOscilloscope() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
+    // --- ÚJ: DC eltolás korrekció ---
+    // Kiszámoljuk az aktuális oszcilloszkóp minták átlagát (DC komponens)
+    double sum_samples = 0;
+    // A MAX_INTERNAL_WIDTH konstans a headerben van definiálva
+    for (int k = 0; k < MiniAudioFftConstants::MAX_INTERNAL_WIDTH; ++k) {
+        sum_samples += osciSamples[k];
+    }
+    double dc_offset_correction = MiniAudioFftConstants::MAX_INTERNAL_WIDTH > 0 ? sum_samples / MiniAudioFftConstants::MAX_INTERNAL_WIDTH : 2048.0;
+    // --- ÚJ VÉGE ---
+
     int actual_osci_samples_to_draw = width;
     tft.fillRect(posX, posY, width, graphH, TFT_BLACK);  // Grafikon területének törlése
 
@@ -739,18 +749,21 @@ void MiniAudioFft::drawOscilloscope() {
 
     for (int i = 0; i < actual_osci_samples_to_draw; i++) {
         int num_available_samples = sizeof(osciSamples) / sizeof(osciSamples[0]);
+        if (num_available_samples == 0) continue; // Ha nincs minta, ne csináljunk semmit
+
         // Minták leképezése a rendelkezésre álló MAX_INTERNAL_WIDTH-ből a tényleges 'width'-re
         int sample_idx = (i * (num_available_samples - 1)) / std::max(1, (actual_osci_samples_to_draw - 1));
         sample_idx = constrain(sample_idx, 0, num_available_samples - 1);
 
         int raw_sample = osciSamples[sample_idx];
-        // ADC érték (0-4095) átalakítása -1 és +1 közötti tartományba (2048 a középpont)
+        // ADC érték (0-4095) átalakítása a KISZÁMÍTOTT DC KÖZÉPPONTHOZ képest,
         // majd skálázás az OSCI_SENSITIVITY_FACTOR-ral és a grafikon magasságára
-        double centered_sample = (static_cast<double>(raw_sample) - 2048.0) * OSCI_SENSITIVITY_FACTOR;
+        double sample_deviation = (static_cast<double>(raw_sample) - dc_offset_correction);
+        double gain_adjusted_deviation = sample_deviation * OSCI_SENSITIVITY_FACTOR;
         // Skálázás a grafikon felére (mivel a jel a középvonal körül ingadozik)
-        double scaled_to_half_height = centered_sample * (static_cast<double>(graphH) / 2.0 - 1.0) / 2048.0;  // -1 a túlcsordulás elkerülésére
+        double scaled_y_deflection = gain_adjusted_deviation * (static_cast<double>(graphH) / 2.0 - 1.0) / 2048.0;  // A 2048.0 itt a maximális elméleti ADC eltérésre skáláz
 
-        int y_pos = posY + graphH / 2 - static_cast<int>(round(scaled_to_half_height));
+        int y_pos = posY + graphH / 2 - static_cast<int>(round(scaled_y_deflection));
         y_pos = constrain(y_pos, posY, posY + graphH - 1);  // Korlátozás a grafikon területére
         int x_pos = posX + i;
 
