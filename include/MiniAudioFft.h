@@ -13,9 +13,11 @@
 
 // Konstansok a MiniAudioFft komponenshez
 namespace MiniAudioFftConstants {
-constexpr uint16_t FFT_SAMPLES = 256;         // Minták száma az FFT-hez (2 hatványának kell lennie)
-constexpr double SAMPLING_FREQUENCY = 10000;  // Mintavételezési frekvencia Hz-ben
-constexpr float AMPLITUDE_SCALE = 200.0f;     // Skálázási faktor az FFT eredményekhez
+constexpr uint16_t FFT_SAMPLES = 256;                        // Minták száma az FFT-hez (2 hatványának kell lennie)
+constexpr double SAMPLING_FREQUENCY = 10000;                 // Mintavételezési frekvencia Hz-ben (max 5kHz audio)
+constexpr float AMPLITUDE_SCALE = 40.0f;                     // Skálázási faktor az FFT eredményekhez (tovább csökkentve az érzékenység növeléséhez)
+constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 600.0f;  // Ez alatti frekvenciákat csillapítjuk
+constexpr float LOW_FREQ_ATTENUATION_FACTOR = 15.0f;         // Ezzel a faktorral osztjuk az alacsony frekvenciák magnitúdóját
 
 // Belső tömbök maximális méretei, ha a komponens mérete nagyobb lenne.
 // A tényleges rajzolás a komponens w,h méreteihez van vágva/skálázva.
@@ -26,7 +28,7 @@ constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak 
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
 constexpr int WF_GRADIENT = 100;                    // Vízesés színátmenetének erőssége
-constexpr float ENVELOPE_INPUT_GAIN = 5.0f;         // Erősítési faktor a burkológörbe bemenetéhez (tovább csökkentett érték)
+constexpr float ENVELOPE_INPUT_GAIN = 0.1f;         // Erősítési faktor a burkológörbe bemenetéhez (tovább csökkentett érték)
 constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burkológörbéhez
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
 constexpr float OSCI_SENSITIVITY_FACTOR = 3.0f;     // Oszcilloszkóp érzékenységi faktora
@@ -155,7 +157,8 @@ class MiniAudioFft {
 
     // Segédfüggvények az alacsony felbontású spektrumhoz
     uint8_t getBandVal(int fft_bin_index);
-    void drawSpectrumBar(int band_idx, int magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode);
+    void drawSpectrumBar(int band_idx, double magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode);
+
     // Segédfüggvény a vízesés/burkológörbe színeihez
     uint16_t valueToWaterfallColor(int scaled_value);
 

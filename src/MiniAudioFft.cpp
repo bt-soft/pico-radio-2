@@ -34,7 +34,7 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
       configModeFieldRef(configModeField),  // Referencia elmentése
       FFT(),                                // FFT objektum inicializálása
       highResOffset(0),
-      envelope_prev_smoothed_max_val(0.0f) { // Új tagváltozó inicializálása
+      envelope_prev_smoothed_max_val(0.0f) {  // Új tagváltozó inicializálása
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
     if (this->height > 0 && this->width > 0) {
@@ -98,7 +98,7 @@ void MiniAudioFft::cycleMode() {
         for (auto& row : wabuf) std::fill(row.begin(), row.end(), 0);
     }
     if (currentMode == DisplayMode::Envelope || (currentMode != DisplayMode::Envelope && envelope_prev_smoothed_max_val != 0.0f)) {
-        envelope_prev_smoothed_max_val = 0.0f; // Envelope simítási előzmény nullázása
+        envelope_prev_smoothed_max_val = 0.0f;  // Envelope simítási előzmény nullázása
     }
     highResOffset = 0;  // Magas felbontású spektrum eltolásának resetelése
 
@@ -239,6 +239,7 @@ void MiniAudioFft::drawModeIndicator() {
  * Beolvassa az analóg audio bemenetet, alkalmazza az ablakozást,
  * elvégzi az FFT-t, majd a komplex eredményből magnitúdókat számol.
  * Opcionálisan mintákat gyűjt az oszcilloszkóp módhoz.
+ * Az alacsony frekvenciás komponenseket csillapítja a jobb vizuális megjelenítés érdekében.
  *
  * @param collectOsciSamples Igaz, ha az oszcilloszkóp számára is kell mintákat gyűjteni.
  */
@@ -261,16 +262,30 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
                 }
             }
         }
-        vReal[i] = averaged_sample - 2048.0;
+        vReal[i] = averaged_sample - 2048.0;  // Középre igazítás (feltételezve, hogy 2048 a nulla szint)
         vImag[i] = 0.0;
     }
 
     FFT.windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
     FFT.compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
-    FFT.complexToMagnitude(vReal, vImag, FFT_SAMPLES);
+    FFT.complexToMagnitude(vReal, vImag, FFT_SAMPLES);  // Az eredmény a vReal-be kerül
 
+    // Magnitúdók átmásolása az RvReal tömbbe
     for (int i = 0; i < FFT_SAMPLES; ++i) {
         RvReal[i] = vReal[i];
+    }
+
+    // Alacsony frekvenciák csillapítása az RvReal tömbben
+    const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
+    const int attenuation_cutoff_bin = static_cast<int>(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz);
+
+    for (int i = 0; i < (FFT_SAMPLES / 2); ++i) {  // Csak a releváns (nem tükrözött) frekvencia bin-eken iterálunk
+        if (i < attenuation_cutoff_bin) {
+            // Csillapítjuk azokat a bin-eket, amelyek frekvenciája a küszöb alatt van.
+            // A 0. (DC) és 1. bin-t is érintheti, ha a cutoff_bin elég magas.
+            // A rajzoló függvények általában a 2. bin-től kezdenek.
+            RvReal[i] /= LOW_FREQ_ATTENUATION_FACTOR;
+        }
     }
 }
 
@@ -313,11 +328,14 @@ void MiniAudioFft::loop() {
     // --- Csak akkor jutunk ide, ha nincs némítás, a mód nem "Off", és nem volt állapotváltozás miatti forceRedraw ---
 
     // FFT mintavételezés és számítás
+    unsigned long fft_start_time = micros();
     performFFT(currentMode == DisplayMode::Oscilloscope);
+    unsigned long fft_duration = micros() - fft_start_time;
 
     // Grafikonok kirajzolása a nekik szánt (csökkentett) területre
     // Ezek a függvények a `posY`-tól `posY + getGraphHeight() - 1`-ig rajzolnak.
     // A `getGraphHeight()` mindig a grafikon magasságát adja vissza, a módkijelző sávja nélkül.
+    unsigned long draw_start_time = micros();
     switch (currentMode) {
         case DisplayMode::SpectrumLowRes:
             drawSpectrumLowRes();
@@ -339,8 +357,47 @@ void MiniAudioFft::loop() {
             break;
             // Nem kell default, mert a currentMode mindig érvényes DisplayMode érték.
     }
+    unsigned long draw_duration = micros() - draw_start_time;
+
     // A drawModeIndicator() metódust NEM hívjuk itt minden ciklusban,
     // csak akkor, ha a mód/láthatóság ténylegesen megváltozik (cycleMode, forceRedraw).
+
+    // Segédfüggvény a DisplayMode szöveges nevének lekérdezéséhez
+    auto getModeNameString = [](MiniAudioFft::DisplayMode mode) -> const char* {
+        switch (mode) {
+            case MiniAudioFft::DisplayMode::Off:
+                return "Off";
+            case MiniAudioFft::DisplayMode::SpectrumLowRes:
+                return "LowRes";
+            case MiniAudioFft::DisplayMode::SpectrumHighRes:
+                return "HighRes";
+            case MiniAudioFft::DisplayMode::Oscilloscope:
+                return "Scope";
+            case MiniAudioFft::DisplayMode::Waterfall:
+                return "Waterfall";
+            case MiniAudioFft::DisplayMode::Envelope:
+                return "Envelope";
+            case MiniAudioFft::DisplayMode::TuningAid:
+                return "TuneAid";
+            default:
+                return "Unknown";
+        }
+    };
+
+    // Belső időmérés kiíratása (opcionális, csak debugoláshoz)
+    static unsigned long lastInternalTimingPrint = 0;
+    static unsigned long max_fft_loop_duration = 0;
+    static unsigned long max_draw_loop_duration = 0;
+
+    if (fft_duration > max_fft_loop_duration) max_fft_loop_duration = fft_duration;
+    if (draw_duration > max_draw_loop_duration) max_draw_loop_duration = draw_duration;
+
+    if (millis() - lastInternalTimingPrint >= 1000) {
+        DEBUG("MiniAudioFft Internal (max 1s) - FFT: %lu us, Draw (%s): %lu us\n", max_fft_loop_duration, getModeNameString(currentMode), max_draw_loop_duration);
+        lastInternalTimingPrint = millis();
+        max_fft_loop_duration = 0;
+        max_draw_loop_duration = 0;
+    }
 }
 
 /**
@@ -358,13 +415,13 @@ bool MiniAudioFft::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
     if (touched && (tx >= posX && tx < (posX + width) && ty >= posY && ty < (posY + height))) {
         // Debounce logika: Csak akkor dolgozzuk fel, ha elegendő idő telt el az utolsó feldolgozás óta
         if (millis() - lastTouchProcessTime > MiniAudioFftConstants::TOUCH_DEBOUNCE_MS) {
-            lastTouchProcessTime = millis(); // Időbélyeg frissítése
-            cycleMode();  // Ez beállítja az isIndicatorCurrentlyVisible-t, a timert, és hívja a forceRedraw-t
-            return true;  // Kezeltük az érintést
+            lastTouchProcessTime = millis();  // Időbélyeg frissítése
+            cycleMode();                      // Ez beállítja az isIndicatorCurrentlyVisible-t, a timert, és hívja a forceRedraw-t
+            return true;                      // Kezeltük az érintést
         }
         // Ha túl gyorsan jött az érintés, akkor is jelezzük, hogy a komponens területén volt,
         // de nem váltunk módot, hogy más ne kezelje le.
-        return true; 
+        return true;
     }
     return false;
 }
@@ -453,11 +510,12 @@ void MiniAudioFft::drawSpectrumLowRes() {
         if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
     }
 
-    for (int i = 2; i < (FFT_SAMPLES / 2); i++) {
-        if (RvReal[i] > (AMPLITUDE_SCALE / 10.0)) {
+    for (int i = 2; i < (FFT_SAMPLES / 2); i++) {    // FFT bin indexek 2-től indulnak a DC és Nyquist komponensek elhagyása miatt
+        if (RvReal[i] > (AMPLITUDE_SCALE / 10.0)) {  // Csak akkor rajzolunk, ha a jel erőssége meghalad egy küszöböt
             byte band_idx = getBandVal(i);
             if (band_idx < bands_to_process) {
-                drawSpectrumBar(band_idx, (int)RvReal[i], current_draw_x_on_screen, actual_low_res_peak_max_height);
+                // Most RvReal[i]-t (double) adjuk át, nem (int)RvReal[i]-t
+                drawSpectrumBar(band_idx, RvReal[i], current_draw_x_on_screen, actual_low_res_peak_max_height);
             }
         }
     }
@@ -469,25 +527,27 @@ void MiniAudioFft::drawSpectrumLowRes() {
  * @return A sáv indexe (0-tól LOW_RES_BANDS-1-ig).
  */
 uint8_t MiniAudioFft::getBandVal(int fft_bin_index) {
-    if (fft_bin_index < 2) return 0;
-    int effective_bins = MiniAudioFftConstants::FFT_SAMPLES / 2 - 2;
+    if (fft_bin_index < 2) return 0;                                  // Az első két bin-t (DC, Nyquist/2) általában nem használjuk a spektrum sávokhoz
+    int effective_bins = MiniAudioFftConstants::FFT_SAMPLES / 2 - 2;  // Hasznos bin-ek száma (a 0. és 1. nélkül)
     if (effective_bins <= 0) return 0;
+    // Lineáris leképezés a hasznos bin-ekről a LOW_RES_BANDS sávokra
     return constrain((fft_bin_index - 2) * MiniAudioFftConstants::LOW_RES_BANDS / effective_bins, 0, MiniAudioFftConstants::LOW_RES_BANDS - 1);
 }
 
 /**
  * @brief Kirajzol egyetlen oszlopot/sávot (bar-t) az alacsony felbontású spektrumhoz.
  * @param band_idx A frekvenciasáv indexe, amelyhez az oszlop tartozik.
- * @param magnitude A sáv magnitúdója.
+ * @param magnitude A sáv magnitúdója (most double).
  * @param actual_start_x_on_screen A spektrum rajzolásának kezdő X koordinátája a képernyőn.
  * @param peak_max_height_for_mode A sáv maximális magassága az adott módban.
  */
-void MiniAudioFft::drawSpectrumBar(int band_idx, int magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode) {
+void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode) {
     using namespace MiniAudioFftConstants;
     int graphH = getGraphHeight();
     if (graphH <= 0) return;
 
-    int dsize = magnitude / AMPLITUDE_SCALE;
+    // A magnitúdó (double) osztása a float AMPLITUDE_SCALE-lel, majd int-re kasztolás
+    int dsize = static_cast<int>(magnitude / AMPLITUDE_SCALE);
     dsize = constrain(dsize, 0, peak_max_height_for_mode);  // peak_max_height_for_mode már graphH-1
 
     constexpr int bar_width_pixels = 3;
@@ -495,13 +555,13 @@ void MiniAudioFft::drawSpectrumBar(int band_idx, int magnitude, int actual_start
     constexpr int bar_total_width_pixels = bar_width_pixels + bar_gap_pixels;
     int xPos = actual_start_x_on_screen + bar_total_width_pixels * band_idx;
 
-    if (xPos + bar_width_pixels > posX + width || xPos < posX) return;
+    if (xPos + bar_width_pixels > posX + width || xPos < posX) return;  // Ne rajzoljunk a komponensen kívülre
 
     if (dsize > 0) {
         int y_start_bar = posY + graphH - dsize;  // Y a grafikon területén belül
-        int bar_h_visual = dsize; // A ténylegesen kirajzolandó magasság
+        int bar_h_visual = dsize;                 // A ténylegesen kirajzolandó magasság
         // Biztosítjuk, hogy a sáv a grafikon területén belül maradjon
-        if (y_start_bar < posY) {  // Elvileg a constrain(dsize) ezt kezeli
+        if (y_start_bar < posY) {
             bar_h_visual -= (posY - y_start_bar);
             y_start_bar = posY;
         }
@@ -525,22 +585,27 @@ void MiniAudioFft::drawSpectrumHighRes() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
-    int actual_high_res_bins_to_display = width;
+    int actual_high_res_bins_to_display = width;  // Minden pixel egy FFT bin-t (vagy interpolált értéket) képvisel
 
     for (int i = 0; i < actual_high_res_bins_to_display; i++) {
+        // FFT bin index leképezése a képernyő pixelére.
+        // A 2. bin-től indulunk (elhagyva a DC-t és az első komponenst).
+        // Az FFT_SAMPLES/2 - 2 a használható bin-ek száma (a 0. és 1. nélkül).
         int fft_bin_index = 2 + (i * (FFT_SAMPLES / 2 - 2)) / std::max(1, (actual_high_res_bins_to_display - 1));
+        // Biztosítjuk, hogy az index a határokon belül maradjon
         if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
         if (fft_bin_index < 2) fft_bin_index = 2;
 
         int screen_x = posX + i;
         tft.drawFastVLine(screen_x, posY, graphH, TFT_BLACK);  // Oszlop törlése a grafikon területén
 
-        int scaled_magnitude = (int)(RvReal[fft_bin_index] / AMPLITUDE_SCALE);
-        scaled_magnitude = constrain(scaled_magnitude, 0, graphH - 1);
+        // A RvReal[fft_bin_index] (double) osztása AMPLITUDE_SCALE-lel (float), majd int-re kasztolás
+        int scaled_magnitude = static_cast<int>(RvReal[fft_bin_index] / AMPLITUDE_SCALE);
+        scaled_magnitude = constrain(scaled_magnitude, 0, graphH - 1);  // Korlátozás a grafikon magasságára
 
         if (scaled_magnitude > 0) {
-            int y_bar_start = posY + graphH - 1 - scaled_magnitude;
-            int bar_actual_height = (posY + graphH - 1) - y_bar_start + 1;
+            int y_bar_start = posY + graphH - 1 - scaled_magnitude;         // Oszlop teteje
+            int bar_actual_height = (posY + graphH - 1) - y_bar_start + 1;  // Oszlop magassága
             if (bar_actual_height > 0) {
                 tft.drawFastVLine(screen_x, y_bar_start, bar_actual_height, TFT_SKYBLUE);
             }
@@ -565,12 +630,16 @@ void MiniAudioFft::drawOscilloscope() {
 
     for (int i = 0; i < actual_osci_samples_to_draw; i++) {
         int num_available_samples = sizeof(osciSamples) / sizeof(osciSamples[0]);
+        // Minták leképezése a rendelkezésre álló MAX_INTERNAL_WIDTH-ből a tényleges 'width'-re
         int sample_idx = (i * (num_available_samples - 1)) / std::max(1, (actual_osci_samples_to_draw - 1));
         sample_idx = constrain(sample_idx, 0, num_available_samples - 1);
 
         int raw_sample = osciSamples[sample_idx];
+        // ADC érték (0-4095) átalakítása -1 és +1 közötti tartományba (2048 a középpont)
+        // majd skálázás az OSCI_SENSITIVITY_FACTOR-ral és a grafikon magasságára
         double centered_sample = (static_cast<double>(raw_sample) - 2048.0) * OSCI_SENSITIVITY_FACTOR;
-        double scaled_to_half_height = centered_sample * (static_cast<double>(graphH) / 2.0 - 1.0) / 2048.0;
+        // Skálázás a grafikon felére (mivel a jel a középvonal körül ingadozik)
+        double scaled_to_half_height = centered_sample * (static_cast<double>(graphH) / 2.0 - 1.0) / 2048.0;  // -1 a túlcsordulás elkerülésére
 
         int y_pos = posY + graphH / 2 - static_cast<int>(round(scaled_to_half_height));
         y_pos = constrain(y_pos, posY, posY + graphH - 1);  // Korlátozás a grafikon területére
@@ -579,7 +648,7 @@ void MiniAudioFft::drawOscilloscope() {
         if (prev_x != -1) {
             tft.drawLine(prev_x, prev_y, x_pos, y_pos, TFT_GREEN);
         } else {
-            tft.drawPixel(x_pos, y_pos, TFT_GREEN);
+            tft.drawPixel(x_pos, y_pos, TFT_GREEN);  // Első pont kirajzolása
         }
         prev_x = x_pos;
         prev_y = y_pos;
@@ -607,23 +676,46 @@ void MiniAudioFft::drawWaterfall() {
 
     // 2. Új adatok betöltése a `wabuf` jobb szélére
     for (int r = 0; r < height; ++r) {  // A teljes `this->height` magasságon iterálunk
+        // FFT bin index leképezése a 'height' soraira
         int fft_bin_index = 2 + (r * (FFT_SAMPLES / 2 - 2)) / std::max(1, (height - 1));
         if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
         if (fft_bin_index < 2) fft_bin_index = 2;
 
-        double scaled_fft_val = RvReal[fft_bin_index] / AMPLITUDE_SCALE;
-        wabuf[r][width - 1] = static_cast<int>(constrain(scaled_fft_val * 50.0, 0.0, 255.0));
+        // Itt RvReal[fft_bin_index] (ami már lehet csillapított) / AMPLITUDE_SCALE
+        // A vízeséshez egy másik skálázást használunk, ami független az AMPLITUDE_SCALE-től,
+        // hogy a vízesés érzékenysége külön állítható legyen.
+        // Az eredeti kódban: scaled_fft_val * 50.0
+        // Most RvReal[fft_bin_index] már tartalmazza az FFT magnitúdót.
+        // A vízeséshez egy saját skálázást alkalmazunk, pl. * 0.2, vagy egy konstanssal.
+        // Legyen ez egy konstans szorzó, pl. WATERFALL_SENSITIVITY_FACTOR
+        // Az eredeti kódban `scaled_fft_val * 50.0` volt, ahol `scaled_fft_val = RvReal / AMPLITUDE_SCALE`.
+        // Tehát `(RvReal / AMPLITUDE_SCALE) * 50.0`.
+        // Ha `AMPLITUDE_SCALE` most `40`, akkor `(RvReal / 40) * 50 = RvReal * 1.25`.
+        // Használjunk egy fix szorzót az `RvReal`-re, pl. `0.5` vagy `1.0`.
+        // A `wabuf` 0-255 közötti értékeket tárol.
+        // `RvReal` értékei lehetnek nagyobbak.
+        // Próbáljuk meg az `RvReal` értékét közvetlenül skálázni 0-255 közé.
+        // Az `AMPLITUDE_SCALE` itt nem játszik szerepet, mert az a bar graph-okhoz van.
+        // A vízeséshez egy másik érzékenységi faktort használunk.
+        // Az eredeti `scaled_fft_val * 50.0` kb. `(RvReal[bin] / 200.0) * 50.0 = RvReal[bin] * 0.25` volt.
+        // Most `RvReal[bin]` már csillapított lehet.
+        // Legyen a vízesés érzékenysége:
+        constexpr float WATERFALL_INPUT_SCALE = 0.25f;  // Ezzel finomhangolható a vízesés érzékenysége
+        wabuf[r][width - 1] = static_cast<int>(constrain(RvReal[fft_bin_index] * WATERFALL_INPUT_SCALE, 0.0, 255.0));
     }
 
     // 3. Pixelek kirajzolása a grafikon területére
-    if (graphH <= 0) return;
+    if (graphH <= 0) return;                              // Ha nincs hely a grafikonnak, ne rajzoljunk
     for (int r_wabuf = 0; r_wabuf < height; ++r_wabuf) {  // Iterálás a `wabuf` összes során
         // Átskálázzuk a `r_wabuf` indexet a `graphH` magasságra a képernyőn való megjelenítéshez.
+        // A vízesés "fentről lefelé" jelenik meg a képernyőn, de a `wabuf` sorai a frekvenciákat jelentik (alulról felfelé).
+        // Tehát a `wabuf` r-edik sorát a képernyő (graphH - 1 - r_scaled) pozíciójára kell rajzolni.
         int screen_y_relative_inverted = (r_wabuf * (graphH - 1)) / std::max(1, (height - 1));
-        int screen_y_on_component = posY + (graphH - 1 - screen_y_relative_inverted);
+        int screen_y_on_component = posY + (graphH - 1 - screen_y_relative_inverted);  // Y koordináta a komponensen belül
 
+        // Csak akkor rajzolunk, ha az Y koordináta a grafikon területén belül van
         if (screen_y_on_component >= posY && screen_y_on_component < posY + graphH) {
-            for (int c = 0; c < width; ++c) {
+            for (int c = 0; c < width; ++c) {  // Iterálás a `wabuf` oszlopain (idő)
                 uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[r_wabuf][c]);
                 tft.drawPixel(posX + c, screen_y_on_component, color);
             }
@@ -638,10 +730,11 @@ void MiniAudioFft::drawWaterfall() {
  */
 uint16_t MiniAudioFft::valueToWaterfallColor(int scaled_value) {
     using namespace MiniAudioFftConstants;
+    // Normalizálás 0.0 és 1.0 közé a MAX_WATERFALL_COLOR_INPUT_VALUE alapján
     float normalized = static_cast<float>(constrain(scaled_value, 0, MAX_WATERFALL_COLOR_INPUT_VALUE)) / static_cast<float>(MAX_WATERFALL_COLOR_INPUT_VALUE);
     byte color_size = sizeof(WATERFALL_COLORS) / sizeof(WATERFALL_COLORS[0]);
-    int index = (int)(normalized * (color_size - 1));
-    index = constrain(index, 0, color_size - 1);
+    int index = (int)(normalized * (color_size - 1));  // Index számítása a normalizált értékből
+    index = constrain(index, 0, color_size - 1);       // Biztosítjuk, hogy az index a tömb határain belül maradjon
     return WATERFALL_COLORS[index];
 }
 
@@ -664,14 +757,16 @@ void MiniAudioFft::drawEnvelope() {
     }
 
     // 2. Új adatok betöltése
+    // Az Envelope módhoz az RvReal értékeit használjuk, de egy saját erősítéssel.
     for (int r = 0; r < height; ++r) {  // Teljes `this->height`
         int fft_bin_index = 2 + (r * (FFT_SAMPLES / 2 - 2)) / std::max(1, (height - 1));
         if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
         if (fft_bin_index < 2) fft_bin_index = 2;
 
-        double scaled_val = RvReal[fft_bin_index] / AMPLITUDE_SCALE;
-        double gained_val = scaled_val * ENVELOPE_INPUT_GAIN;
-        wabuf[r][width - 1] = static_cast<int>(constrain(gained_val, 0.0, 255.0));
+        // Az RvReal[fft_bin_index] már tartalmazza a csillapított értéket.
+        // Alkalmazzuk az ENVELOPE_INPUT_GAIN-t.
+        double gained_val = RvReal[fft_bin_index] * ENVELOPE_INPUT_GAIN;
+        wabuf[r][width - 1] = static_cast<int>(constrain(gained_val, 0.0, 255.0));  // 0-255 közé korlátozzuk a wabuf számára
     }
 
     // 3. Burkológörbe kirajzolása
@@ -679,7 +774,6 @@ void MiniAudioFft::drawEnvelope() {
     // Az 'envelope_prev_smoothed_max_val' tagváltozót használjuk a simításhoz
 
     for (int c = 0; c < width; ++c) {
-        // int env_idx_for_col_wabuf = height / 2; // Erre már nincs szükség az amplitúdó alapú rajzolásnál
         int max_val_in_col = 0;
         bool column_has_signal = false;
 
@@ -687,7 +781,6 @@ void MiniAudioFft::drawEnvelope() {
             if (wabuf[r_wabuf][c] > 0) column_has_signal = true;
             if (wabuf[r_wabuf][c] > max_val_in_col) {
                 max_val_in_col = wabuf[r_wabuf][c];
-                // env_idx_for_col_wabuf = r_wabuf; // Erre már nincs szükség
             }
         }
 
@@ -700,14 +793,17 @@ void MiniAudioFft::drawEnvelope() {
         tft.drawFastVLine(col_x_on_screen, posY, graphH, TFT_BLACK);  // Oszlop törlése a grafikon területén
 
         // Csak akkor rajzolunk, ha van jel vagy a simított érték számottevő
-       if (column_has_signal || envelope_prev_smoothed_max_val > 0.5f) {
+        if (column_has_signal || envelope_prev_smoothed_max_val > 0.5f) {
             // A simított amplitúdó skálázása a grafikon magasságára (0-255 -> 0-half_graph_h)
+            // Az ENVELOPE_THICKNESS_SCALER-t itt nem használjuk közvetlenül,
+            // a vastagságot a `y_offset_pixels` adja. Ha vastagabb görbét szeretnénk,
+            // az `ENVELOPE_INPUT_GAIN`-t kell növelni, vagy a skálázást módosítani.
             float y_offset_float = (envelope_prev_smoothed_max_val / 255.0f) * (half_graph_h - 1.0f);
             int y_offset_pixels = static_cast<int>(round(y_offset_float));
-            y_offset_pixels = std::min(y_offset_pixels, half_graph_h - 1); // Biztosítjuk, hogy a határokon belül maradjon
+            y_offset_pixels = std::min(y_offset_pixels, half_graph_h - 1);  // Biztosítjuk, hogy a határokon belül maradjon
             if (y_offset_pixels < 0) y_offset_pixels = 0;
 
-            if (y_offset_pixels >= 0) { // Ha van vastagság (akár 0 is, ami egy középvonalat jelenthet)
+            if (y_offset_pixels >= 0) {  // Ha van vastagság
                 int yCenter = posY + half_graph_h;
                 int yUpper = yCenter - y_offset_pixels;
                 int yLower = yCenter + y_offset_pixels;
@@ -715,7 +811,7 @@ void MiniAudioFft::drawEnvelope() {
                 yUpper = constrain(yUpper, posY, posY + graphH - 1);
                 yLower = constrain(yLower, posY, posY + graphH - 1);
 
-                if (yUpper <= yLower) { // Biztosítjuk, hogy van mit rajzolni
+                if (yUpper <= yLower) {  // Biztosítjuk, hogy van mit rajzolni
                     // Kitöltött burkológörbe rajzolása
                     tft.drawFastVLine(col_x_on_screen, yUpper, yLower - yUpper + 1, TFT_WHITE);
                 }
@@ -737,6 +833,7 @@ void MiniAudioFft::drawTuningAid() {
 
     // 1. Adatok eltolása "lefelé" a `wabuf`-ban (időbeli léptetés)
     // Csak a grafikon magasságáig (`graphH`) használjuk a `wabuf` sorait.
+    // A wabuf mérete (height x width), de itt csak graphH sort használunk fel a vízeséshez.
     for (int r = graphH - 1; r > 0; --r) {  // Utolsó sortól a másodikig
         for (int c = 0; c < width; ++c) {   // Minden oszlop (frekvencia bin)
             wabuf[r][c] = wabuf[r - 1][c];
@@ -756,13 +853,12 @@ void MiniAudioFft::drawTuningAid() {
         int fft_bin_index = min_fft_bin_for_tuning + static_cast<int>(std::round(ratio_in_display_width * (num_bins_in_tuning_range - 1)));
         // Biztosítjuk, hogy az index a számított és az abszolút érvényes tartományon belül maradjon
         fft_bin_index = constrain(fft_bin_index, min_fft_bin_for_tuning, max_fft_bin_for_tuning);
-        fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(FFT_SAMPLES / 2 - 1));
+        fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(FFT_SAMPLES / 2 - 1));  // Abszolút FFT határok
 
-        double scaled_fft_val = RvReal[fft_bin_index] / AMPLITUDE_SCALE;
-
-        // Érzékenység beállítása a hangolási segédhez.
-        // Legyen ugyanaz, mint a normál vízesésnél, ami a felhasználó szerint "egész jó".
-        wabuf[0][c_col] = static_cast<int>(constrain(scaled_fft_val * 50.0f, 0.0, 255.0));
+        // Az RvReal[fft_bin_index] már tartalmazza a csillapított értéket.
+        // A vízeséshez használt skálázást alkalmazzuk (pl. WATERFALL_INPUT_SCALE).
+        constexpr float TUNING_AID_INPUT_SCALE = 0.35f;  // Finomhangolható érzékenység a hangolási segédhez
+        wabuf[0][c_col] = static_cast<int>(constrain(RvReal[fft_bin_index] * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
     }
 
     // 3. Pixelek kirajzolása a grafikon területére
@@ -777,14 +873,12 @@ void MiniAudioFft::drawTuningAid() {
 
     // 4. Célfrekvencia vonalának kirajzolása (FÜGGŐLEGES vonal)
     // A ténylegesen megjelenített frekvenciatartomány alsó és felső határa Hz-ben
-
     float min_freq_displayed_actual = static_cast<float>(min_fft_bin_for_tuning) * binWidthHz;
     float max_freq_displayed_actual = static_cast<float>(max_fft_bin_for_tuning) * binWidthHz;
     float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;
 
     // Csak akkor rajzoljuk a vonalat, ha a célfrekvencia a megjelenített tartományon belül van
     if (displayed_span_hz > 0 && TUNING_AID_TARGET_FREQ_HZ >= min_freq_displayed_actual && TUNING_AID_TARGET_FREQ_HZ <= max_freq_displayed_actual) {
-
         // Arány kiszámítása: hol helyezkedik el a célfrekvencia a megjelenített sávon belül
         float ratio = (TUNING_AID_TARGET_FREQ_HZ - min_freq_displayed_actual) / displayed_span_hz;
 

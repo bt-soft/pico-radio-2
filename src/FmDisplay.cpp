@@ -353,6 +353,7 @@ void FmDisplay::displayLoop() {
 
     // MiniAudioFft ciklus futtatása
     if (pMiniAudioFft) {  // Ellenőrizzük, hogy létezik-e
+
         pMiniAudioFft->loop();
     }
 }
