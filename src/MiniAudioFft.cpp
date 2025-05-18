@@ -395,11 +395,26 @@ void MiniAudioFft::loop() {
 
     // Ha némítva van (és nem most változott az állapota, mert azt már a forceRedraw kezelte)
     if (rtv::muteStat) {
+        // A "MUTED" felirat már kint van a forceRedraw miatt, vagy ha a némítás
+        // korábban bekapcsolt és azóta nem volt teljes újrarajzolás.
+        return;
+    }
+
+    // Ha némítva van (és nem most változott az állapota, mert azt már a forceRedraw kezelte)
+    if (rtv::muteStat) {
         return;  // A "MUTED" felirat már kint van a forceRedraw miatt
     }
 
     // Ellenőrizzük az FFT konfigurációt (Disabled, Auto, Manual)
     // Az activeFftGainConfigRef már a megfelelő AM/FM configra mutat.
+    // --- ÚJ: "Off" állapot kijelzése a grafikon közepén, ha a módjelző nem látszik ---
+    if (currentMode == DisplayMode::Off && !isIndicatorCurrentlyVisible) {
+        // A grafikon területét a forceRedraw() már törölte, amikor az isIndicatorCurrentlyVisible false-ra váltott.
+        // Vagy egy előző mód rajzolása törölte, mielőtt Off-ra váltottunk.
+        drawOffStatusInCenter();
+        return; // Nincs más teendő Off módban, ha a jelző nem látszik.
+    }
+    // --- ÚJ VÉGE ---
     if (activeFftGainConfigRef == -1.0f) {  // FFT Disabled
         // Ha a módkijelző látható, azt még ki kell rajzolni, de utána return
         // A drawModeIndicator az "Off" szöveget fogja mutatni, ha currentMode == DisplayMode::Off
@@ -574,6 +589,27 @@ void MiniAudioFft::forceRedraw() {
     }
 }
 
+/**
+ * @brief Kirajzolja az "Off" státuszt a grafikon területének közepére,
+ * ha a komponens Off módban van és a normál módkijelző nem látható.
+ */
+void MiniAudioFft::drawOffStatusInCenter() {
+    int graphH = getGraphHeight();
+    if (width < 10 || graphH < 10) return; // Nincs elég hely
+
+    // A grafikon területének háttere már fekete kell, hogy legyen
+    // a korábbi clearArea() vagy egy másik mód rajzolása miatt.
+    // Itt csak a szöveget rajzoljuk ki.
+
+    tft.setTextDatum(MC_DATUM); // Middle-Center
+    tft.setTextColor(TFT_DARKGREY); // Sötétszürke szín
+    tft.setFreeFont(); // Alapértelmezett vagy választott font
+    tft.setTextSize(2); // Megfelelő méret
+
+    int centerX = posX + width / 2;
+    int centerY = posY + graphH / 2;
+    tft.drawString("Off", centerX, centerY);
+}
 // --- Rajzoló metódusok (a MiniAudioDisplay.cpp alapján adaptálva) ---
 // A grafikonrajzoló függvények (drawSpectrumLowRes, stb.) változatlanok maradnak,
 // mivel a `getGraphHeight()` által visszaadott magasságot használják,

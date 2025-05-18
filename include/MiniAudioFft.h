@@ -196,6 +196,7 @@ class MiniAudioFft {
      */
     int getEffectiveHeight() const;
     void manageSpriteForMode(DisplayMode modeToPrepareFor);
+    void drawOffStatusInCenter(); // ÚJ: "Off" státusz kirajzolása középre
 
     void drawMuted();
 };
