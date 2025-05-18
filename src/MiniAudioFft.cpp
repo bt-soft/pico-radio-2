@@ -236,6 +236,7 @@ void MiniAudioFft::drawModeIndicator() {
     tft.setTextDatum(BC_DATUM);               // Alul-középre igazítás
 
     String modeText = "";
+    String gainText = "";
     switch (currentMode) {
         case DisplayMode::Off:
             modeText = "Off";
@@ -263,12 +264,22 @@ void MiniAudioFft::drawModeIndicator() {
             break;
     }
 
+    // Erősítés állapotának hozzáadása, ha a mód nem "Off"
+    if (currentMode != DisplayMode::Off) {
+        if (activeFftGainConfigRef == -1.0f) {
+            gainText = " (Off)";
+        } else if (activeFftGainConfigRef == 0.0f) {
+            gainText = " (Auto G)";
+        } else if (activeFftGainConfigRef > 0.0f) {
+            gainText = " (Man G)";
+        }
+    }
+
     // Módkijelző területének explicit törlése a szövegkirajzolás előtt
     tft.fillRect(posX, indicatorYstart, width, indicatorH, TFT_BLACK);
     // Szöveg kirajzolása a komponens aljára, középre.
-    // Az Y koordináta a szöveg alapvonala lesz.
-    // A `posY + height - 2` a teljes komponensmagasság aljára igazít.
-    tft.drawString(modeText, posX + width / 2, posY + height - 2);
+    // Az Y koordináta a szöveg alapvonala lesz. A `posY + height - 2` a teljes komponensmagasság aljára igazít.
+    tft.drawString(modeText + gainText, posX + width / 2, posY + height - 2);
 }
 
 /**

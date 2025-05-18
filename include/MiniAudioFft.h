@@ -16,7 +16,7 @@ namespace MiniAudioFftConstants {
 constexpr uint16_t FFT_SAMPLES = 256;                        // Minták száma az FFT-hez (2 hatványának kell lennie)
 constexpr double SAMPLING_FREQUENCY = 10000;                 // Mintavételezési frekvencia Hz-ben (max 5kHz audio)
 constexpr float AMPLITUDE_SCALE = 40.0f;                     // Skálázási faktor az FFT eredményekhez (tovább csökkentve az érzékenység növeléséhez)
-constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 600.0f;  // Ez alatti frekvenciákat csillapítjuk
+constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 350.0f;  // Ez alatti frekvenciákat csillapítjuk
 constexpr float LOW_FREQ_ATTENUATION_FACTOR = 15.0f;         // Ezzel a faktorral osztjuk az alacsony frekvenciák magnitúdóját
 
 // Belső tömbök maximális méretei, ha a komponens mérete nagyobb lenne.
