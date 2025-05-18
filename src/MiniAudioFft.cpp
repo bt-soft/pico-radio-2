@@ -779,8 +779,23 @@ void MiniAudioFft::drawOscilloscope() {
     // --- ÚJ VÉGE ---
 
     int actual_osci_samples_to_draw = width;
-    tft.fillRect(posX, posY, width, graphH, TFT_BLACK);  // Grafikon területének törlése
 
+    // --- Érzékenységi faktor meghatározása ---
+    float current_sensitivity_factor = OSCI_SENSITIVITY_FACTOR;
+    // Az activeFftGainConfigRef egy referencia a config.data.miniAudioFftConfigAm vagy ...Fm mezőre.
+    // Ha ez 0.0f, akkor az FFT Auto Gain módja aktív.
+    if (activeFftGainConfigRef == 0.0f) {
+        // Ha az FFT Auto Gain aktív, az oszcilloszkóp érzékenységét úgy állítjuk,
+        // hogy egy FFT_AUTO_GAIN_TARGET_PEAK amplitúdójú AC jel kb. a grafikon feléig térjen ki.
+        if (FFT_AUTO_GAIN_TARGET_PEAK > 0.001f) { // Osztás nullával és túl kicsi értékkel való elkerülése
+            current_sensitivity_factor = 2048.0f / FFT_AUTO_GAIN_TARGET_PEAK;
+        } else {
+            current_sensitivity_factor = 1.0f; // Alapértelmezett/nagyon érzékeny, ha a target peak érvénytelen
+        }
+    }
+    // --- Érzékenységi faktor vége ---
+
+    tft.fillRect(posX, posY, width, graphH, TFT_BLACK);  // Grafikon területének törlése
     int prev_x = -1, prev_y = -1;
 
     for (int i = 0; i < actual_osci_samples_to_draw; i++) {
@@ -795,7 +810,7 @@ void MiniAudioFft::drawOscilloscope() {
         // ADC érték (0-4095) átalakítása a KISZÁMÍTOTT DC KÖZÉPPONTHOZ képest,
         // majd skálázás az OSCI_SENSITIVITY_FACTOR-ral és a grafikon magasságára
         double sample_deviation = (static_cast<double>(raw_sample) - dc_offset_correction);
-        double gain_adjusted_deviation = sample_deviation * OSCI_SENSITIVITY_FACTOR;
+        double gain_adjusted_deviation = sample_deviation * current_sensitivity_factor;
         // Skálázás a grafikon felére (mivel a jel a középvonal körül ingadozik)
         double scaled_y_deflection = gain_adjusted_deviation * (static_cast<double>(graphH) / 2.0 - 1.0) / 2048.0;  // A 2048.0 itt a maximális elméleti ADC eltérésre skáláz
 
