@@ -85,7 +85,8 @@ void MiniAudioFft::manageSpriteForMode(DisplayMode modeToPrepareFor) {
         sprGraph.deleteSprite();
         spriteCreated = false;
     }
-    if (modeToPrepareFor == DisplayMode::Waterfall || modeToPrepareFor == DisplayMode::TuningAid) {
+    // Sprite használata Waterfall, TuningAid és Envelope módokhoz
+    if (modeToPrepareFor == DisplayMode::Waterfall || modeToPrepareFor == DisplayMode::TuningAid || modeToPrepareFor == DisplayMode::Envelope) {
         int graphH = getGraphHeight();
         if (width > 0 && graphH > 0) {
             sprGraph.setColorDepth(16);  // Vagy 8, ha palettát használsz
@@ -767,8 +768,6 @@ void MiniAudioFft::drawOscilloscope() {
     using namespace MiniAudioFftConstants;
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
-
-    // --- ÚJ: DC eltolás korrekció ---
     // Kiszámoljuk az aktuális oszcilloszkóp minták átlagát (DC komponens)
     double sum_samples = 0;
     // A MAX_INTERNAL_WIDTH konstans a headerben van definiálva
@@ -776,10 +775,8 @@ void MiniAudioFft::drawOscilloscope() {
         sum_samples += osciSamples[k];
     }
     double dc_offset_correction = MiniAudioFftConstants::MAX_INTERNAL_WIDTH > 0 ? sum_samples / MiniAudioFftConstants::MAX_INTERNAL_WIDTH : 2048.0;
-    // --- ÚJ VÉGE ---
 
     int actual_osci_samples_to_draw = width;
-
     // --- Érzékenységi faktor meghatározása ---
     float current_sensitivity_factor = OSCI_SENSITIVITY_FACTOR;
     // Az activeFftGainConfigRef egy referencia a config.data.miniAudioFftConfigAm vagy ...Fm mezőre.
@@ -795,7 +792,9 @@ void MiniAudioFft::drawOscilloscope() {
     }
     // --- Érzékenységi faktor vége ---
 
-    tft.fillRect(posX, posY, width, graphH, TFT_BLACK);  // Grafikon területének törlése
+    // Grafikon területének törlése (csak a grafikon sávja)
+    tft.fillRect(posX, posY, width, graphH, TFT_BLACK);
+
     int prev_x = -1, prev_y = -1;
 
     for (int i = 0; i < actual_osci_samples_to_draw; i++) {
@@ -826,6 +825,7 @@ void MiniAudioFft::drawOscilloscope() {
         prev_x = x_pos;
         prev_y = y_pos;
     }
+    // A drawModeIndicator-t a loop() vagy a forceRedraw() hívja, itt nem szükséges
 }
 
 /**
@@ -908,7 +908,14 @@ uint16_t MiniAudioFft::valueToWaterfallColor(int scaled_value) {
 void MiniAudioFft::drawEnvelope() {
     using namespace MiniAudioFftConstants;
     int graphH = getGraphHeight();
-    if (width == 0 || graphH <= 0 || wabuf.empty() || wabuf[0].empty()) return;
+    if (!spriteCreated || width == 0 || graphH <= 0 || wabuf.empty() || wabuf[0].empty()) {
+        if (!spriteCreated && currentMode == DisplayMode::Envelope) {
+            DEBUG("MiniAudioFft::drawEnvelope - Sprite not created for Envelope mode.\n");
+        }
+        return;
+    }
+
+    sprGraph.fillSprite(TFT_BLACK); // Sprite törlése minden rajzolás előtt
 
     // 1. Adatok eltolása balra
     for (int r = 0; r < height; ++r) {  // Teljes `this->height`
@@ -949,9 +956,9 @@ void MiniAudioFft::drawEnvelope() {
         float current_col_max_amplitude = static_cast<float>(max_val_in_col);
         // A tagváltozót használjuk a simításhoz az oszlopok között
         envelope_prev_smoothed_max_val = ENVELOPE_SMOOTH_FACTOR * envelope_prev_smoothed_max_val + (1.0f - ENVELOPE_SMOOTH_FACTOR) * current_col_max_amplitude;
-
-        int col_x_on_screen = posX + c;
-        tft.drawFastVLine(col_x_on_screen, posY, graphH, TFT_BLACK);  // Oszlop törlése a grafikon területén
+        
+        // Az oszlop törlését a sprGraph.fillSprite(TFT_BLACK) már elvégezte.
+        // Itt közvetlenül a sprite-ra rajzolunk.
 
         // Csak akkor rajzolunk, ha van jel vagy a simított érték számottevő
         if (column_has_signal || envelope_prev_smoothed_max_val > 0.5f) {
@@ -965,20 +972,23 @@ void MiniAudioFft::drawEnvelope() {
             if (y_offset_pixels < 0) y_offset_pixels = 0;
 
             if (y_offset_pixels >= 0) {  // Ha van vastagság
-                int yCenter = posY + half_graph_h;
-                int yUpper = yCenter - y_offset_pixels;
-                int yLower = yCenter + y_offset_pixels;
+                // Y koordináták a sprite-on belül (0-tól graphH-1-ig)
+                int yCenter_on_sprite = half_graph_h;
+                int yUpper_on_sprite = yCenter_on_sprite - y_offset_pixels;
+                int yLower_on_sprite = yCenter_on_sprite + y_offset_pixels;
 
-                yUpper = constrain(yUpper, posY, posY + graphH - 1);
-                yLower = constrain(yLower, posY, posY + graphH - 1);
+                yUpper_on_sprite = constrain(yUpper_on_sprite, 0, graphH - 1);
+                yLower_on_sprite = constrain(yLower_on_sprite, 0, graphH - 1);
 
-                if (yUpper <= yLower) {  // Biztosítjuk, hogy van mit rajzolni
+                if (yUpper_on_sprite <= yLower_on_sprite) {  // Biztosítjuk, hogy van mit rajzolni
                     // Kitöltött burkológörbe rajzolása
-                    tft.drawFastVLine(col_x_on_screen, yUpper, yLower - yUpper + 1, TFT_WHITE);
+                    // Az X koordináta 'c' (0-tól width-1-ig)
+                    sprGraph.drawFastVLine(c, yUpper_on_sprite, yLower_on_sprite - yUpper_on_sprite + 1, TFT_WHITE);
                 }
             }
         }
     }
+    sprGraph.pushSprite(posX, posY); // Sprite kirakása a képernyőre
 }
 
 /**
