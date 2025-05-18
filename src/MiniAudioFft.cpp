@@ -34,7 +34,9 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
       configModeFieldRef(configModeField),  // Referencia elmentése
       FFT(),                                // FFT objektum inicializálása
       highResOffset(0),
-      envelope_prev_smoothed_max_val(0.0f) {  // Új tagváltozó inicializálása
+      envelope_prev_smoothed_max_val(0.0f),
+      sprGraph(&tft_ref),  // Sprite inicializálása a TFT referenciával
+      spriteCreated(false) {
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
     if (this->height > 0 && this->width > 0) {
@@ -51,6 +53,13 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
     }
 }
 
+MiniAudioFft::~MiniAudioFft() {
+    if (spriteCreated) {
+        sprGraph.deleteSprite();
+        spriteCreated = false;
+    }
+}
+
 /**
  * @brief Beállítja a komponens kezdeti megjelenítési módját.
  * Ezt a szülő képernyő hívja meg a konstruktor után, a configból kiolvasott értékkel.
@@ -60,7 +69,31 @@ void MiniAudioFft::setInitialMode(DisplayMode mode) {
     currentMode = mode;
     isIndicatorCurrentlyVisible = true;  // Induláskor mindig látható
     modeIndicatorShowUntil = millis() + MODE_INDICATOR_TIMEOUT_MS;
-    forceRedraw();  // Ez gondoskodik a clearArea-ról és a drawModeIndicator-ról
+    manageSpriteForMode(currentMode);  // Sprite előkészítése a kezdeti módhoz
+    forceRedraw();                     // Ez gondoskodik a clearArea-ról és a drawModeIndicator-ról
+}
+
+/**
+ * @brief Kezeli a sprite létrehozását/törlését a megadott módhoz.
+ * @param modeToPrepareFor Az a mód, amelyhez a sprite-ot elő kell készíteni.
+ */
+void MiniAudioFft::manageSpriteForMode(DisplayMode modeToPrepareFor) {
+    if (spriteCreated) {  // Ha létezik sprite egy korábbi módból
+        sprGraph.deleteSprite();
+        spriteCreated = false;
+    }
+    if (modeToPrepareFor == DisplayMode::Waterfall || modeToPrepareFor == DisplayMode::TuningAid) {
+        int graphH = getGraphHeight();
+        if (width > 0 && graphH > 0) {
+            sprGraph.setColorDepth(16);  // Vagy 8, ha palettát használsz
+            sprGraph.createSprite(width, graphH);
+            sprGraph.fillSprite(TFT_BLACK);  // Kezdeti törlés
+            spriteCreated = true;
+        } else {
+            spriteCreated = false;  // Nem lehetett létrehozni
+            DEBUG("MiniAudioFft: Sprite creation failed for mode %d (w:%d, graphH:%d)\n", static_cast<int>(modeToPrepareFor), width, graphH);
+        }
+    }
 }
 
 /**
@@ -101,6 +134,8 @@ void MiniAudioFft::cycleMode() {
         envelope_prev_smoothed_max_val = 0.0f;  // Envelope simítási előzmény nullázása
     }
     highResOffset = 0;  // Magas felbontású spektrum eltolásának resetelése
+
+    manageSpriteForMode(currentMode);  // Sprite előkészítése az új módhoz
 
     forceRedraw();  // Teljes újrarajzolás, ami kezeli a clearArea-t és a drawModeIndicator-t
 }
@@ -660,67 +695,55 @@ void MiniAudioFft::drawOscilloscope() {
  *
  * A `getGraphHeight()` által visszaadott magasságot használja a rajzoláshoz.
  * A `wabuf` feltöltése a teljes komponens magasság (`this->height`) alapján történik.
+ * Sprite-ot használ a gyorsabb rajzoláshoz.
  */
 void MiniAudioFft::drawWaterfall() {
     using namespace MiniAudioFftConstants;
-    int graphH = getGraphHeight();  // A grafikon tényleges rajzolási magassága
-    // A `wabuf` sorainak száma `this->height`, oszlopainak száma `this->width`.
-    if (width == 0 || height == 0 || wabuf.empty() || wabuf[0].empty()) return;
+    int graphH = getGraphHeight();
+    if (!spriteCreated || width == 0 || graphH <= 0 || wabuf.empty() || wabuf[0].empty()) {
+        if (!spriteCreated && (currentMode == DisplayMode::Waterfall || currentMode == DisplayMode::TuningAid)) {
+            DEBUG("MiniAudioFft::drawWaterfall - Sprite not created for mode %d\n", static_cast<int>(currentMode));
+        }
+        return;
+    }
 
-    // 1. Adatok eltolása balra a `wabuf`-ban
+    // 1. Adatok eltolása balra a `wabuf`-ban (ez továbbra is szükséges a `wabuf` frissítéséhez)
     for (int r = 0; r < height; ++r) {  // A teljes `this->height` magasságon iterálunk a `wabuf` miatt
         for (int c = 0; c < width - 1; ++c) {
             wabuf[r][c] = wabuf[r][c + 1];
         }
     }
 
-    // 2. Új adatok betöltése a `wabuf` jobb szélére
-    for (int r = 0; r < height; ++r) {  // A teljes `this->height` magasságon iterálunk
-        // FFT bin index leképezése a 'height' soraira
+    // 2. Új adatok betöltése a `wabuf` jobb szélére (a `wabuf` továbbra is `height` magas)
+    for (int r = 0; r < height; ++r) {
         int fft_bin_index = 2 + (r * (FFT_SAMPLES / 2 - 2)) / std::max(1, (height - 1));
         if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
         if (fft_bin_index < 2) fft_bin_index = 2;
 
-        // Itt RvReal[fft_bin_index] (ami már lehet csillapított) / AMPLITUDE_SCALE
-        // A vízeséshez egy másik skálázást használunk, ami független az AMPLITUDE_SCALE-től,
-        // hogy a vízesés érzékenysége külön állítható legyen.
-        // Az eredeti kódban: scaled_fft_val * 50.0
-        // Most RvReal[fft_bin_index] már tartalmazza az FFT magnitúdót.
-        // A vízeséshez egy saját skálázást alkalmazunk, pl. * 0.2, vagy egy konstanssal.
-        // Legyen ez egy konstans szorzó, pl. WATERFALL_SENSITIVITY_FACTOR
-        // Az eredeti kódban `scaled_fft_val * 50.0` volt, ahol `scaled_fft_val = RvReal / AMPLITUDE_SCALE`.
-        // Tehát `(RvReal / AMPLITUDE_SCALE) * 50.0`.
-        // Ha `AMPLITUDE_SCALE` most `40`, akkor `(RvReal / 40) * 50 = RvReal * 1.25`.
-        // Használjunk egy fix szorzót az `RvReal`-re, pl. `0.5` vagy `1.0`.
-        // A `wabuf` 0-255 közötti értékeket tárol.
-        // `RvReal` értékei lehetnek nagyobbak.
-        // Próbáljuk meg az `RvReal` értékét közvetlenül skálázni 0-255 közé.
-        // Az `AMPLITUDE_SCALE` itt nem játszik szerepet, mert az a bar graph-okhoz van.
-        // A vízeséshez egy másik érzékenységi faktort használunk.
-        // Az eredeti `scaled_fft_val * 50.0` kb. `(RvReal[bin] / 200.0) * 50.0 = RvReal[bin] * 0.25` volt.
-        // Most `RvReal[bin]` már csillapított lehet.
-        // Legyen a vízesés érzékenysége:
-        constexpr float WATERFALL_INPUT_SCALE = 0.25f;  // Ezzel finomhangolható a vízesés érzékenysége
+        constexpr float WATERFALL_INPUT_SCALE = 0.25f;
         wabuf[r][width - 1] = static_cast<int>(constrain(RvReal[fft_bin_index] * WATERFALL_INPUT_SCALE, 0.0, 255.0));
     }
 
-    // 3. Pixelek kirajzolása a grafikon területére
-    if (graphH <= 0) return;                              // Ha nincs hely a grafikonnak, ne rajzoljunk
-    for (int r_wabuf = 0; r_wabuf < height; ++r_wabuf) {  // Iterálás a `wabuf` összes során
-        // Átskálázzuk a `r_wabuf` indexet a `graphH` magasságra a képernyőn való megjelenítéshez.
-        // A vízesés "fentről lefelé" jelenik meg a képernyőn, de a `wabuf` sorai a frekvenciákat jelentik (alulról felfelé).
-        // Tehát a `wabuf` r-edik sorát a képernyő (graphH - 1 - r_scaled) pozíciójára kell rajzolni.
-        int screen_y_relative_inverted = (r_wabuf * (graphH - 1)) / std::max(1, (height - 1));
-        int screen_y_on_component = posY + (graphH - 1 - screen_y_relative_inverted);  // Y koordináta a komponensen belül
+    // 3. Sprite görgetése és új oszlop kirajzolása
+    sprGraph.scroll(-1, 0);  // Tartalom görgetése 1 pixellel balra
 
-        // Csak akkor rajzolunk, ha az Y koordináta a grafikon területén belül van
-        if (screen_y_on_component >= posY && screen_y_on_component < posY + graphH) {
-            for (int c = 0; c < width; ++c) {  // Iterálás a `wabuf` oszlopain (idő)
-                uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[r_wabuf][c]);
-                tft.drawPixel(posX + c, screen_y_on_component, color);
-            }
+    // Az új (jobb szélső) oszlop kirajzolása a sprite-ra
+    // A sprite `graphH` magas, a `wabuf` `height` magas.
+    for (int r_wabuf = 0; r_wabuf < height; ++r_wabuf) {
+        // `r_wabuf` (0..height-1) leképezése `y_on_sprite`-ra (0..graphH-1)
+        // A vízesés "fentről lefelé" jelenik meg a képernyőn, de a `wabuf` sorai a frekvenciákat jelentik (alulról felfelé).
+        // Tehát a `wabuf` r-edik sorát a sprite (graphH - 1 - r_scaled) pozíciójára kell rajzolni.
+        int screen_y_relative_inverted = (r_wabuf * (graphH - 1)) / std::max(1, (height - 1));
+        int y_on_sprite = (graphH - 1 - screen_y_relative_inverted);  // Y koordináta a sprite-on belül
+
+        if (y_on_sprite >= 0 && y_on_sprite < graphH) {                                       // Biztosítjuk, hogy a sprite-on belül rajzolunk
+            uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[r_wabuf][width - 1]);  // Az új oszlop adata
+            sprGraph.drawPixel(width - 1, y_on_sprite, color);                                // Rajzolás a sprite jobb szélére
         }
     }
+
+    // Sprite kirakása a képernyőre
+    sprGraph.pushSprite(posX, posY);
 }
 
 /**
@@ -825,11 +848,17 @@ void MiniAudioFft::drawEnvelope() {
  *
  * A `getGraphHeight()` által visszaadott magasságot használja a rajzoláshoz.
  * A `wabuf` feltöltése a TUNING_AID_DISPLAY_MIN_FREQ_HZ és MAX_FREQ_HZ közötti FFT bin-ek alapján történik.
+ * Sprite-ot használ a gyorsabb rajzoláshoz.
  */
 void MiniAudioFft::drawTuningAid() {
     using namespace MiniAudioFftConstants;
-    int graphH = getGraphHeight();  // A grafikon tényleges rajzolási magassága
-    if (width == 0 || height == 0 || wabuf.empty() || wabuf[0].empty() || graphH <= 0) return;
+    int graphH = getGraphHeight();
+    if (!spriteCreated || width == 0 || graphH <= 0 || wabuf.empty() || wabuf[0].empty()) {
+        if (!spriteCreated && (currentMode == DisplayMode::Waterfall || currentMode == DisplayMode::TuningAid)) {
+            DEBUG("MiniAudioFft::drawTuningAid - Sprite not created for mode %d\n", static_cast<int>(currentMode));
+        }
+        return;
+    }
 
     // 1. Adatok eltolása "lefelé" a `wabuf`-ban (időbeli léptetés)
     // Csak a grafikon magasságáig (`graphH`) használjuk a `wabuf` sorait.
@@ -842,58 +871,47 @@ void MiniAudioFft::drawTuningAid() {
 
     // 2. Új adatok betöltése a `wabuf[0]` sorába (legfrissebb spektrum)
     //    a hangolási tartományból.
-    const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
-    const int min_fft_bin_for_tuning = std::max(2, static_cast<int>(std::round(TUNING_AID_DISPLAY_MIN_FREQ_HZ / binWidthHz)));
-    const int max_fft_bin_for_tuning = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(TUNING_AID_DISPLAY_MAX_FREQ_HZ / binWidthHz)));
-    const int num_bins_in_tuning_range = std::max(1, max_fft_bin_for_tuning - min_fft_bin_for_tuning + 1);
+    const float binWidthHz_local = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;  // Helyi, mert a globális nincs itt
+    const int min_fft_bin_for_tuning_local = std::max(2, static_cast<int>(std::round(TUNING_AID_DISPLAY_MIN_FREQ_HZ / binWidthHz_local)));
+    const int max_fft_bin_for_tuning_local = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(TUNING_AID_DISPLAY_MAX_FREQ_HZ / binWidthHz_local)));
+    const int num_bins_in_tuning_range = std::max(1, max_fft_bin_for_tuning_local - min_fft_bin_for_tuning_local + 1);
 
     for (int c_col = 0; c_col < width; ++c_col) {  // c_col a képernyő X pozíciója / wabuf oszlop indexe
-        // Képernyő oszlop (c_col) leképezése egy FFT bin indexre a kívánt tartományon belül
         float ratio_in_display_width = (width == 1) ? 0.0f : (static_cast<float>(c_col) / (width - 1));
-        int fft_bin_index = min_fft_bin_for_tuning + static_cast<int>(std::round(ratio_in_display_width * (num_bins_in_tuning_range - 1)));
-        // Biztosítjuk, hogy az index a számított és az abszolút érvényes tartományon belül maradjon
-        fft_bin_index = constrain(fft_bin_index, min_fft_bin_for_tuning, max_fft_bin_for_tuning);
-        fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(FFT_SAMPLES / 2 - 1));  // Abszolút FFT határok
+        int fft_bin_index = min_fft_bin_for_tuning_local + static_cast<int>(std::round(ratio_in_display_width * (num_bins_in_tuning_range - 1)));
+        fft_bin_index = constrain(fft_bin_index, min_fft_bin_for_tuning_local, max_fft_bin_for_tuning_local);
+        fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(FFT_SAMPLES / 2 - 1));
 
-        // Az RvReal[fft_bin_index] már tartalmazza a csillapított értéket.
-        // A vízeséshez használt skálázást alkalmazzuk (pl. WATERFALL_INPUT_SCALE).
-        constexpr float TUNING_AID_INPUT_SCALE = 0.35f;  // Finomhangolható érzékenység a hangolási segédhez
+        constexpr float TUNING_AID_INPUT_SCALE = 0.35f;
         wabuf[0][c_col] = static_cast<int>(constrain(RvReal[fft_bin_index] * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
     }
 
-    // 3. Pixelek kirajzolása a grafikon területére
-    // A sorok (r) az időt, az oszlopok (c) a frekvenciát jelentik.
-    for (int r_time = 0; r_time < graphH; ++r_time) {     // Y koordináta a képernyőn (idő)
-        for (int c_freq = 0; c_freq < width; ++c_freq) {  // X koordináta a képernyőn (frekvencia)
-            // A wabuf[r_time][c_freq] tartalmazza a színerősséget
-            uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[r_time][c_freq]);
-            tft.drawPixel(posX + c_freq, posY + r_time, color);
-        }
+    // 3. Sprite görgetése és új sor kirajzolása
+    sprGraph.scroll(0, 1);  // Tartalom görgetése 1 pixellel lefelé
+
+    // Az új (legfelső) sor kirajzolása a sprite-ra
+    for (int c_freq = 0; c_freq < width; ++c_freq) {
+        uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[0][c_freq]);  // A wabuf[0] az új sor
+        sprGraph.drawPixel(c_freq, 0, color);                                    // Rajzolás a sprite legfelső sorára (y=0)
     }
 
-    // 4. Célfrekvencia vonalának kirajzolása (FÜGGŐLEGES vonal)
-    // A ténylegesen megjelenített frekvenciatartomány alsó és felső határa Hz-ben
-    float min_freq_displayed_actual = static_cast<float>(min_fft_bin_for_tuning) * binWidthHz;
-    float max_freq_displayed_actual = static_cast<float>(max_fft_bin_for_tuning) * binWidthHz;
+    // 4. Célfrekvencia vonalának kirajzolása a sprite-ra
+    float min_freq_displayed_actual = static_cast<float>(min_fft_bin_for_tuning_local) * binWidthHz_local;
+    float max_freq_displayed_actual = static_cast<float>(max_fft_bin_for_tuning_local) * binWidthHz_local;
     float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;
 
-    // Csak akkor rajzoljuk a vonalat, ha a célfrekvencia a megjelenített tartományon belül van
     if (displayed_span_hz > 0 && TUNING_AID_TARGET_FREQ_HZ >= min_freq_displayed_actual && TUNING_AID_TARGET_FREQ_HZ <= max_freq_displayed_actual) {
-        // Arány kiszámítása: hol helyezkedik el a célfrekvencia a megjelenített sávon belül
         float ratio = (TUNING_AID_TARGET_FREQ_HZ - min_freq_displayed_actual) / displayed_span_hz;
+        int line_x_on_sprite = static_cast<int>(std::round(ratio * (width - 1)));
 
-        // X pozíció kiszámítása a komponens szélességén
-        int line_x_on_graph = static_cast<int>(std::round(ratio * (width - 1)));
-        int final_line_x = posX + line_x_on_graph;  // Abszolút X pozíció a képernyőn
-
-        // Függőleges vonal kirajzolása a grafikon teljes magasságában
-        tft.drawFastVLine(final_line_x, posY, graphH, TUNING_AID_TARGET_LINE_COLOR);
-
-        // Opcionálisan egy második vonal a jobb láthatóságért
-        if (final_line_x + 1 < posX + width) {  // Biztosítjuk, hogy a komponensen belül maradjon
-            tft.drawFastVLine(final_line_x + 1, posY, graphH, TUNING_AID_TARGET_LINE_COLOR);
+        sprGraph.drawFastVLine(line_x_on_sprite, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
+        if (line_x_on_sprite + 1 < width) {
+            sprGraph.drawFastVLine(line_x_on_sprite + 1, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
         }
     }
+
+    // Sprite kirakása a képernyőre
+    sprGraph.pushSprite(posX, posY);
 }
 
 /**

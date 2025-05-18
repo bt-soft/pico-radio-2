@@ -28,7 +28,7 @@ constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak 
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
 constexpr int WF_GRADIENT = 100;                    // Vízesés színátmenetének erőssége
-constexpr float ENVELOPE_INPUT_GAIN = 0.1f;         // Erősítési faktor a burkológörbe bemenetéhez (tovább csökkentett érték)
+constexpr float ENVELOPE_INPUT_GAIN = 0.1f;         // Erősítési faktor a burkológörbe bemenetéhez (jelentősen csökkentve)
 constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burkológörbéhez
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
 constexpr float OSCI_SENSITIVITY_FACTOR = 3.0f;     // Oszcilloszkóp érzékenységi faktora
@@ -85,7 +85,7 @@ class MiniAudioFft {
      * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
      */
     MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configModeField);
-    ~MiniAudioFft() = default;  // Alapértelmezett destruktor
+    ~MiniAudioFft();
 
     void setInitialMode(DisplayMode mode);  // Kezdeti mód beállítása
     /**
@@ -125,8 +125,12 @@ class MiniAudioFft {
     int Rpeak[MiniAudioFftConstants::LOW_RES_BANDS + 1];         // Csúcsértékek az alacsony felbontású spektrumhoz
     std::vector<std::vector<int>> wabuf;                         // Vízeséshez és burkológörbéhez, méretezése a konstruktorban történik
     int osciSamples[MiniAudioFftConstants::MAX_INTERNAL_WIDTH];  // Oszcilloszkóp minták
-    int highResOffset;                                           // Magas felbontású spektrum eltolásához (FFT.ino 'offset')
-    float envelope_prev_smoothed_max_val;                        // Előző simított maximális amplitúdó az Envelope módhoz
+
+    TFT_eSprite sprGraph;  // Sprite a grafikonokhoz (Waterfall, TuningAid)
+    bool spriteCreated;    // Jelzi, hogy a sprGraph létre van-e hozva
+
+    int highResOffset;                     // Magas felbontású spektrum eltolásához (FFT.ino 'offset')
+    float envelope_prev_smoothed_max_val;  // Előző simított maximális amplitúdó az Envelope módhoz
 
     // Belső segédfüggvények
     /**
@@ -185,6 +189,7 @@ class MiniAudioFft {
      * @return Az effektív magasság pixelekben.
      */
     int getEffectiveHeight() const;
+    void manageSpriteForMode(DisplayMode modeToPrepareFor);
 
     void drawMuted();
 };
