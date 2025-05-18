@@ -34,6 +34,8 @@ class SetupDisplay : public DisplayBase, public IScrollableListDataSource {
     static const int MAX_SETTINGS = 9;  // Régi FFT opciók törölve, 2 új összevont
     SetupList::SettingItem settingItems[MAX_SETTINGS];
     ScrollableListComponent scrollListComponent;
+    bool nestedDialogOpened = false;  // Beágyazott dialógus nyitva van-e?
+    DialogBase* pendingCloseDialog = nullptr; // Az előző dialógus, amit be kell zárni beágyazott nyitáskor
 
    protected:
     /**

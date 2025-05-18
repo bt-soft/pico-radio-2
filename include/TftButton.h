@@ -260,8 +260,9 @@ class TftButton {
     bool handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         bool eventGenerated = false;  // Jelzi, ha eseményt kell küldeni
 
-        // Tiltott vagy Aktív gomb nem reagál
-        if (state == ButtonState::Disabled || state == ButtonState::CurrentActive) {
+        // Tiltott gomb nem reagál.
+        // A CurrentActive állapotú Toggleable gomb sem reagál (de a Pushable igen).
+        if (state == ButtonState::Disabled || (state == ButtonState::CurrentActive && type == ButtonType::Toggleable)) {
             buttonPressed = false;  // Biztos, ami biztos
             pressStartTime = 0;
             return false;

@@ -26,9 +26,9 @@ constexpr uint16_t TITLE_COLOR = TFT_YELLOW;
 SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref)
     : DisplayBase(tft_ref, si4735_ref, band_ref),
       scrollListComponent(tft_ref, SetupListConstants::LIST_AREA_X_START, SetupListConstants::LIST_START_Y, tft_ref.width() - (SetupListConstants::LIST_AREA_X_START * 2),
-                          // A lista magassága: képernyő magassága - lista Y kezdete - alsó gombok magassága - margók
                           tft_ref.height() - SetupListConstants::LIST_START_Y - (SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2 + 5),
-                          this) {  // dataSource ez a SetupDisplay példány
+                          this),   // dataSource ez a SetupDisplay példány
+      nestedDialogOpened(false) {  // Új jelzőbit inicializálása
     using namespace SetupList;
 
     // Beállítási lista elemeinek definiálása
@@ -281,16 +281,22 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
                 currentActiveFFTLabel = options[2];  // "Set Manual..."
             }
             DisplayBase::pDialog = new MultiButtonDialog(
-                this, DisplayBase::tft, 280, 150, F(dialogTitle), options, 3,
+                this, DisplayBase::tft, 280, 80, F(dialogTitle), options, 3,
                 [this, targetConfigField, itemIndex](TftButton::ButtonTouchEvent ev) {  // Lambda callback
+                    // A MultiButtonDialog gombjainak eseményei
                     if (STREQ(ev.label, "Disabled")) {
                         *targetConfigField = -1.0f;
+
                     } else if (STREQ(ev.label, "Auto G")) {
                         *targetConfigField = 0.0f;
+
                     } else if (STREQ(ev.label, "Manu G")) {
+
                         // Új dialógus a manuális értékhez
                         float currentManualGain = (*targetConfigField > 0.0f) ? *targetConfigField : 1.0f;  // Alapértelmezett, ha nem volt manuális
+                        this->pendingCloseDialog = DisplayBase::pDialog; // Elmentjük a MultiButtonDialog-ot törlésre
                         DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Set Manual FFT Gain"), F("Factor (0.1-10.0):"),
+                                                                     // A pDialog-ot felülírjuk, a MultiButtonDialog NEM záródik be azonnal a return miatt
                                                                      &currentManualGain,                                             // float*
                                                                      0.1f,                                                           // min
                                                                      10.0f,                                                          // max
@@ -300,7 +306,8 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
                                                                          // A lista frissítése a ValueChangeDialog bezárása után történik
                                                                          // a processDialogButtonResponse-ban, ami meghívja a drawScreen()-t.
                                                                      });
-                        return;  // Ne zárja be a MultiButtonDialog-ot még, a ValueChangeDialog nyílik
+                        this->nestedDialogOpened = true;  // Jelezzük, hogy beágyazott dialógus nyílt
+                        return;                           // Ne zárja be a MultiButtonDialog-ot még, a ValueChangeDialog nyílik
                     }
                     // A lista frissítése a MultiButtonDialog bezárása után történik
                     // a processDialogButtonResponse-ban, ami meghívja a drawScreen()-t.
@@ -327,6 +334,19 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
  * Dialógus gomb eseményének feldolgozása
  */
 void SetupDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent &event) {
+    // Ha egy beágyazott dialógus nyílt meg (pl. a ValueChangeDialog a MultiButtonDialog-ból),
+    // akkor az eredeti MultiButtonDialog válaszát nem szabad úgy feldolgozni,
+    // hogy az bezárja az újonnan megnyitott ValueChangeDialog-ot.
+    if (nestedDialogOpened) {
+        nestedDialogOpened = false;  // Jelzőbit visszaállítása
+        if (pendingCloseDialog) {
+            delete pendingCloseDialog;
+            pendingCloseDialog = nullptr;
+        }
+        // Nem hívjuk meg a DisplayBase::processDialogButtonResponse-t,
+        // hogy ne záródjon be a pDialog (ami most a ValueChangeDialog).
+        return;
+    }
 
     // Csak ha van dialóg
     if (pDialog) {
