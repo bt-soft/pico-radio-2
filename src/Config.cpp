@@ -55,4 +55,8 @@ const Config_t DEFAULT_CONFIG = {
     // MiniAudioFft láthatósága (kezdetben bekapcsolva)
     .showMiniAudioFftAm = true,
     .showMiniAudioFftFm = true,
+
+    // MiniAudioFft erősítés
+    .miniAudioFftGainMode = static_cast<uint8_t>(MiniAudioFftConstants::FftGainMode::Auto),  // Default to Auto
+    .miniAudioFftManualGain = 1.0f,
 };

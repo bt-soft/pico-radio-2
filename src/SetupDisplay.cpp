@@ -39,8 +39,10 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref
     settingItems[4] = {"Beeper", ItemAction::BEEPER_ENABLED};                         // Beeper engedélyezése (4)
     settingItems[5] = {"Mini FFT (AM Screen)", ItemAction::TOGGLE_MINI_FFT_AM};       // AM módban a mini FFT
     settingItems[6] = {"Mini FFT (FM Screen)", ItemAction::TOGGLE_MINI_FFT_FM};       // FM módban a mini FFT
-    settingItems[7] = {"Info", ItemAction::INFO};                                     // Információ
-    settingItems[8] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása (5)
+    settingItems[7] = {"FFT Gain Mode", ItemAction::FFT_GAIN_MODE};                   // ÚJ
+    settingItems[8] = {"FFT Manual Gain", ItemAction::FFT_MANUAL_GAIN};               // ÚJ
+    settingItems[9] = {"Info", ItemAction::INFO};                                     // Információ
+    settingItems[10] = {"Factory Reset", ItemAction::FACTORY_RESET};                  // Gyári beállítások visszaállítása (5)
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -150,7 +152,18 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
         case SetupList::ItemAction::TOGGLE_MINI_FFT_FM:
             valueStr = config.data.showMiniAudioFftFm ? "ON" : "OFF";
             break;
+        case SetupList::ItemAction::FFT_GAIN_MODE:  // ÚJ
+            valueStr = (static_cast<MiniAudioFftConstants::FftGainMode>(config.data.miniAudioFftGainMode) == MiniAudioFftConstants::FftGainMode::Auto) ? "Auto" : "Manual";
+            break;
+        case SetupList::ItemAction::FFT_MANUAL_GAIN:  // ÚJ
+            if (static_cast<MiniAudioFftConstants::FftGainMode>(config.data.miniAudioFftGainMode) == MiniAudioFftConstants::FftGainMode::Manual) {
+                valueStr = String(config.data.miniAudioFftManualGain, 1) + "x";
+            } else {
+                valueStr = "N/A";  // Vagy üresen hagyjuk, ha Auto módban van
+            }
+            break;
         case SetupList::ItemAction::INFO:
+        case SetupList::ItemAction::FACTORY_RESET:
         case SetupList::ItemAction::NONE:
         default:
             hasValue = false;  // Az Info-nak és a None-nak nincs megjelenítendő értéke
@@ -264,6 +277,30 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action) {
                 new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Mini FFT (FM)"), F("Show:"), &config.data.showMiniAudioFftFm, false, true, true, [this](bool newValue) {
                     // Nincs szükség további műveletre.
                 });
+            break;
+
+        case SetupList::ItemAction::FFT_GAIN_MODE: {
+            const char *options[] = {"Manual", "Auto"};
+            const char *currentValue =
+                (static_cast<MiniAudioFftConstants::FftGainMode>(config.data.miniAudioFftGainMode) == MiniAudioFftConstants::FftGainMode::Auto) ? "Auto" : "Manual";
+            DisplayBase::pDialog = new MultiButtonDialog(
+                this, DisplayBase::tft, 250, 120, F("FFT Gain Mode"), options, 2,
+                [this](TftButton::ButtonTouchEvent ev) {
+                    if (STREQ(ev.label, "Auto")) {
+                        config.data.miniAudioFftGainMode = static_cast<uint8_t>(MiniAudioFftConstants::FftGainMode::Auto);
+                    } else {
+                        config.data.miniAudioFftGainMode = static_cast<uint8_t>(MiniAudioFftConstants::FftGainMode::Manual);
+                    }
+                },
+                currentValue);
+        } break;
+
+        case SetupList::ItemAction::FFT_MANUAL_GAIN:
+            // Ez a dialógus csak akkor nyílik meg, ha a mód Manuális (az activateListItem-ben ellenőrizve)
+            DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("FFT Manual Gain"), F("Factor (0.1-10.0):"), &config.data.miniAudioFftManualGain, 0.1f,
+                                                         10.0f, 0.1f, [this](float newValue) {
+                                                             // Nincs szükség további műveletre.
+                                                         });
             break;
 
         case SetupList::ItemAction::FACTORY_RESET:

@@ -1,7 +1,8 @@
 #include "MiniAudioFft.h"
 
-#include <cmath>  // std::round, std::max, std::min
+#include <cmath>  // std::round, std::max, std::min, std::abs
 
+#include "Config.h"  // Szükséges a config.data eléréséhez
 #include "rtVars.h"  // rtv::muteStat eléréséhez
 
 // Konstans a módkijelző láthatósági idejéhez (ms)
@@ -271,8 +272,8 @@ void MiniAudioFft::drawModeIndicator() {
 /**
  * @brief Elvégzi az FFT mintavételezést és a szükséges számításokat.
  *
- * Beolvassa az analóg audio bemenetet, alkalmazza az ablakozást,
- * elvégzi az FFT-t, majd a komplex eredményből magnitúdókat számol.
+ * Beolvassa az analóg audio bemenetet, alkalmazza az erősítést (manuális vagy auto),
+ * alkalmazza az ablakozást, elvégzi az FFT-t, majd a komplex eredményből magnitúdókat számol.
  * Opcionálisan mintákat gyűjt az oszcilloszkóp módhoz.
  * Az alacsony frekvenciás komponenseket csillapítja a jobb vizuális megjelenítés érdekében.
  *
@@ -281,7 +282,9 @@ void MiniAudioFft::drawModeIndicator() {
 void MiniAudioFft::performFFT(bool collectOsciSamples) {
     using namespace MiniAudioFftConstants;
     int osci_sample_idx = 0;
+    double max_abs_sample_for_auto_gain = 0.0;
 
+    // 1. Mintavételezés és középre igazítás, opcionális oszcilloszkóp mintagyűjtés
     for (int i = 0; i < FFT_SAMPLES; i++) {
         uint32_t sum = 0;
         for (int j = 0; j < 4; j++) {
@@ -299,8 +302,31 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
         }
         vReal[i] = averaged_sample - 2048.0;  // Középre igazítás (feltételezve, hogy 2048 a nulla szint)
         vImag[i] = 0.0;
+
+        if (static_cast<FftGainMode>(config.data.miniAudioFftGainMode) == FftGainMode::Auto) {
+            if (std::abs(vReal[i]) > max_abs_sample_for_auto_gain) {
+                max_abs_sample_for_auto_gain = std::abs(vReal[i]);
+            }
+        }
     }
 
+    // 2. Erősítés alkalmazása (manuális vagy automatikus)
+    if (static_cast<FftGainMode>(config.data.miniAudioFftGainMode) == FftGainMode::Manual) {
+        for (int i = 0; i < FFT_SAMPLES; i++) {
+            vReal[i] *= config.data.miniAudioFftManualGain;
+        }
+    } else {                                         // Auto Gain (normalizálás)
+        if (max_abs_sample_for_auto_gain > 0.001) {  // Elkerüljük a nullával való osztást és a túl kicsi jelek extrém erősítését
+            float auto_gain_factor = FFT_AUTO_GAIN_TARGET_PEAK / max_abs_sample_for_auto_gain;
+            auto_gain_factor = constrain(auto_gain_factor, FFT_AUTO_GAIN_MIN_FACTOR, FFT_AUTO_GAIN_MAX_FACTOR);
+            for (int i = 0; i < FFT_SAMPLES; i++) {
+                vReal[i] *= auto_gain_factor;
+            }
+        }
+        // Ha max_abs_sample_for_auto_gain nagyon kicsi vagy nulla, nem alkalmazunk erősítést
+    }
+
+    // 3. Ablakozás, FFT számítás, magnitúdó
     FFT.windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
     FFT.compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
     FFT.complexToMagnitude(vReal, vImag, FFT_SAMPLES);  // Az eredmény a vReal-be kerül
@@ -310,15 +336,12 @@ void MiniAudioFft::performFFT(bool collectOsciSamples) {
         RvReal[i] = vReal[i];
     }
 
-    // Alacsony frekvenciák csillapítása az RvReal tömbben
+    // 4. Alacsony frekvenciák csillapítása az RvReal tömbben
     const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
     const int attenuation_cutoff_bin = static_cast<int>(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz);
 
     for (int i = 0; i < (FFT_SAMPLES / 2); ++i) {  // Csak a releváns (nem tükrözött) frekvencia bin-eken iterálunk
         if (i < attenuation_cutoff_bin) {
-            // Csillapítjuk azokat a bin-eket, amelyek frekvenciája a küszöb alatt van.
-            // A 0. (DC) és 1. bin-t is érintheti, ha a cutoff_bin elég magas.
-            // A rajzoló függvények általában a 2. bin-től kezdenek.
             RvReal[i] /= LOW_FREQ_ATTENUATION_FACTOR;
         }
     }
@@ -423,10 +446,8 @@ void MiniAudioFft::loop() {
     static unsigned long lastInternalTimingPrint = 0;
     static unsigned long max_fft_loop_duration = 0;
     static unsigned long max_draw_loop_duration = 0;
-
     if (fft_duration > max_fft_loop_duration) max_fft_loop_duration = fft_duration;
     if (draw_duration > max_draw_loop_duration) max_draw_loop_duration = draw_duration;
-
     if (millis() - lastInternalTimingPrint >= 1000) {
         DEBUG("MiniAudioFft Internal (max 1s) - FFT: %lu us, Draw (%s): %lu us\n", max_fft_loop_duration, getModeNameString(currentMode), max_draw_loop_duration);
         lastInternalTimingPrint = millis();

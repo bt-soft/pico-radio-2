@@ -18,19 +18,19 @@ class DebugDataInspector {
      * @brief Kiírja a Config struktúra tartalmát a soros portra.
      * @param config A Config objektum.
      */
-    static void printConfigData(const Config_t& configData); // Csak a deklaráció marad
+    static void printConfigData(const Config_t& configData);  // Csak a deklaráció marad
 
     /**
      * @brief Kiírja az FM állomáslista tartalmát a soros portra.
      * @param fmStore Az FM állomáslista objektum.
      */
-    static void printFmStationData(const FmStationList_t& fmData); // Csak a deklaráció marad
+    static void printFmStationData(const FmStationList_t& fmData);  // Csak a deklaráció marad
 
     /**
      * @brief Kiírja az AM állomáslista tartalmát a soros portra.
      * @param amStore Az AM állomáslista objektum.
      */
-    static void printAmStationData(const AmStationList_t& amData); // Csak a deklaráció marad
+    static void printAmStationData(const AmStationList_t& amData);  // Csak a deklaráció marad
 };
 
 #endif  // __DEBUGDATAINSPECTOR_H

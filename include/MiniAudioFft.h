@@ -59,6 +59,12 @@ const uint16_t WATERFALL_COLORS[16] = {
 };
 constexpr int MAX_WATERFALL_COLOR_INPUT_VALUE = 20000;  // Maximális bemeneti érték a vízesés színkonverziójához
 
+// Erősítési módok
+enum class FftGainMode : uint8_t { Manual = 0, Auto = 1 };
+constexpr float FFT_AUTO_GAIN_TARGET_PEAK = 1500.0f;  // Cél csúcsérték az Auto Gain módhoz (a +/-2047 tartományból)
+constexpr float FFT_AUTO_GAIN_MIN_FACTOR = 0.1f;      // Minimális erősítési faktor Auto módban
+constexpr float FFT_AUTO_GAIN_MAX_FACTOR = 10.0f;     // Maximális erősítési faktor Auto módban
+
 }  // namespace MiniAudioFftConstants
 
 class MiniAudioFft {

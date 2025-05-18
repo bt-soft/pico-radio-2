@@ -66,6 +66,9 @@ void DebugDataInspector::printConfigData(const Config_t& configData) {
     DEBUG("  miniAudioFftModeFm: %u\n", configData.miniAudioFftModeFm);
     DEBUG("  showMiniAudioFftAm: %s\n", configData.showMiniAudioFftAm ? "true" : "false");
     DEBUG("  showMiniAudioFftFm: %s\n", configData.showMiniAudioFftFm ? "true" : "false");
+    DEBUG("  miniAudioFftGainMode: %u (%s)\n", configData.miniAudioFftGainMode,
+          configData.miniAudioFftGainMode == static_cast<uint8_t>(MiniAudioFftConstants::FftGainMode::Auto) ? "Auto" : "Manual");
+    DEBUG("  miniAudioFftManualGain: %.2f\n", configData.miniAudioFftManualGain);
     DEBUG("====================\n");
 #endif
 }
