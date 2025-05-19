@@ -29,8 +29,9 @@ constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak 
 
 // Konstansok a LowRes spektrumhoz
 constexpr float LOW_RES_SPECTRUM_MIN_FREQ_HZ = 300.0f;   // Alacsony felbontású spektrum kezdő frekvenciája (Hz)
-constexpr float LOW_RES_SPECTRUM_MAX_FREQ_HZ = 6000.0f;  // Alacsony felbontású spektrum végfrekvenciája (Hz)
-constexpr float MAX_DISPLAY_AUDIO_FREQ_HZ = 6000.0f;     // Általános maximális megjelenítendő audio frekvencia más módokhoz
+// constexpr float LOW_RES_SPECTRUM_MAX_FREQ_HZ = 6000.0f; // Ezt most már a MAX_DISPLAY_AUDIO_FREQ_..._HZ konstansok határozzák meg
+constexpr float MAX_DISPLAY_AUDIO_FREQ_AM_HZ = 6000.0f; // Maximális megjelenítendő audio frekvencia AM módban
+constexpr float MAX_DISPLAY_AUDIO_FREQ_FM_HZ = 15000.0f; // Maximális megjelenítendő audio frekvencia FM módban
 
 constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
 
@@ -99,9 +100,10 @@ class MiniAudioFft {
      * @param y A komponens bal felső sarkának Y koordinátája.
      * @param w A komponens szélessége.
      * @param h A komponens magassága.
+     * @param configuredMaxDisplayAudioFreq Az adott képernyőmódhoz (AM/FM) konfigurált maximális megjelenítendő audio frekvencia.
      * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
      * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.     */
-    MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef);
+    MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef);
     ~MiniAudioFft();
 
     void setInitialMode(DisplayMode mode);  // Kezdeti mód beállítása
@@ -132,6 +134,7 @@ class MiniAudioFft {
     bool isIndicatorCurrentlyVisible;  // A módkijelző aktuálisan látható-e
     uint32_t lastTouchProcessTime;     // Utolsó érintésfeldolgozás ideje a debounce-hoz
     uint8_t& configModeFieldRef;       // Referencia a Config mezőre a mód mentéséhez
+    float currentConfiguredMaxDisplayAudioFreqHz; // Az AM/FM módnak megfelelő maximális frekvencia
     float& activeFftGainConfigRef;     // Referencia az aktív FFT erősítés konfigurációra (AM vagy FM)
 
     ArduinoFFT<double> FFT;                             // FFT objektum

@@ -162,8 +162,14 @@ void FmDisplay::drawScreen() {
     if (config.data.miniAudioFftConfigFm >= 0.0f) {  // Csak akkor példányosítjuk, ha engedélyezve van
         using namespace DisplayConstants;
 
-        // Átadjuk a config.data.miniAudioFftModeFm és config.data.miniAudioFftConfigFm referenciáját
-        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeFm, config.data.miniAudioFftConfigFm);
+        pMiniAudioFft = new MiniAudioFft(tft,
+                                         mini_fft_x,
+                                         mini_fft_y,
+                                         mini_fft_w,
+                                         mini_fft_h,
+                                         MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_FM_HZ, // FM módhoz 15kHz
+                                         config.data.miniAudioFftModeFm,
+                                         config.data.miniAudioFftConfigFm);
         // Beállítjuk a kezdeti módot a configból
         pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeFm));
         pMiniAudioFft->forceRedraw();

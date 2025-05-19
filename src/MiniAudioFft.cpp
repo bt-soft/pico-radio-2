@@ -19,10 +19,11 @@ constexpr uint32_t MODE_INDICATOR_TIMEOUT_MS = 20000;  // 20 másodperc
  * @param y A komponens bal felső sarkának Y koordinátája a képernyőn.
  * @param w A komponens szélessége pixelekben.
  * @param h A komponens magassága pixelekben.
+ * @param configuredMaxDisplayAudioFreq Az adott képernyőmódhoz (AM/FM) konfigurált maximális megjelenítendő audio frekvencia.
  * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
  * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.
  */
-MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef)
+MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef)
     : tft(tft_ref),
       posX(x),
       posY(y),
@@ -33,6 +34,7 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, uint8_
       modeIndicatorShowUntil(0),                      // Kezdetben nem látható (setInitialMode állítja)
       isIndicatorCurrentlyVisible(true),              // Kezdetben látható (setInitialMode állítja)
       lastTouchProcessTime(0),                        // Debounce időzítő nullázása
+      currentConfiguredMaxDisplayAudioFreqHz(configuredMaxDisplayAudioFreq), // Maximális frekvencia elmentése
       configModeFieldRef(configDisplayModeFieldRef),  // Referencia elmentése a kijelzési módhoz
       activeFftGainConfigRef(fftGainConfigRef),       // Referencia elmentése az erősítés konfigurációhoz
       FFT(),                                          // FFT objektum inicializálása
@@ -661,7 +663,7 @@ void MiniAudioFft::drawSpectrumLowRes() {
     double band_magnitudes[LOW_RES_BANDS] = {0.0}; // Inicializálás nullával
     const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
     const int min_bin_idx_low_res = std::max(2, static_cast<int>(std::round(LOW_RES_SPECTRUM_MIN_FREQ_HZ / binWidthHz)));
-    const int max_bin_idx_low_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(LOW_RES_SPECTRUM_MAX_FREQ_HZ / binWidthHz)));
+    const int max_bin_idx_low_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz))); // FM/AM specifikus határ használata
     const int num_bins_in_low_res_range = std::max(1, max_bin_idx_low_res - min_bin_idx_low_res + 1);
 
     for (int i = min_bin_idx_low_res; i <= max_bin_idx_low_res; i++) {
@@ -752,7 +754,7 @@ void MiniAudioFft::drawSpectrumHighRes() {
 
     const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
     const int min_bin_idx_high_res = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
-    const int max_bin_idx_high_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(MAX_DISPLAY_AUDIO_FREQ_HZ / binWidthHz)));
+    const int max_bin_idx_high_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz)));
     const int num_bins_in_high_res_range = std::max(1, max_bin_idx_high_res - min_bin_idx_high_res + 1);
 
     int actual_high_res_bins_to_display = width;  // Minden pixel egy FFT bin-t (vagy interpolált értéket) képvisel
@@ -870,7 +872,7 @@ void MiniAudioFft::drawWaterfall() {
 
     const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
     const int min_bin_for_wf_env = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
-    const int max_bin_for_wf_env = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(MAX_DISPLAY_AUDIO_FREQ_HZ / binWidthHz)));
+    const int max_bin_for_wf_env = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz)));
     const int num_bins_in_wf_env_range = std::max(1, max_bin_for_wf_env - min_bin_for_wf_env + 1);
 
     // 2. Új adatok betöltése a `wabuf` jobb szélére (a `wabuf` továbbra is `height` magas)
@@ -947,7 +949,7 @@ void MiniAudioFft::drawEnvelope() {
 
     const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
     const int min_bin_for_wf_env = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
-    const int max_bin_for_wf_env = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(MAX_DISPLAY_AUDIO_FREQ_HZ / binWidthHz)));
+    const int max_bin_for_wf_env = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz)));
     const int num_bins_in_wf_env_range = std::max(1, max_bin_for_wf_env - min_bin_for_wf_env + 1);
 
     // 2. Új adatok betöltése

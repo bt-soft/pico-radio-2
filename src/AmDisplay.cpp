@@ -89,8 +89,14 @@ void AmDisplay::drawScreen() {
     if (config.data.miniAudioFftConfigAm >= 0.0f) {  // Csak akkor példányosítjuk, ha engedélyezve van
         using namespace DisplayConstants;
 
-        // Átadjuk a config.data.miniAudioFftModeAm és config.data.miniAudioFftConfigAm referenciáját
-        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, config.data.miniAudioFftModeAm, config.data.miniAudioFftConfigAm);
+        pMiniAudioFft = new MiniAudioFft(tft,
+                                         mini_fft_x,
+                                         mini_fft_y,
+                                         mini_fft_w,
+                                         mini_fft_h,
+                                         MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ, // AM módhoz 6kHz
+                                         config.data.miniAudioFftModeAm,
+                                         config.data.miniAudioFftConfigAm);
         // Beállítjuk a kezdeti módot a configból
         pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
         pMiniAudioFft->forceRedraw();
