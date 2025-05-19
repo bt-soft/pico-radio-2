@@ -28,14 +28,14 @@ constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak 
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
 // Konstansok a LowRes spektrumhoz
-constexpr float LOW_RES_SPECTRUM_MIN_FREQ_HZ = 300.0f;  // Alacsony felbontású spektrum kezdő frekvenciája (Hz)
-constexpr float LOW_RES_SPECTRUM_MAX_FREQ_HZ = 6000.0f; // Alacsony felbontású spektrum végfrekvenciája (Hz)
-constexpr float MAX_DISPLAY_AUDIO_FREQ_HZ = 6000.0f;    // Általános maximális megjelenítendő audio frekvencia más módokhoz
+constexpr float LOW_RES_SPECTRUM_MIN_FREQ_HZ = 300.0f;   // Alacsony felbontású spektrum kezdő frekvenciája (Hz)
+constexpr float LOW_RES_SPECTRUM_MAX_FREQ_HZ = 6000.0f;  // Alacsony felbontású spektrum végfrekvenciája (Hz)
+constexpr float MAX_DISPLAY_AUDIO_FREQ_HZ = 6000.0f;     // Általános maximális megjelenítendő audio frekvencia más módokhoz
 
 constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
 
 // Evenlope
-constexpr float ENVELOPE_INPUT_GAIN = 0.01f;        // Erősítési faktor a burkológörbe bemenetéhez
+constexpr float ENVELOPE_INPUT_GAIN = 0.1f;         // Erősítési faktor a burkológörbe bemenetéhez
 constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burkológörbéhez
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
 
