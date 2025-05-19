@@ -16,7 +16,7 @@ namespace MiniAudioFftConstants {
 constexpr uint16_t FFT_SAMPLES = 256;                        // Minták száma az FFT-hez (2 hatványának kell lennie)
 constexpr double SAMPLING_FREQUENCY = 10000;                 // Mintavételezési frekvencia Hz-ben (max 5kHz audio)
 constexpr float AMPLITUDE_SCALE = 40.0f;                     // Skálázási faktor az FFT eredményekhez (tovább csökkentve az érzékenység növeléséhez)
-constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 100.0f;  // Ez alatti frekvenciákat csillapítjuk
+constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 500.0f;  // Ez alatti frekvenciákat csillapítjuk
 constexpr float LOW_FREQ_ATTENUATION_FACTOR = 10.0f;         // Ezzel a faktorral osztjuk az alacsony frekvenciák magnitúdóját
 
 // Belső tömbök maximális méretei, ha a komponens mérete nagyobb lenne.
@@ -41,9 +41,10 @@ constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;  // Oszcilloszkóp mintavételi
 // Konstansok a hangolási segéd módhoz
 constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;  // Célvonal színe
 constexpr float TUNING_AID_TARGET_FREQ_HZ = 700.0f;           // Célfrekvencia CW-hez (Hz)
-constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 200.0f;      // Megjelenített tartomány minimuma (Hz) - Kérésnek megfelelően
-constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 1200.0f;     // Megjelenített tartomány maximuma (Hz) - 1kHz sávszélesség, 700Hz középen
-constexpr float TUNING_AID_INPUT_SCALE = 0.08f;               // Erősítési faktor a hangolási segéd bemenetéhez
+constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 300.0f;      // Megjelenített tartomány minimuma (Hz)
+constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 2500.0f;     // Megjelenített tartomány maximuma (Hz) - RTTY jelekhez is
+constexpr float TUNING_AID_INPUT_SCALE = 0.3f;                // Erősítési faktor a hangolási segéd bemenetéhez (növelve a jobb láthatóságért)
+constexpr int TUNING_AID_INTERNAL_WIDTH = 50;                 // Belső szélesség a hangolási segédhez (a komponens szélessége)
 
 // Vízesés
 constexpr int WF_GRADIENT = 100;  // Vízesés színátmenetének erőssége
@@ -62,7 +63,7 @@ const uint16_t WATERFALL_COLORS[16] = {
     0xFDE0,                         // Világos sárga
     0xFFE0,                         // Sárga
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF  // Fehér a csúcsokhoz
-};
+};  // A színek változatlanok
 constexpr int MAX_WATERFALL_COLOR_INPUT_VALUE = 20000;  // Maximális bemeneti érték a vízesés színkonverziójához
 
 // Konstansok az Auto Gain módhoz

@@ -152,6 +152,12 @@ void FmDisplay::drawScreen() {
     // Gombok kirajzolása
     DisplayBase::drawScreenButtons();
 
+    // MiniAudioFft korábbi példányának törlése, ha létezik
+    if (pMiniAudioFft != nullptr) {
+        delete pMiniAudioFft;
+        pMiniAudioFft = nullptr;
+    }
+
     // MiniAudioFft komponens elhelyezése
     if (config.data.miniAudioFftConfigFm >= 0.0f) {  // Csak akkor példányosítjuk, ha engedélyezve van
         using namespace DisplayConstants;
@@ -352,7 +358,7 @@ void FmDisplay::displayLoop() {
     }
 
     // MiniAudioFft ciklus futtatása
-    if (pMiniAudioFft) {  // Ellenőrizzük, hogy létezik-e
+    if (pMiniAudioFft != nullptr) {  // Ellenőrizzük, hogy létezik-e és nem nullptr
         pMiniAudioFft->loop();
     }
 }
