@@ -413,7 +413,7 @@ void MiniAudioFft::loop() {
         // A grafikon területét a forceRedraw() már törölte, amikor az isIndicatorCurrentlyVisible false-ra váltott.
         // Vagy egy előző mód rajzolása törölte, mielőtt Off-ra váltottunk.
         drawOffStatusInCenter();
-        return; // Nincs más teendő Off módban, ha a jelző nem látszik.
+        return;  // Nincs más teendő Off módban, ha a jelző nem látszik.
     }
     // --- ÚJ VÉGE ---
     if (activeFftGainConfigRef == -1.0f) {  // FFT Disabled
@@ -596,21 +596,22 @@ void MiniAudioFft::forceRedraw() {
  */
 void MiniAudioFft::drawOffStatusInCenter() {
     int graphH = getGraphHeight();
-    if (width < 10 || graphH < 10) return; // Nincs elég hely
+    if (width < 10 || graphH < 10) return;  // Nincs elég hely
 
     // A grafikon területének háttere már fekete kell, hogy legyen
     // a korábbi clearArea() vagy egy másik mód rajzolása miatt.
     // Itt csak a szöveget rajzoljuk ki.
 
-    tft.setTextDatum(MC_DATUM); // Middle-Center
-    tft.setTextColor(TFT_DARKGREY); // Sötétszürke szín
-    tft.setFreeFont(); // Alapértelmezett vagy választott font
-    tft.setTextSize(2); // Megfelelő méret
+    tft.setTextDatum(MC_DATUM);      // Middle-Center
+    tft.setTextColor(TFT_DARKGREY);  // Sötétszürke szín
+    tft.setFreeFont();               // Alapértelmezett vagy választott font
+    tft.setTextSize(2);              // Megfelelő méret
 
     int centerX = posX + width / 2;
     int centerY = posY + graphH / 2;
     tft.drawString("Off", centerX, centerY);
 }
+
 // --- Rajzoló metódusok (a MiniAudioDisplay.cpp alapján adaptálva) ---
 // A grafikonrajzoló függvények (drawSpectrumLowRes, stb.) változatlanok maradnak,
 // mivel a `getGraphHeight()` által visszaadott magasságot használják,
@@ -778,18 +779,9 @@ void MiniAudioFft::drawOscilloscope() {
 
     int actual_osci_samples_to_draw = width;
     // --- Érzékenységi faktor meghatározása ---
+    // Az oszcilloszkóp mindig a manuális érzékenységi faktort használja,
+    // mivel az osciSamples nyers ADC értékeket tartalmaz, függetlenül az FFT erősítési módjától.
     float current_sensitivity_factor = OSCI_SENSITIVITY_FACTOR;
-    // Az activeFftGainConfigRef egy referencia a config.data.miniAudioFftConfigAm vagy ...Fm mezőre.
-    // Ha ez 0.0f, akkor az FFT Auto Gain módja aktív.
-    if (activeFftGainConfigRef == 0.0f) {
-        // Ha az FFT Auto Gain aktív, az oszcilloszkóp érzékenységét úgy állítjuk,
-        // hogy egy FFT_AUTO_GAIN_TARGET_PEAK amplitúdójú AC jel kb. a grafikon feléig térjen ki.
-        if (FFT_AUTO_GAIN_TARGET_PEAK > 0.001f) { // Osztás nullával és túl kicsi értékkel való elkerülése
-            current_sensitivity_factor = 2048.0f / FFT_AUTO_GAIN_TARGET_PEAK;
-        } else {
-            current_sensitivity_factor = 1.0f; // Alapértelmezett/nagyon érzékeny, ha a target peak érvénytelen
-        }
-    }
     // --- Érzékenységi faktor vége ---
 
     // Grafikon területének törlése (csak a grafikon sávja)
@@ -799,7 +791,7 @@ void MiniAudioFft::drawOscilloscope() {
 
     for (int i = 0; i < actual_osci_samples_to_draw; i++) {
         int num_available_samples = sizeof(osciSamples) / sizeof(osciSamples[0]);
-        if (num_available_samples == 0) continue; // Ha nincs minta, ne csináljunk semmit
+        if (num_available_samples == 0) continue;  // Ha nincs minta, ne csináljunk semmit
 
         // Minták leképezése a rendelkezésre álló MAX_INTERNAL_WIDTH-ből a tényleges 'width'-re
         int sample_idx = (i * (num_available_samples - 1)) / std::max(1, (actual_osci_samples_to_draw - 1));
@@ -915,7 +907,7 @@ void MiniAudioFft::drawEnvelope() {
         return;
     }
 
-    sprGraph.fillSprite(TFT_BLACK); // Sprite törlése minden rajzolás előtt
+    sprGraph.fillSprite(TFT_BLACK);  // Sprite törlése minden rajzolás előtt
 
     // 1. Adatok eltolása balra
     for (int r = 0; r < height; ++r) {  // Teljes `this->height`
@@ -956,7 +948,7 @@ void MiniAudioFft::drawEnvelope() {
         float current_col_max_amplitude = static_cast<float>(max_val_in_col);
         // A tagváltozót használjuk a simításhoz az oszlopok között
         envelope_prev_smoothed_max_val = ENVELOPE_SMOOTH_FACTOR * envelope_prev_smoothed_max_val + (1.0f - ENVELOPE_SMOOTH_FACTOR) * current_col_max_amplitude;
-        
+
         // Az oszlop törlését a sprGraph.fillSprite(TFT_BLACK) már elvégezte.
         // Itt közvetlenül a sprite-ra rajzolunk.
 
@@ -988,7 +980,7 @@ void MiniAudioFft::drawEnvelope() {
             }
         }
     }
-    sprGraph.pushSprite(posX, posY); // Sprite kirakása a képernyőre
+    sprGraph.pushSprite(posX, posY);  // Sprite kirakása a képernyőre
 }
 
 /**
@@ -1030,7 +1022,6 @@ void MiniAudioFft::drawTuningAid() {
         fft_bin_index = constrain(fft_bin_index, min_fft_bin_for_tuning_local, max_fft_bin_for_tuning_local);
         fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(FFT_SAMPLES / 2 - 1));
 
-        constexpr float TUNING_AID_INPUT_SCALE = 0.35f;
         wabuf[0][c_col] = static_cast<int>(constrain(RvReal[fft_bin_index] * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
     }
 

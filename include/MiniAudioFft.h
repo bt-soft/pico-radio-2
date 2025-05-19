@@ -16,7 +16,7 @@ namespace MiniAudioFftConstants {
 constexpr uint16_t FFT_SAMPLES = 256;                        // Minták száma az FFT-hez (2 hatványának kell lennie)
 constexpr double SAMPLING_FREQUENCY = 10000;                 // Mintavételezési frekvencia Hz-ben (max 5kHz audio)
 constexpr float AMPLITUDE_SCALE = 40.0f;                     // Skálázási faktor az FFT eredményekhez (tovább csökkentve az érzékenység növeléséhez)
-constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 400.0f;  // Ez alatti frekvenciákat csillapítjuk
+constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 100.0f;  // Ez alatti frekvenciákat csillapítjuk
 constexpr float LOW_FREQ_ATTENUATION_FACTOR = 10.0f;         // Ezzel a faktorral osztjuk az alacsony frekvenciák magnitúdóját
 
 // Belső tömbök maximális méretei, ha a komponens mérete nagyobb lenne.
@@ -27,20 +27,26 @@ constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak 
 // A HIGH_RES_BINS_TO_DISPLAY és OSCI_SAMPLES_TO_DRAW a komponens aktuális szélességéből adódik.
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
-constexpr int WF_GRADIENT = 100;                    // Vízesés színátmenetének erőssége
-constexpr float ENVELOPE_INPUT_GAIN = 0.08f;        // Erősítési faktor a burkológörbe bemenetéhez (jelentősen csökkentve)
+constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
+
+// Evenlope
+constexpr float ENVELOPE_INPUT_GAIN = 0.01f;        // Erősítési faktor a burkológörbe bemenetéhez
 constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burkológörbéhez
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
-constexpr float OSCI_SENSITIVITY_FACTOR = 15.0f;    // Oszcilloszkóp érzékenységi faktora
-constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;    // Oszcilloszkóp mintavételi decimációs faktora
 
-constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
+// Oszcilloszkóp
+constexpr float OSCI_SENSITIVITY_FACTOR = 25.0f;  // Oszcilloszkóp érzékenységi faktora (növelni a nagyobb amplitúdóhoz)
+constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;  // Oszcilloszkóp mintavételi decimációs faktora
+
 // Konstansok a hangolási segéd módhoz
+constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;  // Célvonal színe
 constexpr float TUNING_AID_TARGET_FREQ_HZ = 700.0f;           // Célfrekvencia CW-hez (Hz)
 constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 200.0f;      // Megjelenített tartomány minimuma (Hz) - Kérésnek megfelelően
 constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 1200.0f;     // Megjelenített tartomány maximuma (Hz) - 1kHz sávszélesség, 700Hz középen
-constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;  // Célvonal színe
+constexpr float TUNING_AID_INPUT_SCALE = 0.15f;               // Erősítési faktor a hangolási segéd bemenetéhez
 
+// Vízesés
+constexpr int WF_GRADIENT = 100;  // Vízesés színátmenetének erőssége
 // Színek a vízeséshez
 const uint16_t WATERFALL_COLORS[16] = {
     0x0000,                         // TFT_BLACK (index 0)
