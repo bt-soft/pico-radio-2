@@ -14,9 +14,9 @@
 // Konstansok a MiniAudioFft komponenshez
 namespace MiniAudioFftConstants {
 constexpr uint16_t FFT_SAMPLES = 256;                        // Minták száma az FFT-hez (2 hatványának kell lennie)
-constexpr double SAMPLING_FREQUENCY = 10000;                 // Mintavételezési frekvencia Hz-ben (max 5kHz audio)
+constexpr double SAMPLING_FREQUENCY = 40000.0;               // Mintavételezési frekvencia Hz-ben (a tényleges mért sebesség alapján ~40kHz)
 constexpr float AMPLITUDE_SCALE = 40.0f;                     // Skálázási faktor az FFT eredményekhez (tovább csökkentve az érzékenység növeléséhez)
-constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 500.0f;  // Ez alatti frekvenciákat csillapítjuk
+constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 200.0f;  // Ez alatti frekvenciákat csillapítjuk
 constexpr float LOW_FREQ_ATTENUATION_FACTOR = 10.0f;         // Ezzel a faktorral osztjuk az alacsony frekvenciák magnitúdóját
 
 // Belső tömbök maximális méretei, ha a komponens mérete nagyobb lenne.
@@ -26,6 +26,11 @@ constexpr int MAX_INTERNAL_HEIGHT = 80;
 constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak száma
 // A HIGH_RES_BINS_TO_DISPLAY és OSCI_SAMPLES_TO_DRAW a komponens aktuális szélességéből adódik.
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
+
+// Konstansok a LowRes spektrumhoz
+constexpr float LOW_RES_SPECTRUM_MIN_FREQ_HZ = 300.0f;  // Alacsony felbontású spektrum kezdő frekvenciája (Hz)
+constexpr float LOW_RES_SPECTRUM_MAX_FREQ_HZ = 6000.0f; // Alacsony felbontású spektrum végfrekvenciája (Hz)
+constexpr float MAX_DISPLAY_AUDIO_FREQ_HZ = 6000.0f;    // Általános maximális megjelenítendő audio frekvencia más módokhoz
 
 constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
 
@@ -43,7 +48,7 @@ constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;  // Célvonal szín
 constexpr float TUNING_AID_TARGET_FREQ_HZ = 700.0f;           // Célfrekvencia CW-hez (Hz)
 constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 300.0f;      // Megjelenített tartomány minimuma (Hz)
 constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 2500.0f;     // Megjelenített tartomány maximuma (Hz) - RTTY jelekhez is
-constexpr float TUNING_AID_INPUT_SCALE = 0.3f;                // Erősítési faktor a hangolási segéd bemenetéhez (növelve a jobb láthatóságért)
+constexpr float TUNING_AID_INPUT_SCALE = 0.1f;                // Erősítési faktor a hangolási segéd bemenetéhez (csökkentve a "vonal" vékonyításához)
 constexpr int TUNING_AID_INTERNAL_WIDTH = 50;                 // Belső szélesség a hangolási segédhez (a komponens szélessége)
 
 // Vízesés
@@ -173,7 +178,7 @@ class MiniAudioFft {
     void drawEnvelope();
 
     // Segédfüggvények az alacsony felbontású spektrumhoz
-    uint8_t getBandVal(int fft_bin_index);
+    uint8_t getBandVal(int fft_bin_index, int min_bin_low_res, int num_bins_low_res_range);
     void drawSpectrumBar(int band_idx, double magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode);
 
     // Segédfüggvény a vízesés/burkológörbe színeihez

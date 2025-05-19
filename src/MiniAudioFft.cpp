@@ -630,22 +630,22 @@ void MiniAudioFft::drawSpectrumLowRes() {
 
     int actual_low_res_peak_max_height = graphH - 1;
 
-    constexpr int bar_width_pixels = 3;
-    constexpr int bar_gap_pixels = 2;
+    constexpr int bar_width_pixels = 3; // Visszaállítva 3-ra
+    constexpr int bar_gap_pixels = 1; // Kisebb rés a sávok között, hogy több elférjen
     constexpr int bar_total_width_pixels = bar_width_pixels + bar_gap_pixels;
 
     int num_drawable_bars = width / bar_total_width_pixels;
-    int bands_to_process = std::min(LOW_RES_BANDS, num_drawable_bars);
-    if (bands_to_process == 0 && LOW_RES_BANDS > 0) bands_to_process = 1;
+    int bands_to_display_on_screen = std::min(LOW_RES_BANDS, num_drawable_bars);
+    if (bands_to_display_on_screen == 0 && LOW_RES_BANDS > 0) bands_to_display_on_screen = 1;
 
-    int total_drawn_width = (bands_to_process * bar_width_pixels) + (std::max(0, bands_to_process - 1) * bar_gap_pixels);
+    int total_drawn_width = (bands_to_display_on_screen * bar_width_pixels) + (std::max(0, bands_to_display_on_screen - 1) * bar_gap_pixels);
     int x_offset = (width - total_drawn_width) / 2;
     int current_draw_x_on_screen = posX + x_offset;
 
     // Grafikon területének törlése (csak a grafikon sávja)
     // Ezt a fő `clearArea` már elvégezte, vagy a `loop` frissíti az oszlopokat.
     // Itt csak a csúcsokat töröljük.
-    for (int band_idx = 0; band_idx < bands_to_process; band_idx++) {
+    for (int band_idx = 0; band_idx < bands_to_display_on_screen; band_idx++) {
         if (Rpeak[band_idx] > 0) {
             int xP = current_draw_x_on_screen + bar_total_width_pixels * band_idx;
             int yP = posY + graphH - Rpeak[band_idx];  // Y a grafikon területén belül
@@ -657,28 +657,46 @@ void MiniAudioFft::drawSpectrumLowRes() {
         if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
     }
 
-    for (int i = 2; i < (FFT_SAMPLES / 2); i++) {    // FFT bin indexek 2-től indulnak a DC és Nyquist komponensek elhagyása miatt
-        if (RvReal[i] > (AMPLITUDE_SCALE / 10.0)) {  // Csak akkor rajzolunk, ha a jel erőssége meghalad egy küszöböt
-            byte band_idx = getBandVal(i);
-            if (band_idx < bands_to_process) {
-                // Most RvReal[i]-t (double) adjuk át, nem (int)RvReal[i]-t
-                drawSpectrumBar(band_idx, RvReal[i], current_draw_x_on_screen, actual_low_res_peak_max_height);
-            }
+    // 1. Sávonkénti magnitúdók összegyűjtése/maximalizálása
+    double band_magnitudes[LOW_RES_BANDS] = {0.0}; // Inicializálás nullával
+    const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
+    const int min_bin_idx_low_res = std::max(2, static_cast<int>(std::round(LOW_RES_SPECTRUM_MIN_FREQ_HZ / binWidthHz)));
+    const int max_bin_idx_low_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(LOW_RES_SPECTRUM_MAX_FREQ_HZ / binWidthHz)));
+    const int num_bins_in_low_res_range = std::max(1, max_bin_idx_low_res - min_bin_idx_low_res + 1);
+
+    for (int i = min_bin_idx_low_res; i <= max_bin_idx_low_res; i++) {
+        byte band_idx = getBandVal(i, min_bin_idx_low_res, num_bins_in_low_res_range);
+        if (band_idx < LOW_RES_BANDS) { // Biztosítjuk, hogy a band_idx érvényes legyen
+            band_magnitudes[band_idx] = std::max(band_magnitudes[band_idx], RvReal[i]);
         }
     }
-}
 
+    // 2. Sávok kirajzolása a kiszámított magnitúdók alapján
+    for (int band_idx = 0; band_idx < bands_to_display_on_screen; band_idx++) {
+        int x_pos_for_bar = current_draw_x_on_screen + bar_total_width_pixels * band_idx;
+        // Oszlop törlése a háttérszínnel
+        tft.fillRect(x_pos_for_bar, posY, bar_width_pixels, graphH, TFT_BLACK);
+        // Sáv kirajzolása (ez frissíti Rpeak-et is)
+        drawSpectrumBar(band_idx, band_magnitudes[band_idx], current_draw_x_on_screen, actual_low_res_peak_max_height);
+    }
+}
 /**
  * @brief Meghatározza, hogy egy adott FFT bin melyik alacsony felbontású sávhoz tartozik.
  * @param fft_bin_index Az FFT bin indexe.
+ * @param min_bin_low_res A LowRes spektrumhoz figyelembe vett legalacsonyabb FFT bin index.
+ * @param num_bins_low_res_range A LowRes spektrumhoz figyelembe vett FFT bin-ek száma.
  * @return A sáv indexe (0-tól LOW_RES_BANDS-1-ig).
  */
-uint8_t MiniAudioFft::getBandVal(int fft_bin_index) {
-    if (fft_bin_index < 2) return 0;                                  // Az első két bin-t (DC, Nyquist/2) általában nem használjuk a spektrum sávokhoz
-    int effective_bins = MiniAudioFftConstants::FFT_SAMPLES / 2 - 2;  // Hasznos bin-ek száma (a 0. és 1. nélkül)
-    if (effective_bins <= 0) return 0;
-    // Lineáris leképezés a hasznos bin-ekről a LOW_RES_BANDS sávokra
-    return constrain((fft_bin_index - 2) * MiniAudioFftConstants::LOW_RES_BANDS / effective_bins, 0, MiniAudioFftConstants::LOW_RES_BANDS - 1);
+uint8_t MiniAudioFft::getBandVal(int fft_bin_index, int min_bin_low_res, int num_bins_low_res_range) {
+    if (fft_bin_index < min_bin_low_res || num_bins_low_res_range <= 0) {
+        return 0; // Vagy egy érvénytelen sáv index, ha szükséges
+    }
+    // Kiszámítjuk a relatív indexet a megadott tartományon belül
+    int relative_bin_index = fft_bin_index - min_bin_low_res;
+    if (relative_bin_index < 0) return 0; // Elvileg nem fordulhat elő, ha fft_bin_index >= min_bin_low_res
+
+    // Leképezzük a relatív bin indexet (0-tól num_bins_low_res_range-1-ig) a LOW_RES_BANDS sávokra
+    return constrain(relative_bin_index * MiniAudioFftConstants::LOW_RES_BANDS / num_bins_low_res_range, 0, MiniAudioFftConstants::LOW_RES_BANDS - 1);
 }
 
 /**
@@ -697,8 +715,8 @@ void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_st
     int dsize = static_cast<int>(magnitude / AMPLITUDE_SCALE);
     dsize = constrain(dsize, 0, peak_max_height_for_mode);  // peak_max_height_for_mode már graphH-1
 
-    constexpr int bar_width_pixels = 3;
-    constexpr int bar_gap_pixels = 2;
+    constexpr int bar_width_pixels = 3; // Visszaállítva 3-ra
+    constexpr int bar_gap_pixels = 1; // Javítva 1-re, hogy konzisztens legyen a hívóval
     constexpr int bar_total_width_pixels = bar_width_pixels + bar_gap_pixels;
     int xPos = actual_start_x_on_screen + bar_total_width_pixels * band_idx;
 
@@ -732,23 +750,29 @@ void MiniAudioFft::drawSpectrumHighRes() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
+    const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
+    const int min_bin_idx_high_res = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
+    const int max_bin_idx_high_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(MAX_DISPLAY_AUDIO_FREQ_HZ / binWidthHz)));
+    const int num_bins_in_high_res_range = std::max(1, max_bin_idx_high_res - min_bin_idx_high_res + 1);
+
     int actual_high_res_bins_to_display = width;  // Minden pixel egy FFT bin-t (vagy interpolált értéket) képvisel
 
     for (int i = 0; i < actual_high_res_bins_to_display; i++) {
-        // FFT bin index leképezése a képernyő pixelére.
-        // A 2. bin-től indulunk (elhagyva a DC-t és az első komponenst).
-        // Az FFT_SAMPLES/2 - 2 a használható bin-ek száma (a 0. és 1. nélkül).
-        int fft_bin_index = 2 + (i * (FFT_SAMPLES / 2 - 2)) / std::max(1, (actual_high_res_bins_to_display - 1));
-        // Biztosítjuk, hogy az index a határokon belül maradjon
-        if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
-        if (fft_bin_index < 2) fft_bin_index = 2;
+        // Képernyő pixel 'i' leképezése FFT bin indexre a szűkített tartományon belül
+        int fft_bin_index = min_bin_idx_high_res + static_cast<int>(std::round(static_cast<float>(i) / std::max(1, (actual_high_res_bins_to_display - 1)) * (num_bins_in_high_res_range - 1)));
+        fft_bin_index = constrain(fft_bin_index, min_bin_idx_high_res, max_bin_idx_high_res);
 
         int screen_x = posX + i;
         tft.drawFastVLine(screen_x, posY, graphH, TFT_BLACK);  // Oszlop törlése a grafikon területén
 
         // A RvReal[fft_bin_index] (double) osztása AMPLITUDE_SCALE-lel (float), majd int-re kasztolás
-        int scaled_magnitude = static_cast<int>(RvReal[fft_bin_index] / AMPLITUDE_SCALE);
-        scaled_magnitude = constrain(scaled_magnitude, 0, graphH - 1);  // Korlátozás a grafikon magasságára
+        double magnitude_for_bar = RvReal[fft_bin_index];
+        // Csillapított alacsony frekvenciák figyelmen kívül hagyása a magas felbontású nézetben, ha túl alacsonyak
+        if (fft_bin_index < static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)) && magnitude_for_bar < (AMPLITUDE_SCALE / LOW_FREQ_ATTENUATION_FACTOR / 2.0)) {
+            magnitude_for_bar = 0; // Túl alacsony csillapított jel, ne rajzoljuk
+        }
+        int scaled_magnitude = static_cast<int>(magnitude_for_bar / AMPLITUDE_SCALE);
+        scaled_magnitude = constrain(scaled_magnitude, 0, graphH - 1);
 
         if (scaled_magnitude > 0) {
             int y_bar_start = posY + graphH - 1 - scaled_magnitude;         // Oszlop teteje
@@ -844,13 +868,18 @@ void MiniAudioFft::drawWaterfall() {
         }
     }
 
+    const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
+    const int min_bin_for_wf_env = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
+    const int max_bin_for_wf_env = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(MAX_DISPLAY_AUDIO_FREQ_HZ / binWidthHz)));
+    const int num_bins_in_wf_env_range = std::max(1, max_bin_for_wf_env - min_bin_for_wf_env + 1);
+
     // 2. Új adatok betöltése a `wabuf` jobb szélére (a `wabuf` továbbra is `height` magas)
     for (int r = 0; r < height; ++r) {
-        int fft_bin_index = 2 + (r * (FFT_SAMPLES / 2 - 2)) / std::max(1, (height - 1));
-        if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
-        if (fft_bin_index < 2) fft_bin_index = 2;
+        // 'r' (0 to height-1) leképezése FFT bin indexre a szűkített tartományon belül
+        int fft_bin_index = min_bin_for_wf_env + static_cast<int>(std::round(static_cast<float>(r) / std::max(1, (height - 1)) * (num_bins_in_wf_env_range - 1)));
+        fft_bin_index = constrain(fft_bin_index, min_bin_for_wf_env, max_bin_for_wf_env);
 
-        constexpr float WATERFALL_INPUT_SCALE = 0.25f;
+        constexpr float WATERFALL_INPUT_SCALE = 0.3f; // Kicsit növelve az érzékenységet
         wabuf[r][width - 1] = static_cast<int>(constrain(RvReal[fft_bin_index] * WATERFALL_INPUT_SCALE, 0.0, 255.0));
     }
 
@@ -916,12 +945,17 @@ void MiniAudioFft::drawEnvelope() {
         }
     }
 
+    const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
+    const int min_bin_for_wf_env = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
+    const int max_bin_for_wf_env = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(MAX_DISPLAY_AUDIO_FREQ_HZ / binWidthHz)));
+    const int num_bins_in_wf_env_range = std::max(1, max_bin_for_wf_env - min_bin_for_wf_env + 1);
+
     // 2. Új adatok betöltése
     // Az Envelope módhoz az RvReal értékeit használjuk, de egy saját erősítéssel.
     for (int r = 0; r < height; ++r) {  // Teljes `this->height`
-        int fft_bin_index = 2 + (r * (FFT_SAMPLES / 2 - 2)) / std::max(1, (height - 1));
-        if (fft_bin_index >= FFT_SAMPLES / 2) fft_bin_index = FFT_SAMPLES / 2 - 1;
-        if (fft_bin_index < 2) fft_bin_index = 2;
+        // 'r' (0 to height-1) leképezése FFT bin indexre a szűkített tartományon belül
+        int fft_bin_index = min_bin_for_wf_env + static_cast<int>(std::round(static_cast<float>(r) / std::max(1, (height - 1)) * (num_bins_in_wf_env_range - 1)));
+        fft_bin_index = constrain(fft_bin_index, min_bin_for_wf_env, max_bin_for_wf_env);
 
         // Az RvReal[fft_bin_index] már tartalmazza a csillapított értéket.
         // Alkalmazzuk az ENVELOPE_INPUT_GAIN-t.
@@ -1074,9 +1108,9 @@ void MiniAudioFft::drawTuningAid() {
         line_x_on_sprite = constrain(line_x_on_sprite, 0, width - 1);
 
         sprGraph.drawFastVLine(line_x_on_sprite, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
-        if (line_x_on_sprite + 1 < width) { // Két pixel vastag vonal
-            sprGraph.drawFastVLine(line_x_on_sprite + 1, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
-        }
+        // if (line_x_on_sprite + 1 < width) { // Két pixel vastag vonal
+        // sprGraph.drawFastVLine(line_x_on_sprite + 1, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
+        // }
     }
 
     // Sprite kirakása a képernyőre
