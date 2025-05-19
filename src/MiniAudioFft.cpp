@@ -630,17 +630,27 @@ void MiniAudioFft::drawSpectrumLowRes() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
-    int actual_low_res_peak_max_height = graphH - 1;
+    int actual_low_res_peak_max_height = graphH - 1; // graphH can be 0, so -1 is possible. Constrain dsize later.
 
-    constexpr int bar_width_pixels = 3; // Visszaállítva 3-ra
+    // Dinamikus sávszélesség számítása, hogy kitöltse a helyet
     constexpr int bar_gap_pixels = 1; // Kisebb rés a sávok között, hogy több elférjen
-    constexpr int bar_total_width_pixels = bar_width_pixels + bar_gap_pixels;
+    int bands_to_display_on_screen = LOW_RES_BANDS; // Alapértelmezetten a LOW_RES_BANDS számú sávot akarjuk megjeleníteni
 
-    int num_drawable_bars = width / bar_total_width_pixels;
-    int bands_to_display_on_screen = std::min(LOW_RES_BANDS, num_drawable_bars);
-    if (bands_to_display_on_screen == 0 && LOW_RES_BANDS > 0) bands_to_display_on_screen = 1;
+    // Ha a szélesség túl kicsi még a minimális sávszélességhez (1px) és résekhez is, csökkentjük a sávok számát
+    if (width < (bands_to_display_on_screen + (bands_to_display_on_screen -1) * bar_gap_pixels) ) {
+        bands_to_display_on_screen = (width + bar_gap_pixels) / (1 + bar_gap_pixels);
+    }
+    if (bands_to_display_on_screen <= 0) bands_to_display_on_screen = 1; // Legalább egy sáv legyen
 
-    int total_drawn_width = (bands_to_display_on_screen * bar_width_pixels) + (std::max(0, bands_to_display_on_screen - 1) * bar_gap_pixels);
+    int dynamic_bar_width_pixels = 1; // Minimum 1 pixel
+    if (bands_to_display_on_screen > 0) {
+        dynamic_bar_width_pixels = (width - (std::max(0, bands_to_display_on_screen - 1) * bar_gap_pixels)) / bands_to_display_on_screen;
+    }
+    if (dynamic_bar_width_pixels < 1) dynamic_bar_width_pixels = 1; // Biztosítjuk, hogy legalább 1 pixel legyen
+
+    int bar_total_width_pixels_dynamic = dynamic_bar_width_pixels + bar_gap_pixels;
+
+    int total_drawn_width = (bands_to_display_on_screen * dynamic_bar_width_pixels) + (std::max(0, bands_to_display_on_screen - 1) * bar_gap_pixels);
     int x_offset = (width - total_drawn_width) / 2;
     int current_draw_x_on_screen = posX + x_offset;
 
@@ -649,11 +659,11 @@ void MiniAudioFft::drawSpectrumLowRes() {
     // Itt csak a csúcsokat töröljük.
     for (int band_idx = 0; band_idx < bands_to_display_on_screen; band_idx++) {
         if (Rpeak[band_idx] > 0) {
-            int xP = current_draw_x_on_screen + bar_total_width_pixels * band_idx;
+            int xP = current_draw_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
             int yP = posY + graphH - Rpeak[band_idx];  // Y a grafikon területén belül
             int erase_h = std::min(2, posY + graphH - yP);
-            if (yP < posY + graphH && erase_h > 0) {  // Biztosítjuk, hogy a grafikonon belül törlünk
-                tft.fillRect(xP, yP, bar_width_pixels, erase_h, TFT_BLACK);
+            if (yP < posY + graphH && erase_h > 0) {
+                tft.fillRect(xP, yP, dynamic_bar_width_pixels, erase_h, TFT_BLACK);
             }
         }
         if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
@@ -675,11 +685,11 @@ void MiniAudioFft::drawSpectrumLowRes() {
 
     // 2. Sávok kirajzolása a kiszámított magnitúdók alapján
     for (int band_idx = 0; band_idx < bands_to_display_on_screen; band_idx++) {
-        int x_pos_for_bar = current_draw_x_on_screen + bar_total_width_pixels * band_idx;
+        int x_pos_for_bar = current_draw_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
         // Oszlop törlése a háttérszínnel
-        tft.fillRect(x_pos_for_bar, posY, bar_width_pixels, graphH, TFT_BLACK);
+        tft.fillRect(x_pos_for_bar, posY, dynamic_bar_width_pixels, graphH, TFT_BLACK);
         // Sáv kirajzolása (ez frissíti Rpeak-et is)
-        drawSpectrumBar(band_idx, band_magnitudes[band_idx], current_draw_x_on_screen, actual_low_res_peak_max_height);
+        drawSpectrumBar(band_idx, band_magnitudes[band_idx], current_draw_x_on_screen, actual_low_res_peak_max_height, dynamic_bar_width_pixels);
     }
 }
 /**
@@ -707,8 +717,9 @@ uint8_t MiniAudioFft::getBandVal(int fft_bin_index, int min_bin_low_res, int num
  * @param magnitude A sáv magnitúdója (most double).
  * @param actual_start_x_on_screen A spektrum rajzolásának kezdő X koordinátája a képernyőn.
  * @param peak_max_height_for_mode A sáv maximális magassága az adott módban.
+ * @param current_bar_width_pixels Az aktuális sávszélesség pixelekben.
  */
-void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode) {
+void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode, int current_bar_width_pixels) {
     using namespace MiniAudioFftConstants;
     int graphH = getGraphHeight();
     if (graphH <= 0) return;
@@ -717,12 +728,12 @@ void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_st
     int dsize = static_cast<int>(magnitude / AMPLITUDE_SCALE);
     dsize = constrain(dsize, 0, peak_max_height_for_mode);  // peak_max_height_for_mode már graphH-1
 
-    constexpr int bar_width_pixels = 3; // Visszaállítva 3-ra
+    // constexpr int bar_width_pixels = 3; // Ezt most paraméterként kapjuk
     constexpr int bar_gap_pixels = 1; // Javítva 1-re, hogy konzisztens legyen a hívóval
-    constexpr int bar_total_width_pixels = bar_width_pixels + bar_gap_pixels;
-    int xPos = actual_start_x_on_screen + bar_total_width_pixels * band_idx;
+    int bar_total_width_pixels_dynamic = current_bar_width_pixels + bar_gap_pixels;
+    int xPos = actual_start_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
 
-    if (xPos + bar_width_pixels > posX + width || xPos < posX) return;  // Ne rajzoljunk a komponensen kívülre
+    if (xPos + current_bar_width_pixels > posX + width || xPos < posX) return;  // Ne rajzoljunk a komponensen kívülre
 
     if (dsize > 0) {
         int y_start_bar = posY + graphH - dsize;  // Y a grafikon területén belül
@@ -733,7 +744,7 @@ void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_st
             y_start_bar = posY;
         }
         if (bar_h_visual > 0) {
-            tft.fillRect(xPos, y_start_bar, bar_width_pixels, bar_h_visual, TFT_YELLOW);
+            tft.fillRect(xPos, y_start_bar, current_bar_width_pixels, bar_h_visual, TFT_YELLOW);
         }
     }
 

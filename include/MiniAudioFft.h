@@ -22,8 +22,8 @@ constexpr float LOW_FREQ_ATTENUATION_FACTOR = 10.0f;         // Ezzel a faktorra
 // Belső tömbök maximális méretei, ha a komponens mérete nagyobb lenne.
 // A tényleges rajzolás a komponens w,h méreteihez van vágva/skálázva.
 constexpr int MAX_INTERNAL_WIDTH = 86;  // Oszcilloszkóp és magas felb. spektrum belső bufferéhez
-constexpr int MAX_INTERNAL_HEIGHT = 80;
-constexpr int LOW_RES_BANDS = 16;  // Alacsony felbontású spektrum sávjainak száma
+constexpr int MAX_INTERNAL_HEIGHT = 80; // Vízesés és burkológörbe belső buffer magassága
+constexpr int LOW_RES_BANDS = 24;  // Alacsony felbontású spektrum sávjainak száma (csökkentve 24-re)
 // A HIGH_RES_BINS_TO_DISPLAY és OSCI_SAMPLES_TO_DRAW a komponens aktuális szélességéből adódik.
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
@@ -182,7 +182,7 @@ class MiniAudioFft {
 
     // Segédfüggvények az alacsony felbontású spektrumhoz
     uint8_t getBandVal(int fft_bin_index, int min_bin_low_res, int num_bins_low_res_range);
-    void drawSpectrumBar(int band_idx, double magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode);
+    void drawSpectrumBar(int band_idx, double magnitude, int actual_start_x_on_screen, int peak_max_height_for_mode, int current_bar_width_pixels);
 
     // Segédfüggvény a vízesés/burkológörbe színeihez
     uint16_t valueToWaterfallColor(int scaled_value);
