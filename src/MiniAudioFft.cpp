@@ -763,35 +763,47 @@ void MiniAudioFft::drawSpectrumHighRes() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
+    // Grafikon területének törlése
+    tft.fillRect(posX, posY, width, graphH, TFT_BLACK);
+
+    // FFT bin szélessége és a megjelenítendő bin-ek tartománya
     const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
-    const int min_bin_idx_high_res = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
-    const int max_bin_idx_high_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz)));
-    const int num_bins_in_high_res_range = std::max(1, max_bin_idx_high_res - min_bin_idx_high_res + 1);
+    const int min_bin_idx_for_display = std::max(2, static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)));
+    const int max_bin_idx_for_display = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz)));
+    const int num_bins_in_display_range = std::max(1, max_bin_idx_for_display - min_bin_idx_for_display + 1);
 
-    int actual_high_res_bins_to_display = width;  // Minden pixel egy FFT bin-t (vagy interpolált értéket) képvisel
-
-    for (int i = 0; i < actual_high_res_bins_to_display; i++) {
-        // Képernyő pixel 'i' leképezése FFT bin indexre a szűkített tartományon belül
-        int fft_bin_index = min_bin_idx_high_res + static_cast<int>(std::round(static_cast<float>(i) / std::max(1, (actual_high_res_bins_to_display - 1)) * (num_bins_in_high_res_range - 1)));
-        fft_bin_index = constrain(fft_bin_index, min_bin_idx_high_res, max_bin_idx_high_res);
-
-        int screen_x = posX + i;
-        tft.drawFastVLine(screen_x, posY, graphH, TFT_BLACK);  // Oszlop törlése a grafikon területén
-
-        // A RvReal[fft_bin_index] (double) osztása AMPLITUDE_SCALE-lel (float), majd int-re kasztolás
-        double magnitude_for_bar = RvReal[fft_bin_index];
-        // Csillapított alacsony frekvenciák figyelmen kívül hagyása a magas felbontású nézetben, ha túl alacsonyak
-        if (fft_bin_index < static_cast<int>(std::round(LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz)) && magnitude_for_bar < (AMPLITUDE_SCALE / LOW_FREQ_ATTENUATION_FACTOR / 2.0)) {
-            magnitude_for_bar = 0; // Túl alacsony csillapított jel, ne rajzoljuk
+    // Iterálás a komponens minden egyes vízszintes pixelén
+    for (int screen_pixel_x = 0; screen_pixel_x < width; ++screen_pixel_x) {
+        // Képernyő pixel X koordinátájának leképezése FFT bin indexre
+        int fft_bin_index;
+        if (width == 1) { // Osztás nullával elkerülése, ha a szélesség 1
+            fft_bin_index = min_bin_idx_for_display;
+        } else {
+            float ratio = static_cast<float>(screen_pixel_x) / (width - 1);
+            fft_bin_index = min_bin_idx_for_display + static_cast<int>(std::round(ratio * (num_bins_in_display_range - 1)));
         }
-        int scaled_magnitude = static_cast<int>(magnitude_for_bar / AMPLITUDE_SCALE);
+        // Biztosítjuk, hogy az fft_bin_index az RvReal tömb érvényes tartományán belül maradjon
+        fft_bin_index = constrain(fft_bin_index, 0, static_cast<int>(FFT_SAMPLES / 2 - 1));
+
+        // Magnitúdó kiolvasása és skálázása
+        double magnitude = RvReal[fft_bin_index];
+        int scaled_magnitude = static_cast<int>(magnitude / AMPLITUDE_SCALE);
         scaled_magnitude = constrain(scaled_magnitude, 0, graphH - 1);
 
+        // X koordináta a TFT-n
+        int x_coord_on_tft = posX + screen_pixel_x;
+
+        // Vonal kirajzolása
         if (scaled_magnitude > 0) {
-            int y_bar_start = posY + graphH - 1 - scaled_magnitude;         // Oszlop teteje
-            int bar_actual_height = (posY + graphH - 1) - y_bar_start + 1;  // Oszlop magassága
+            int y_bar_start = posY + graphH - 1 - scaled_magnitude; // Vonal teteje
+            int bar_actual_height = scaled_magnitude + 1;           // Vonal magassága
+            // Biztosítjuk, hogy a vonal a grafikon területén belül kezdődjön
+            if (y_bar_start < posY) {
+                bar_actual_height -= (posY - y_bar_start);
+                y_bar_start = posY;
+            }
             if (bar_actual_height > 0) {
-                tft.drawFastVLine(screen_x, y_bar_start, bar_actual_height, TFT_SKYBLUE);
+                tft.drawFastVLine(x_coord_on_tft, y_bar_start, bar_actual_height, TFT_SKYBLUE);
             }
         }
     }

@@ -30,6 +30,7 @@ constexpr int LOW_RES_BANDS = 24;  // Alacsony felbontású spektrum sávjainak 
 // Konstansok a LowRes spektrumhoz
 constexpr float LOW_RES_SPECTRUM_MIN_FREQ_HZ = 300.0f;   // Alacsony felbontású spektrum kezdő frekvenciája (Hz)
 // constexpr float LOW_RES_SPECTRUM_MAX_FREQ_HZ = 6000.0f; // Ezt most már a MAX_DISPLAY_AUDIO_FREQ_..._HZ konstansok határozzák meg
+// constexpr int HIGH_RES_SPECTRUM_COLUMNS = 48;        // Eltávolítva, visszatérünk a vonalankénti rajzoláshoz
 constexpr float MAX_DISPLAY_AUDIO_FREQ_AM_HZ = 6000.0f; // Maximális megjelenítendő audio frekvencia AM módban
 constexpr float MAX_DISPLAY_AUDIO_FREQ_FM_HZ = 15000.0f; // Maximális megjelenítendő audio frekvencia FM módban
 
