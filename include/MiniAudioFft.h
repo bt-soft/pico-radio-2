@@ -43,7 +43,7 @@ constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;  // Célvonal szín
 constexpr float TUNING_AID_TARGET_FREQ_HZ = 700.0f;           // Célfrekvencia CW-hez (Hz)
 constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 200.0f;      // Megjelenített tartomány minimuma (Hz) - Kérésnek megfelelően
 constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 1200.0f;     // Megjelenített tartomány maximuma (Hz) - 1kHz sávszélesség, 700Hz középen
-constexpr float TUNING_AID_INPUT_SCALE = 0.15f;               // Erősítési faktor a hangolási segéd bemenetéhez
+constexpr float TUNING_AID_INPUT_SCALE = 0.08f;               // Erősítési faktor a hangolási segéd bemenetéhez
 
 // Vízesés
 constexpr int WF_GRADIENT = 100;  // Vízesés színátmenetének erőssége
