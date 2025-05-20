@@ -44,6 +44,10 @@
 #define SCREEN_SAVER_TIMEOUT_MAX 60
 #define SCREEN_SAVER_TIMEOUT 10  // 10 perc a képernyővédő időzítése
 
+//--- CW mód adatai
+#define CW_DEMOD_MODE LSB          // CW demodulációs mód = LSB + 700Hz offset
+#define CW_SHIFT_FREQUENCY 800.0f  // CW alap offset
+
 //--- Debug ---
 #define __DEBUG  // Debug mód bekapcsolása
 

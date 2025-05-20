@@ -20,9 +20,6 @@
 #define AM 3
 #define CW 4
 
-#define CW_DEMOD_MODE LSB       // CW demodulációs mód = LSB + 700Hz offset
-#define CW_SHIFT_FREQUENCY 700  // CW alap offset
-
 // BandTable állandó része (PROGMEM-ben tároljuk)
 struct BandTableConst {
     const char *bandName;  // Sáv neve (PROGMEM mutató)
@@ -300,7 +297,7 @@ class Band {
         const char *currentStepStr = nullptr;
         BandTable &currentBand = getCurrentBand();
         uint8_t currentBandType = currentBand.pConstData->bandType;  // Kikeressük az aktuális Band típust
-        
+
         if (currentBandType == FM_BAND_TYPE) {
             currentStepStr = getStepSizeLabelByIndex(Band::stepSizeFM, configRef.data.ssIdxFM);
 
