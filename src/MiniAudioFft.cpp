@@ -112,9 +112,19 @@ void MiniAudioFft::manageSpriteForMode(DisplayMode modeToPrepareFor) {
 void MiniAudioFft::cycleMode() {
     // Az enum értékének növelése és körbejárás
     uint8_t modeValue = static_cast<uint8_t>(currentMode);
-    modeValue++;
-    if (modeValue > static_cast<uint8_t>(DisplayMode::TuningAid)) {  // Az utolsó érvényes mód most a TuningAid
-        modeValue = static_cast<uint8_t>(DisplayMode::Off);          // Visszaugrás az Off-ra
+    modeValue++; // Lépés a következő módra
+
+    // Ellenőrizzük, hogy FM módban vagyunk-e (a konfigurált maximális megjelenítendő frekvencia alapján)
+    // és hogy a következő mód a TuningAid lenne-e.
+    // Ha igen, akkor átugorjuk a TuningAid módot.
+    if (currentConfiguredMaxDisplayAudioFreqHz == MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_FM_HZ &&
+        static_cast<DisplayMode>(modeValue) == DisplayMode::TuningAid) {
+        modeValue++; // Ugrás a TuningAid utáni módra
+    }
+
+    // Ha túlléptünk az utolsó érvényes módon (TuningAid), akkor visszaugrunk az Off-ra.
+    if (modeValue > static_cast<uint8_t>(DisplayMode::TuningAid)) {
+        modeValue = static_cast<uint8_t>(DisplayMode::Off);
     }
     currentMode = static_cast<DisplayMode>(modeValue);
 
