@@ -14,7 +14,7 @@ TFT_eSPI tft;          // TFT objektum
 #ifdef __USE_ROTARY_ENCODER_IN_HW_TIMER
 // Pico Hardware timer a Rotary encoder olvasására
 #include <RPi_Pico_TimerInterrupt.h>
-RPI_PICO_Timer ITimer1(1);
+RPI_PICO_Timer rotaryTimer(0);  // 0-ás timer használata
 #endif
 
 #include "RotaryEncoder.h"
@@ -156,7 +156,7 @@ void changeDisplay() {
 /**
  * Hardware timer interrupt service routine a rotaryhoz
  */
-bool hardwareTimerHandler1(struct repeating_timer *t) {
+bool rotaryTimerHardwareInterruptHandler(struct repeating_timer *t) {
     rotaryEncoder.service();
     return true;
 }
@@ -184,7 +184,7 @@ void setup() {
     rotaryEncoder.setAccelerationEnabled(true);
 #ifdef __USE_ROTARY_ENCODER_IN_HW_TIMER
     // Pico HW Timer1 beállítása a rotaryhoz
-    ITimer1.attachInterruptInterval(ROTARY_ENCODER_SERVICE_INTERVAL_IN_MSEC * 1000, hardwareTimerHandler1);
+    rotaryTimer.attachInterruptInterval(ROTARY_ENCODER_SERVICE_INTERVAL_IN_MSEC * 1000, rotaryTimerHardwareInterruptHandler);
 #endif
 
     // TFT inicializálása
