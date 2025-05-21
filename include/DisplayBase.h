@@ -63,7 +63,7 @@ constexpr uint8_t ButtonMargin = 5;
 // MiniAudioFft pozíció és méret konstansai
 constexpr uint16_t mini_fft_x = 260;
 constexpr uint16_t mini_fft_y = 50;
-constexpr uint16_t mini_fft_w = 140; 
+constexpr uint16_t mini_fft_w = 140;
 constexpr uint16_t mini_fft_h = MiniAudioFftConstants::MAX_INTERNAL_HEIGHT;
 
 }  // namespace DisplayConstants
@@ -79,7 +79,7 @@ class DisplayBase : public Si4735Utils, public IGuiEvents, public IDialogParent 
 
    public:
     // Lehetséges képernyő típusok
-    enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory, audioAnalyzer };
+    enum DisplayType { none, fm, am, freqScan, screenSaver, setup, memory, audioAnalyzer, sstv };
 
     // Gombok orientációja
     enum ButtonOrientation { Horizontal, Vertical };

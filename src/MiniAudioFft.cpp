@@ -23,24 +23,24 @@ constexpr uint32_t MODE_INDICATOR_TIMEOUT_MS = 20000;  // 20 másodperc
  * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
  * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.
  */
-MiniAudioFft::MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef)
-    : tft(tft_ref),
+MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef)
+    : tft(tft),
       posX(x),
       posY(y),
       width(w),
       height(h),
       // currentMode itt nem kap explicit kezdőértéket, a setInitialMode állítja be
-      prevMuteState(rtv::muteStat),                   // Némítás előző állapotának inicializálása
-      modeIndicatorShowUntil(0),                      // Kezdetben nem látható (setInitialMode állítja)
-      isIndicatorCurrentlyVisible(true),              // Kezdetben látható (setInitialMode állítja)
-      lastTouchProcessTime(0),                        // Debounce időzítő nullázása
-      currentConfiguredMaxDisplayAudioFreqHz(configuredMaxDisplayAudioFreq), // Maximális frekvencia elmentése
-      configModeFieldRef(configDisplayModeFieldRef),  // Referencia elmentése a kijelzési módhoz
-      activeFftGainConfigRef(fftGainConfigRef),       // Referencia elmentése az erősítés konfigurációhoz
-      FFT(),                                          // FFT objektum inicializálása
+      prevMuteState(rtv::muteStat),                                           // Némítás előző állapotának inicializálása
+      modeIndicatorShowUntil(0),                                              // Kezdetben nem látható (setInitialMode állítja)
+      isIndicatorCurrentlyVisible(true),                                      // Kezdetben látható (setInitialMode állítja)
+      lastTouchProcessTime(0),                                                // Debounce időzítő nullázása
+      currentConfiguredMaxDisplayAudioFreqHz(configuredMaxDisplayAudioFreq),  // Maximális frekvencia elmentése
+      configModeFieldRef(configDisplayModeFieldRef),                          // Referencia elmentése a kijelzési módhoz
+      activeFftGainConfigRef(fftGainConfigRef),                               // Referencia elmentése az erősítés konfigurációhoz
+      FFT(),                                                                  // FFT objektum inicializálása
       highResOffset(0),
       envelope_prev_smoothed_max_val(0.0f),
-      sprGraph(&tft_ref),  // Sprite inicializálása a TFT referenciával
+      sprGraph(&tft),  // Sprite inicializálása a TFT referenciával
       spriteCreated(false) {
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
@@ -112,14 +112,13 @@ void MiniAudioFft::manageSpriteForMode(DisplayMode modeToPrepareFor) {
 void MiniAudioFft::cycleMode() {
     // Az enum értékének növelése és körbejárás
     uint8_t modeValue = static_cast<uint8_t>(currentMode);
-    modeValue++; // Lépés a következő módra
+    modeValue++;  // Lépés a következő módra
 
     // Ellenőrizzük, hogy FM módban vagyunk-e (a konfigurált maximális megjelenítendő frekvencia alapján)
     // és hogy a következő mód a TuningAid lenne-e.
     // Ha igen, akkor átugorjuk a TuningAid módot.
-    if (currentConfiguredMaxDisplayAudioFreqHz == MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_FM_HZ &&
-        static_cast<DisplayMode>(modeValue) == DisplayMode::TuningAid) {
-        modeValue++; // Ugrás a TuningAid utáni módra
+    if (currentConfiguredMaxDisplayAudioFreqHz == MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_FM_HZ && static_cast<DisplayMode>(modeValue) == DisplayMode::TuningAid) {
+        modeValue++;  // Ugrás a TuningAid utáni módra
     }
 
     // Ha túlléptünk az utolsó érvényes módon (TuningAid), akkor visszaugrunk az Off-ra.
@@ -640,23 +639,23 @@ void MiniAudioFft::drawSpectrumLowRes() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
-    int actual_low_res_peak_max_height = graphH - 1; // graphH can be 0, so -1 is possible. Constrain dsize later.
+    int actual_low_res_peak_max_height = graphH - 1;  // graphH can be 0, so -1 is possible. Constrain dsize later.
 
     // Dinamikus sávszélesség számítása, hogy kitöltse a helyet
-    constexpr int bar_gap_pixels = 1; // Kisebb rés a sávok között, hogy több elférjen
-    int bands_to_display_on_screen = LOW_RES_BANDS; // Alapértelmezetten a LOW_RES_BANDS számú sávot akarjuk megjeleníteni
+    constexpr int bar_gap_pixels = 1;                // Kisebb rés a sávok között, hogy több elférjen
+    int bands_to_display_on_screen = LOW_RES_BANDS;  // Alapértelmezetten a LOW_RES_BANDS számú sávot akarjuk megjeleníteni
 
     // Ha a szélesség túl kicsi még a minimális sávszélességhez (1px) és résekhez is, csökkentjük a sávok számát
-    if (width < (bands_to_display_on_screen + (bands_to_display_on_screen -1) * bar_gap_pixels) ) {
+    if (width < (bands_to_display_on_screen + (bands_to_display_on_screen - 1) * bar_gap_pixels)) {
         bands_to_display_on_screen = (width + bar_gap_pixels) / (1 + bar_gap_pixels);
     }
-    if (bands_to_display_on_screen <= 0) bands_to_display_on_screen = 1; // Legalább egy sáv legyen
+    if (bands_to_display_on_screen <= 0) bands_to_display_on_screen = 1;  // Legalább egy sáv legyen
 
-    int dynamic_bar_width_pixels = 1; // Minimum 1 pixel
+    int dynamic_bar_width_pixels = 1;  // Minimum 1 pixel
     if (bands_to_display_on_screen > 0) {
         dynamic_bar_width_pixels = (width - (std::max(0, bands_to_display_on_screen - 1) * bar_gap_pixels)) / bands_to_display_on_screen;
     }
-    if (dynamic_bar_width_pixels < 1) dynamic_bar_width_pixels = 1; // Biztosítjuk, hogy legalább 1 pixel legyen
+    if (dynamic_bar_width_pixels < 1) dynamic_bar_width_pixels = 1;  // Biztosítjuk, hogy legalább 1 pixel legyen
 
     int bar_total_width_pixels_dynamic = dynamic_bar_width_pixels + bar_gap_pixels;
 
@@ -680,15 +679,16 @@ void MiniAudioFft::drawSpectrumLowRes() {
     }
 
     // 1. Sávonkénti magnitúdók összegyűjtése/maximalizálása
-    double band_magnitudes[LOW_RES_BANDS] = {0.0}; // Inicializálás nullával
+    double band_magnitudes[LOW_RES_BANDS] = {0.0};  // Inicializálás nullával
     const float binWidthHz = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;
     const int min_bin_idx_low_res = std::max(2, static_cast<int>(std::round(LOW_RES_SPECTRUM_MIN_FREQ_HZ / binWidthHz)));
-    const int max_bin_idx_low_res = std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz))); // FM/AM specifikus határ használata
+    const int max_bin_idx_low_res =
+        std::min(static_cast<int>(FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / binWidthHz)));  // FM/AM specifikus határ használata
     const int num_bins_in_low_res_range = std::max(1, max_bin_idx_low_res - min_bin_idx_low_res + 1);
 
     for (int i = min_bin_idx_low_res; i <= max_bin_idx_low_res; i++) {
         byte band_idx = getBandVal(i, min_bin_idx_low_res, num_bins_in_low_res_range);
-        if (band_idx < LOW_RES_BANDS) { // Biztosítjuk, hogy a band_idx érvényes legyen
+        if (band_idx < LOW_RES_BANDS) {  // Biztosítjuk, hogy a band_idx érvényes legyen
             band_magnitudes[band_idx] = std::max(band_magnitudes[band_idx], RvReal[i]);
         }
     }
@@ -702,6 +702,7 @@ void MiniAudioFft::drawSpectrumLowRes() {
         drawSpectrumBar(band_idx, band_magnitudes[band_idx], current_draw_x_on_screen, actual_low_res_peak_max_height, dynamic_bar_width_pixels);
     }
 }
+
 /**
  * @brief Meghatározza, hogy egy adott FFT bin melyik alacsony felbontású sávhoz tartozik.
  * @param fft_bin_index Az FFT bin indexe.
@@ -711,11 +712,11 @@ void MiniAudioFft::drawSpectrumLowRes() {
  */
 uint8_t MiniAudioFft::getBandVal(int fft_bin_index, int min_bin_low_res, int num_bins_low_res_range) {
     if (fft_bin_index < min_bin_low_res || num_bins_low_res_range <= 0) {
-        return 0; // Vagy egy érvénytelen sáv index, ha szükséges
+        return 0;  // Vagy egy érvénytelen sáv index, ha szükséges
     }
     // Kiszámítjuk a relatív indexet a megadott tartományon belül
     int relative_bin_index = fft_bin_index - min_bin_low_res;
-    if (relative_bin_index < 0) return 0; // Elvileg nem fordulhat elő, ha fft_bin_index >= min_bin_low_res
+    if (relative_bin_index < 0) return 0;  // Elvileg nem fordulhat elő, ha fft_bin_index >= min_bin_low_res
 
     // Leképezzük a relatív bin indexet (0-tól num_bins_low_res_range-1-ig) a LOW_RES_BANDS sávokra
     return constrain(relative_bin_index * MiniAudioFftConstants::LOW_RES_BANDS / num_bins_low_res_range, 0, MiniAudioFftConstants::LOW_RES_BANDS - 1);
@@ -739,7 +740,7 @@ void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_st
     dsize = constrain(dsize, 0, peak_max_height_for_mode);  // peak_max_height_for_mode már graphH-1
 
     // constexpr int bar_width_pixels = 3; // Ezt most paraméterként kapjuk
-    constexpr int bar_gap_pixels = 1; // Javítva 1-re, hogy konzisztens legyen a hívóval
+    constexpr int bar_gap_pixels = 1;  // Javítva 1-re, hogy konzisztens legyen a hívóval
     int bar_total_width_pixels_dynamic = current_bar_width_pixels + bar_gap_pixels;
     int xPos = actual_start_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
 
@@ -786,7 +787,7 @@ void MiniAudioFft::drawSpectrumHighRes() {
     for (int screen_pixel_x = 0; screen_pixel_x < width; ++screen_pixel_x) {
         // Képernyő pixel X koordinátájának leképezése FFT bin indexre
         int fft_bin_index;
-        if (width == 1) { // Osztás nullával elkerülése, ha a szélesség 1
+        if (width == 1) {  // Osztás nullával elkerülése, ha a szélesség 1
             fft_bin_index = min_bin_idx_for_display;
         } else {
             float ratio = static_cast<float>(screen_pixel_x) / (width - 1);
@@ -805,8 +806,8 @@ void MiniAudioFft::drawSpectrumHighRes() {
 
         // Vonal kirajzolása
         if (scaled_magnitude > 0) {
-            int y_bar_start = posY + graphH - 1 - scaled_magnitude; // Vonal teteje
-            int bar_actual_height = scaled_magnitude + 1;           // Vonal magassága
+            int y_bar_start = posY + graphH - 1 - scaled_magnitude;  // Vonal teteje
+            int bar_actual_height = scaled_magnitude + 1;            // Vonal magassága
             // Biztosítjuk, hogy a vonal a grafikon területén belül kezdődjön
             if (y_bar_start < posY) {
                 bar_actual_height -= (posY - y_bar_start);
@@ -914,7 +915,7 @@ void MiniAudioFft::drawWaterfall() {
         int fft_bin_index = min_bin_for_wf_env + static_cast<int>(std::round(static_cast<float>(r) / std::max(1, (height - 1)) * (num_bins_in_wf_env_range - 1)));
         fft_bin_index = constrain(fft_bin_index, min_bin_for_wf_env, max_bin_for_wf_env);
 
-        constexpr float WATERFALL_INPUT_SCALE = 0.3f; // Kicsit növelve az érzékenységet
+        constexpr float WATERFALL_INPUT_SCALE = 0.3f;  // Kicsit növelve az érzékenységet
         wabuf[r][width - 1] = static_cast<int>(constrain(RvReal[fft_bin_index] * WATERFALL_INPUT_SCALE, 0.0, 255.0));
     }
 
@@ -1133,7 +1134,7 @@ void MiniAudioFft::drawTuningAid() {
         float ratio = (TUNING_AID_TARGET_FREQ_HZ - min_freq_displayed_actual) / displayed_span_hz;
         // A célfrekvencia pozícióját a BELSŐ TUNING_AID_INTERNAL_WIDTH (50) oszlophoz képest számoljuk ki
         int internal_line_x = static_cast<int>(std::round(ratio * (TUNING_AID_INTERNAL_WIDTH - 1)));
-        internal_line_x = constrain(internal_line_x, 0, TUNING_AID_INTERNAL_WIDTH - 1); // Biztosítjuk, hogy a belső szélességen belül maradjon
+        internal_line_x = constrain(internal_line_x, 0, TUNING_AID_INTERNAL_WIDTH - 1);  // Biztosítjuk, hogy a belső szélességen belül maradjon
 
         // Ezt a belső pozíciót ültetjük át a sprite-ra, figyelembe véve a középre igazítást
         // A startX_on_sprite már ki lett számolva feljebb

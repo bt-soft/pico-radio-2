@@ -104,7 +104,7 @@ class MiniAudioFft {
      * @param configuredMaxDisplayAudioFreq Az adott képernyőmódhoz (AM/FM) konfigurált maximális megjelenítendő audio frekvencia.
      * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
      * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.     */
-    MiniAudioFft(TFT_eSPI& tft_ref, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef);
+    MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef);
     ~MiniAudioFft();
 
     void setInitialMode(DisplayMode mode);  // Kezdeti mód beállítása
@@ -141,7 +141,7 @@ class MiniAudioFft {
     ArduinoFFT<double> FFT;                             // FFT objektum
     double vReal[MiniAudioFftConstants::FFT_SAMPLES];   // Valós rész az FFT bemenetéhez/kimenetéhez
     double vImag[MiniAudioFftConstants::FFT_SAMPLES];   // Képzetes rész az FFT-hez
-    double RvReal[MiniAudioFftConstants::FFT_SAMPLES];  // FFT magnitúdók tárolására (az FFT.ino alapján)
+    double RvReal[MiniAudioFftConstants::FFT_SAMPLES];  // FFT magnitúdók tárolására
 
     // Pufferek a különböző módokhoz
     int Rpeak[MiniAudioFftConstants::LOW_RES_BANDS + 1];         // Csúcsértékek az alacsony felbontású spektrumhoz

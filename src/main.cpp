@@ -51,6 +51,7 @@ AmStationStore amStationStore;
 #include "MemoryDisplay.h"
 #include "ScreenSaverDisplay.h"
 #include "SetupDisplay.h"
+#include "SstvDisplay.h"  // ÚJ SSTV Display include
 DisplayBase *pDisplay = nullptr;
 
 //---- Dekóderek
@@ -127,6 +128,11 @@ void changeDisplay() {
             case DisplayBase::DisplayType::audioAnalyzer:
                 ::pDisplay = new AudioAnalyzerDisplay(tft, si4735, band);
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
+                break;
+
+            case DisplayBase::DisplayType::sstv:
+                ::pDisplay = new SstvDisplay(tft, si4735, band);
+                // Az SSTV-nek nincs prevDisplay-je, mert általában az AM/FM-ről jövünk ide
                 break;
         }
     }

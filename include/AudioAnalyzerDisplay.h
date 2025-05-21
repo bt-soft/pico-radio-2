@@ -41,7 +41,7 @@ class AudioAnalyzerDisplay : public DisplayBase {
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;  // Hova térjünk vissza
 
     // FFT Változók
-    ArduinoFFT<double> FFT;  // Javítva: kis 'a' -> nagy 'A'
+    ArduinoFFT<double> FFT;
     double vReal[AudioAnalyzerConstants::FFT_SAMPLES];
     double vImag[AudioAnalyzerConstants::FFT_SAMPLES];
 

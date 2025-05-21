@@ -23,6 +23,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band, CwDecoder *cwDec
     DisplayBase::BuildButtonData horizontalButtonsData[] = {
         {"BFO", TftButton::ButtonType::Toggleable, TftButton::ButtonState::Off},  // Beat Frequency Oscillator
         {"AFWdt", TftButton::ButtonType::Pushable},                               //
+        {"SSTV", TftButton::ButtonType::Pushable},                                // SSTV GOMB
         {"AntC", TftButton::ButtonType::Pushable},                                //
     };
 
@@ -89,14 +90,9 @@ void AmDisplay::drawScreen() {
     if (config.data.miniAudioFftConfigAm >= 0.0f) {  // Csak akkor példányosítjuk, ha engedélyezve van
         using namespace DisplayConstants;
 
-        pMiniAudioFft = new MiniAudioFft(tft,
-                                         mini_fft_x,
-                                         mini_fft_y,
-                                         mini_fft_w,
-                                         mini_fft_h,
-                                         MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ, // AM módhoz 6kHz
-                                         config.data.miniAudioFftModeAm,
-                                         config.data.miniAudioFftConfigAm);
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h,
+                                         MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ,  // AM módhoz 6kHz
+                                         config.data.miniAudioFftModeAm, config.data.miniAudioFftConfigAm);
         // Beállítjuk a kezdeti módot a configból
         pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
         pMiniAudioFft->forceRedraw();
@@ -131,6 +127,9 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
                                       // Frissítjük a státusvonalban a kiírást
                                       DisplayBase::drawAntCapStatus(true);
                                   });
+    } else if (STREQ("SSTV", event.label)) {
+        // Képernyő váltás SSTV módra
+        ::newDisplay = DisplayBase::DisplayType::sstv;
     }
 }
 

@@ -5,13 +5,14 @@
 /**
  * Az AudioAnalyzerDisplay osztály konstruktora
  */
-AudioAnalyzerDisplay::AudioAnalyzerDisplay(TFT_eSPI& tft_ref, SI4735& si4735_ref, Band& band_ref)
-    : DisplayBase(tft_ref, si4735_ref, band_ref), FFT() {  // Az FFT tagváltozó alapértelmezett konstruktorának hívása
+AudioAnalyzerDisplay::AudioAnalyzerDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band)
+    : DisplayBase(tft, si4735, band),
+      FFT()  // Az FFT tagváltozó alapértelmezett konstruktorának hívása
+{
     DEBUG("AudioAnalyzerDisplay::AudioAnalyzerDisplay\n");
     // A buildHorizontalScreenButtons-t a drawScreen-ben hívjuk,
     // miután a képernyő méretei és a DisplayBase inicializálása megtörtént.
 }
-
 
 /**
  *
@@ -182,7 +183,6 @@ void AudioAnalyzerDisplay::audioScaleAnalyzer(uint16_t occupiedBottomHeight) {
     int actual_end_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET + AudioAnalyzerConstants::ANALYZER_DISPLAY_NUM_BINS - 1;
     actual_end_display_bin = constrain(actual_end_display_bin, AudioAnalyzerConstants::FFT_START_BIN_OFFSET, AudioAnalyzerConstants::FFT_SAMPLES / 2 - 1);
     float max_freq_for_scale_kHz = (float)actual_end_display_bin * (AudioAnalyzerConstants::SAMPLING_FREQUENCY / (float)AudioAnalyzerConstants::FFT_SAMPLES) / 1000.0f;
-
 
     float displayed_freq_span_kHz = max_freq_for_scale_kHz - actual_start_freq_for_scale_kHz;
     if (displayed_freq_span_kHz < 0) displayed_freq_span_kHz = 0;  // Negatív tartomány elkerülése
