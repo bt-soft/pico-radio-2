@@ -8,9 +8,6 @@
 // Konstans a módkijelző láthatósági idejéhez (ms)
 constexpr uint32_t MODE_INDICATOR_TIMEOUT_MS = 20000;  // 20 másodperc
 
-// Oszlopszámok kiszámítása makrókkal
-#define MIN_BIN_IDX(x) std::max(2, static_cast<int>(std::round(x / AudioProcessorConstants::BIN_WIDTH_HZ)))
-#define MAX_BIN_IDX(x) std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(x / AudioProcessorConstants::BIN_WIDTH_HZ)))
 #define NUM_BINS(maxX, minX) std::max(1, maxX - minX + 1)
 
 /**
@@ -58,8 +55,12 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
     // Pufferek nullázása
     memset(Rpeak, 0, sizeof(Rpeak));
 
-    // AudioProcessor példányosítása
-    pAudioProcessor = new AudioProcessor(activeFftGainConfigRef, AUDIO_INPUT_PIN);
+    // AudioProcessor példányosítása a kívánt mintavételezési frekvenciával.
+    pAudioProcessor = new AudioProcessor(activeFftGainConfigRef,               // Az FFT erősítés konfiguráció referenciája
+                                         AUDIO_INPUT_PIN,                      // Az audio bemeneti pin
+                                         configuredMaxDisplayAudioFreq * 2.0f  // Mintavételezési frekvencia
+
+    );
 }
 
 /**
@@ -123,8 +124,7 @@ void MiniAudioFft::cycleMode() {
     modeValue++;  // Lépés a következő módra
 
     // Ellenőrizzük, hogy FM módban vagyunk-e (a konfigurált maximális megjelenítendő frekvencia alapján)
-    // és hogy a következő mód a TuningAid lenne-e.
-    // Ha igen, akkor átugorjuk a TuningAid módot.
+    // és hogy a következő mód a TuningAid lenne-e. Ha igen, akkor átugorjuk a TuningAid módot.
     if (currentConfiguredMaxDisplayAudioFreqHz == MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_FM_HZ && static_cast<DisplayMode>(modeValue) == DisplayMode::TuningAid) {
         modeValue++;  // Ugrás a TuningAid utáni módra
     }
@@ -606,11 +606,20 @@ void MiniAudioFft::drawSpectrumLowRes() {
     }
 
     // 1. Sávonkénti magnitúdók összegyűjtése/maximalizálása
-    const int min_bin_idx_low_res = MIN_BIN_IDX(LOW_RES_SPECTRUM_MIN_FREQ_HZ);
-    const int max_bin_idx_low_res = MAX_BIN_IDX(currentConfiguredMaxDisplayAudioFreqHz);
+    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::FFT_SAMPLES);  // Fallback, ha pAudioProcessor null
+    if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::FFT_SAMPLES);                                 // Osztás nullával elkerülése
+
+    const int min_bin_idx_low_res = std::max(2, static_cast<int>(std::round(LOW_RES_SPECTRUM_MIN_FREQ_HZ / currentBinWidthHz)));
+    const int max_bin_idx_low_res =
+        std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / currentBinWidthHz)));
     const int num_bins_in_low_res_range = NUM_BINS(max_bin_idx_low_res, min_bin_idx_low_res);
 
     double band_magnitudes[LOW_RES_BANDS] = {0.0};  // Inicializálás nullával
+    if (!pAudioProcessor) {                         // Ha nincs audio processzor, ne csináljunk semmit
+        memset(band_magnitudes, 0, sizeof(band_magnitudes));
+        // return; // Vagy csak nullázzuk és a ciklusok nem futnak le
+    }
+
     for (int i = min_bin_idx_low_res; i <= max_bin_idx_low_res; i++) {
         byte band_idx = getBandVal(i, min_bin_idx_low_res, num_bins_in_low_res_range);
         if (band_idx < LOW_RES_BANDS) {  // Biztosítjuk, hogy a band_idx érvényes legyen
@@ -703,9 +712,14 @@ void MiniAudioFft::drawSpectrumHighRes() {
     tft.fillRect(posX, posY, width, graphH, TFT_BLACK);
 
     // FFT bin szélessége és a megjelenítendő bin-ek tartománya
-    const int min_bin_idx_for_display = MIN_BIN_IDX(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ);
-    const int max_bin_idx_for_display = MAX_BIN_IDX(currentConfiguredMaxDisplayAudioFreqHz);
+    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+    if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+
+    const int min_bin_idx_for_display = std::max(2, static_cast<int>(std::round(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ / currentBinWidthHz)));
+    const int max_bin_idx_for_display =
+        std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / currentBinWidthHz)));
     const int num_bins_in_display_range = NUM_BINS(max_bin_idx_for_display, min_bin_idx_for_display);
+    if (!pAudioProcessor) return;
 
     // Iterálás a komponens minden egyes vízszintes pixelén
     for (int screen_pixel_x = 0; screen_pixel_x < width; ++screen_pixel_x) {
@@ -829,8 +843,12 @@ void MiniAudioFft::drawWaterfall() {
         }
     }
 
-    const int min_bin_for_wf_env = MIN_BIN_IDX(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ);
-    const int max_bin_for_wf_env = MAX_BIN_IDX(currentConfiguredMaxDisplayAudioFreqHz);
+    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+    if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+
+    const int min_bin_for_wf_env = std::max(2, static_cast<int>(std::round(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ / currentBinWidthHz)));
+    const int max_bin_for_wf_env =
+        std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / currentBinWidthHz)));
     const int num_bins_in_wf_env_range = NUM_BINS(max_bin_for_wf_env, min_bin_for_wf_env);
 
     // 2. Új adatok betöltése a `wabuf` jobb szélére (a `wabuf` továbbra is `height` magas)
@@ -839,6 +857,7 @@ void MiniAudioFft::drawWaterfall() {
         int fft_bin_index = min_bin_for_wf_env + static_cast<int>(std::round(static_cast<float>(r) / std::max(1, (height - 1)) * (num_bins_in_wf_env_range - 1)));
         fft_bin_index = constrain(fft_bin_index, min_bin_for_wf_env, max_bin_for_wf_env);
 
+        if (!pAudioProcessor) continue;
         constexpr float WATERFALL_INPUT_SCALE = 0.3f;  // Kicsit növelve az érzékenységet
         wabuf[r][width - 1] = static_cast<int>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * WATERFALL_INPUT_SCALE, 0.0, 255.0));
     }
@@ -906,8 +925,12 @@ void MiniAudioFft::drawEnvelope() {
         }
     }
 
-    const int min_bin_for_wf_env = MIN_BIN_IDX(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ);
-    const int max_bin_for_wf_env = MAX_BIN_IDX(currentConfiguredMaxDisplayAudioFreqHz);
+    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+    if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+
+    const int min_bin_for_wf_env = std::max(2, static_cast<int>(std::round(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ / currentBinWidthHz)));
+    const int max_bin_for_wf_env =
+        std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / currentBinWidthHz)));
     const int num_bins_in_wf_env_range = NUM_BINS(max_bin_for_wf_env, min_bin_for_wf_env);
 
     // 2. Új adatok betöltése
@@ -917,6 +940,7 @@ void MiniAudioFft::drawEnvelope() {
         int fft_bin_index = min_bin_for_wf_env + static_cast<int>(std::round(static_cast<float>(r) / std::max(1, (height - 1)) * (num_bins_in_wf_env_range - 1)));
         fft_bin_index = constrain(fft_bin_index, min_bin_for_wf_env, max_bin_for_wf_env);
 
+        if (!pAudioProcessor) continue;
         // Az AudioProcessor->getMagnitudeData()[fft_bin_index] már tartalmazza a csillapított értéket.
         // Alkalmazzuk az ENVELOPE_INPUT_GAIN-t.
         double gained_val = (pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * ENVELOPE_INPUT_GAIN;
@@ -1006,8 +1030,12 @@ void MiniAudioFft::drawTuningAid() {
     // 2. Új adatok betöltése a `wabuf[0]` sorába (legfrissebb spektrum)
     //    a hangolási tartományból, a belső szélességnek megfelelően.
 
-    const int min_fft_bin_for_tuning_local = MIN_BIN_IDX(TUNING_AID_DISPLAY_MIN_FREQ_HZ);
-    const int max_fft_bin_for_tuning_local = MAX_BIN_IDX(TUNING_AID_DISPLAY_MAX_FREQ_HZ);
+    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+    if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
+
+    const int min_fft_bin_for_tuning_local = std::max(2, static_cast<int>(std::round(TUNING_AID_DISPLAY_MIN_FREQ_HZ / currentBinWidthHz)));
+    const int max_fft_bin_for_tuning_local =
+        std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(TUNING_AID_DISPLAY_MAX_FREQ_HZ / currentBinWidthHz)));
     const int num_bins_in_tuning_range = NUM_BINS(max_fft_bin_for_tuning_local, min_fft_bin_for_tuning_local);
 
     // Iterálás a belső frekvencia-oszlopokon
@@ -1019,6 +1047,7 @@ void MiniAudioFft::drawTuningAid() {
         fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1));
 
         // Az adat tárolása a wabuf első sorában, a belső indexen
+        if (!pAudioProcessor) continue;
         if (internal_x < width) {  // Biztosítjuk, hogy ne írjunk a wabuf szélességén kívülre
             wabuf[0][internal_x] = static_cast<int>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
         }
@@ -1050,8 +1079,8 @@ void MiniAudioFft::drawTuningAid() {
     }
 
     // 4. Célfrekvencia vonalának kirajzolása a sprite-ra
-    float min_freq_displayed_actual = static_cast<float>(min_fft_bin_for_tuning_local) * AudioProcessorConstants::BIN_WIDTH_HZ;
-    float max_freq_displayed_actual = static_cast<float>(max_fft_bin_for_tuning_local) * AudioProcessorConstants::BIN_WIDTH_HZ;
+    float min_freq_displayed_actual = static_cast<float>(min_fft_bin_for_tuning_local) * currentBinWidthHz;
+    float max_freq_displayed_actual = static_cast<float>(max_fft_bin_for_tuning_local) * currentBinWidthHz;
     float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;
 
     if (displayed_span_hz > 0 && TUNING_AID_TARGET_FREQ_HZ >= min_freq_displayed_actual && TUNING_AID_TARGET_FREQ_HZ <= max_freq_displayed_actual) {

@@ -3,7 +3,10 @@
 #include "AudioProcessor.h"
 #include "defines.h"  // DEBUG makróhoz, ha szükséges
 
-AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin) : FFT(), activeFftGainConfigRef(gainConfigRef), audioInputPin(audioPin) {
+AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double samplingRate)
+    : FFT(), activeFftGainConfigRef(gainConfigRef), audioInputPin(audioPin), samplingFrequency_(samplingRate) {
+    // Bin szélesség kiszámítása a kapott mintavételezési frekvencia alapján
+    binWidthHz_ = static_cast<float>(samplingFrequency_) / AudioProcessorConstants::FFT_SAMPLES;
     // Oszcilloszkóp minták inicializálása középpontra (ADC nyers érték)
     for (int i = 0; i < AudioProcessorConstants::MAX_INTERNAL_WIDTH; ++i) {
         osciSamples[i] = 2048;
@@ -83,8 +86,8 @@ void AudioProcessor::process(bool collectOsciSamples) {
     }
 
     // 4. Alacsony frekvenciák csillapítása az RvReal tömbben
-    const float binWidthHz = static_cast<float>(AudioProcessorConstants::SAMPLING_FREQUENCY) / AudioProcessorConstants::FFT_SAMPLES;
-    const int attenuation_cutoff_bin = static_cast<int>(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz);
+    // A binWidthHz_ már tagváltozóként rendelkezésre áll
+    const int attenuation_cutoff_bin = static_cast<int>(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz_);
 
     for (int i = 0; i < (AudioProcessorConstants::FFT_SAMPLES / 2); ++i) {  // Csak a releváns (nem tükrözött) frekvencia bin-eken iterálunk
         if (i < attenuation_cutoff_bin) {

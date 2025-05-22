@@ -4,11 +4,9 @@
 #include <Arduino.h>
 #include <ArduinoFFT.h>
 
+// Constants that are independent of the sampling rate provided at construction
 namespace AudioProcessorConstants {
-// A 40kHz-es SAMPLING_FREQUENCY miatt az FFT eljárás 0 Hz-től 20 kHz-ig terjedő sávszélességben képes mérni a frekvenciakomponenseket.
-constexpr double SAMPLING_FREQUENCY = 40000.0;                                    // Mintavételezési frekvencia Hz-ben (a tényleges mért sebesség alapján ~40kHz)
 constexpr uint16_t FFT_SAMPLES = 256;                                             // Minták száma az FFT-hez (2 hatványának kell lennie)
-const float BIN_WIDTH_HZ = static_cast<float>(SAMPLING_FREQUENCY) / FFT_SAMPLES;  // Bin szélessége Hz-ben
 
 constexpr float AMPLITUDE_SCALE = 40.0f;                     // Skálázási faktor az FFT eredményekhez (tovább csökkentve az érzékenység növeléséhez)
 constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 200.0f;  // Ez alatti frekvenciákat csillapítjuk
@@ -27,28 +25,31 @@ constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;  // Oszcilloszkóp mintavételi
 
 class AudioProcessor {
    public:
-    AudioProcessor(float& gainConfigRef, int audioPin);
+    AudioProcessor(float& gainConfigRef, int audioPin, double samplingRate);
     ~AudioProcessor();
 
     void process(bool collectOsciSamples);
 
     const double* getMagnitudeData() const { return RvReal; }
-
     const int* getOscilloscopeData() const { return osciSamples; }
+    float getBinWidthHz() const { return binWidthHz_; }
 
     // Opcionális: Getterek a belső tömbök méretéhez, ha szükséges
-    // int getMagnitudeDataSize() const { return MiniAudioFftConstants::FFT_SAMPLES / 2; }
-    // int getOscilloscopeDataSize() const { return MiniAudioFftConstants::MAX_INTERNAL_WIDTH; }
+    // int getMagnitudeDataSize() const { return AudioProcessorConstants::FFT_SAMPLES / 2; }
+    // int getOscilloscopeDataSize() const { return AudioProcessorConstants::MAX_INTERNAL_WIDTH; }
 
    private:
     ArduinoFFT<double> FFT;
     double vReal[AudioProcessorConstants::FFT_SAMPLES];
     double vImag[AudioProcessorConstants::FFT_SAMPLES];
     double RvReal[AudioProcessorConstants::FFT_SAMPLES];  // Magnitúdók tárolására
-    int osciSamples[AudioProcessorConstants::MAX_INTERNAL_WIDTH];
+    int osciSamples[AudioProcessorConstants::MAX_INTERNAL_WIDTH]; // MAX_INTERNAL_WIDTH maradhat itt, ha az oszcilloszkóp buffer mérete fix
 
     float& activeFftGainConfigRef;  // Referencia a Config_t gain mezőjére
     int audioInputPin;
+
+    double samplingFrequency_; // Dinamikusan beállított mintavételezési frekvencia
+    float binWidthHz_;         // Kiszámolt bin szélesség
 };
 
 #endif  // AUDIO_PROCESSOR_H
