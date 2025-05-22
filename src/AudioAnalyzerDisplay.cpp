@@ -5,13 +5,17 @@
 /**
  * Az AudioAnalyzerDisplay osztály konstruktora
  */
-AudioAnalyzerDisplay::AudioAnalyzerDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band)
+AudioAnalyzerDisplay::AudioAnalyzerDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band, float& audioAnalyzerGainConfigRef)
     : DisplayBase(tft, si4735, band),
-      FFT()  // Az FFT tagváltozó alapértelmezett konstruktorának hívása
+      pAudioProcessor(nullptr),
+      audioAnalyzerGainConfigRef_(audioAnalyzerGainConfigRef)
 {
     DEBUG("AudioAnalyzerDisplay::AudioAnalyzerDisplay\n");
     // A buildHorizontalScreenButtons-t a drawScreen-ben hívjuk,
     // miután a képernyő méretei és a DisplayBase inicializálása megtörtént.
+
+    // AudioProcessor példányosítása
+    pAudioProcessor = new AudioProcessor(audioAnalyzerGainConfigRef_, AUDIO_INPUT_PIN, 30000.0); // 30kHz target sampling rate for 15kHz Nyquist
 }
 
 /**
@@ -54,6 +58,13 @@ void AudioAnalyzerDisplay::drawScreen() {
     // Az FFT objektumot a konstruktorban inicializáltuk.
 }
 
+AudioAnalyzerDisplay::~AudioAnalyzerDisplay() {
+    DEBUG("AudioAnalyzerDisplay::~AudioAnalyzerDisplay\n");
+    if (pAudioProcessor) {
+        delete pAudioProcessor;
+        pAudioProcessor = nullptr;
+    }
+}
 void AudioAnalyzerDisplay::displayLoop() {
     // Ha van dialógus ablak, akkor nem csinálunk semmit a háttérben.
     if (pDialog != nullptr) {
@@ -61,30 +72,35 @@ void AudioAnalyzerDisplay::displayLoop() {
     }
 
     // FFT mintavételezés és számítás
-    FFTSampleAnalyzer();  // Az eredmények (magnitúdók) a vReal tömbbe kerülnek
+    if (!pAudioProcessor) return;
+    pAudioProcessor->process(false); // false: nem gyűjtünk oszcilloszkóp mintákat
+    const double* magnitudeData = pAudioProcessor->getMagnitudeData();
+    float currentBinWidthHz = pAudioProcessor->getBinWidthHz();
+    if (currentBinWidthHz == 0) return; // Hiba elkerülése
 
     // Az új spektrumvonal kirajzolása
     // Végigiterálunk a kijelző szélességén, és leképezzük az FFT "bin"-ekre (frekvenciasávokra)
     for (int x_coord = 0; x_coord < tft.width(); x_coord++) {
         // Képernyő x-koordináta leképezése FFT bin indexre
-        // Az FFT_START_BIN_OFFSET-től indulunk (kb. 100Hz) az FFT_SAMPLES/2 - 1 bin-ig (Nyquist).
-        constexpr int start_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET;
-        // Az end_display_bin mostantól az ANALYZER_DISPLAY_NUM_BINS alapján számolódik
-        int end_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET + AudioAnalyzerConstants::ANALYZER_DISPLAY_NUM_BINS - 1;
+        // A kijelzendő tartomány: ANALYZER_MIN_FREQ_HZ-től ANALYZER_MAX_FREQ_HZ-ig
+        int start_display_bin = static_cast<int>(roundf(AudioAnalyzerConstants::ANALYZER_MIN_FREQ_HZ / currentBinWidthHz));
+        int end_display_bin = static_cast<int>(roundf(AudioAnalyzerConstants::ANALYZER_MAX_FREQ_HZ / currentBinWidthHz));
+
         // Biztosítjuk, hogy ne lépjük túl a maximális elérhető bin indexet
-        end_display_bin = constrain(end_display_bin, start_display_bin, AudioAnalyzerConstants::FFT_SAMPLES / 2 - 1);
+        start_display_bin = constrain(start_display_bin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
+        end_display_bin = constrain(end_display_bin, start_display_bin, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
         int num_displayable_bins = end_display_bin - start_display_bin + 1;
 
         int fft_bin_index;
         if (num_displayable_bins <= 1) {  // Elkerüljük az osztást nullával vagy negatívval, ha a tartomány túl szűk
             fft_bin_index = start_display_bin;
         } else {
-            fft_bin_index = start_display_bin + static_cast<int>(roundf(((float)x_coord / (tft.width() - 1.0f)) * (num_displayable_bins - 1.0f)));
+            // Lineáris interpoláció a képernyő pixel és a bin index között
+            fft_bin_index = start_display_bin + static_cast<int>(roundf(static_cast<float>(x_coord) / (tft.width() - 1.0f) * (num_displayable_bins - 1.0f)));
         }
         fft_bin_index = constrain(fft_bin_index, start_display_bin, end_display_bin);
 
-        // Magnitúdó kiolvasása a vReal tömbből
-        float magnitude = vReal[fft_bin_index];
+        double magnitude = magnitudeData[fft_bin_index];
 
         // Magnitúdó skálázása és normalizálása (0.0 és 1.0 közé)
         float normalized_magnitude = magnitude / AudioAnalyzerConstants::AMPLITUDE_SCALE;
@@ -143,25 +159,6 @@ void AudioAnalyzerDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchE
 }
 
 /**
- * @brief Audio mintavételezés és FFT végrehajtása. Az eredmények (magnitúdók) a vReal tömbbe kerülnek.
- */
-void AudioAnalyzerDisplay::FFTSampleAnalyzer() {
-
-    using namespace AudioAnalyzerConstants;
-
-    for (int i = 0; i < FFT_SAMPLES; i++) {
-        // Analóg érték olvasása, középre igazítás 0 körül az FFT-hez (12 bites ADC-t, 0-4095 tartományban)
-        // Módosítsd a 2048-at, ha az ADC-dnek más a középpontja vagy tartománya.
-        vReal[i] = (double)analogRead(AUDIO_INPUT_PIN) - 2048.0;
-        vImag[i] = 0;  // A képzetes rész 0 valós bemenet esetén
-    }
-
-    FFT.windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  // Ablakozás (Hamming ablak)
-    FFT.compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);                  // FFT számítás
-    FFT.complexToMagnitude(vReal, vImag, FFT_SAMPLES);                    // Komplex számokból magnitúdók számítása, az eredmény a vReal-be kerül
-}
-
-/**
  * @brief Kirajzolja a frekvencia skálát az analizátor aljára.
  */
 void AudioAnalyzerDisplay::audioScaleAnalyzer(uint16_t occupiedBottomHeight) {
@@ -176,13 +173,8 @@ void AudioAnalyzerDisplay::audioScaleAnalyzer(uint16_t occupiedBottomHeight) {
     tft.setTextSize(1);                                  // Kisebb betűméret a skálához
     tft.setFreeFont();                                   // Standard font
 
-    // A skála kezdő frekvenciája
-    float actual_start_freq_for_scale_kHz =
-        (float)AudioAnalyzerConstants::FFT_START_BIN_OFFSET * (AudioAnalyzerConstants::SAMPLING_FREQUENCY / (float)AudioAnalyzerConstants::FFT_SAMPLES) / 1000.0f;
-    // A skála végfrekvenciája a szűkített tartomány alapján
-    int actual_end_display_bin = AudioAnalyzerConstants::FFT_START_BIN_OFFSET + AudioAnalyzerConstants::ANALYZER_DISPLAY_NUM_BINS - 1;
-    actual_end_display_bin = constrain(actual_end_display_bin, AudioAnalyzerConstants::FFT_START_BIN_OFFSET, AudioAnalyzerConstants::FFT_SAMPLES / 2 - 1);
-    float max_freq_for_scale_kHz = (float)actual_end_display_bin * (AudioAnalyzerConstants::SAMPLING_FREQUENCY / (float)AudioAnalyzerConstants::FFT_SAMPLES) / 1000.0f;
+    float actual_start_freq_for_scale_kHz = AudioAnalyzerConstants::ANALYZER_MIN_FREQ_HZ / 1000.0f;
+    float max_freq_for_scale_kHz = AudioAnalyzerConstants::ANALYZER_MAX_FREQ_HZ / 1000.0f;
 
     float displayed_freq_span_kHz = max_freq_for_scale_kHz - actual_start_freq_for_scale_kHz;
     if (displayed_freq_span_kHz < 0) displayed_freq_span_kHz = 0;  // Negatív tartomány elkerülése

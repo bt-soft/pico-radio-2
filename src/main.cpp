@@ -121,7 +121,7 @@ void changeDisplay() {
                 break;
 
             case DisplayBase::DisplayType::audioAnalyzer:
-                ::pDisplay = new AudioAnalyzerDisplay(tft, si4735, band);
+                ::pDisplay = new AudioAnalyzerDisplay(tft, si4735, band, config.data.miniAudioFftConfigAnalyzer);
                 ::pDisplay->setPrevDisplayType(::currentDisplay);
                 break;
 
