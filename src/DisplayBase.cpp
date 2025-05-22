@@ -307,17 +307,13 @@ uint16_t DisplayBase::getAutoButtonPosition(ButtonOrientation orientation, uint8
     using namespace DisplayConstants;
 
     if (orientation == ButtonOrientation::Horizontal) {
+        // Kiszámoljuk, hány gomb férne el egy sorban, de maximum MaxButtonsInRow lehet
+        uint8_t buttonsPerRow = std::min((uint8_t)(tft.width() / (SCRN_BTN_W + SCREEN_BTNS_GAP)), (uint8_t)MaxButtonsInRow);
 
         if (isXpos) {
-            // uint8_t buttonsPerRow = tft.width() / (SCRN_BTN_W + SCREEN_BTNS_GAP);
-            //  Kiszámoljuk, hány gomb férne el, de maximum 6 lehet
-            uint8_t buttonsPerRow = std::min((uint8_t)(tft.width() / (SCRN_BTN_W + SCREEN_BTNS_GAP)), (uint8_t)MaxButtonsInRow);
             return SCREEN_HBTNS_X_START + ((SCRN_BTN_W + SCREEN_BTNS_GAP) * (index % buttonsPerRow));
 
         } else {
-            // uint8_t buttonsPerRow = tft.width() / (SCRN_BTN_W + SCREEN_BTNS_GAP);
-            //  Kiszámoljuk, hány gomb férne el, de maximum 6 lehet
-            uint8_t buttonsPerRow = std::min((uint8_t)(tft.width() / (SCRN_BTN_W + SCREEN_BTNS_GAP)), (uint8_t)MaxButtonsInRow);
             uint8_t row = index / buttonsPerRow;                                                               // Hányadik sorban van a gomb
             uint8_t rowCount = (horizontalScreenButtonsCount + buttonsPerRow - 1) / buttonsPerRow;             // Összes sor száma
             uint16_t totalHeight = rowCount * (SCRN_BTN_H + SCREEN_BTN_ROW_SPACING) - SCREEN_BTN_ROW_SPACING;  // Az összes sor magassága
