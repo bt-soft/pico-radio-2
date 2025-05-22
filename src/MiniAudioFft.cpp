@@ -48,7 +48,7 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
     if (this->height > 0 && this->width > 0) {
-        wabuf.resize(this->height, std::vector<int>(this->width, 0));
+        wabuf.resize(this->height, std::vector<uint8_t>(this->width, 0));
     } else {
         DEBUG("MiniAudioFft: Invalid dimensions w=%d, h=%d\n", this->width, this->height);
     }
@@ -425,18 +425,20 @@ void MiniAudioFft::loop() {
         }
     };
 
+#ifdef __DEBUG
     // Belső időmérés kiíratása (opcionális, csak debugoláshoz)
     static unsigned long lastInternalTimingPrint = 0;
     static unsigned long max_fft_loop_duration = 0;
     static unsigned long max_draw_loop_duration = 0;
     if (fft_duration > max_fft_loop_duration) max_fft_loop_duration = fft_duration;
     if (draw_duration > max_draw_loop_duration) max_draw_loop_duration = draw_duration;
-    if (millis() - lastInternalTimingPrint >= 1000) {
-        DEBUG("MiniAudioFft Internal (max 1s) - FFT: %lu us, Draw (%s): %lu us\n", max_fft_loop_duration, getModeNameString(currentMode), max_draw_loop_duration);
+    if (millis() - lastInternalTimingPrint >= 5000) {
+        DEBUG("MiniAudioFft elapsed (max 5s): - FFT: %lu us, Draw (%s): %lu us\n", max_fft_loop_duration, getModeNameString(currentMode), max_draw_loop_duration);
         lastInternalTimingPrint = millis();
         max_fft_loop_duration = 0;
         max_draw_loop_duration = 0;
     }
+#endif
 }
 
 /**
@@ -855,7 +857,7 @@ void MiniAudioFft::drawWaterfall() {
 
         if (!pAudioProcessor) continue;
         constexpr float WATERFALL_INPUT_SCALE = 0.3f;  // Kicsit növelve az érzékenységet
-        wabuf[r][width - 1] = static_cast<int>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * WATERFALL_INPUT_SCALE, 0.0, 255.0));
+        wabuf[r][width - 1] = static_cast<uint8_t>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * WATERFALL_INPUT_SCALE, 0.0, 255.0));
     }
 
     // 3. Sprite görgetése és új oszlop kirajzolása
@@ -940,7 +942,7 @@ void MiniAudioFft::drawEnvelope() {
         // Az AudioProcessor->getMagnitudeData()[fft_bin_index] már tartalmazza a csillapított értéket.
         // Alkalmazzuk az ENVELOPE_INPUT_GAIN-t.
         double gained_val = (pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * ENVELOPE_INPUT_GAIN;
-        wabuf[r][width - 1] = static_cast<int>(constrain(gained_val, 0.0, 255.0));  // 0-255 közé korlátozzuk a wabuf számára
+        wabuf[r][width - 1] = static_cast<uint8_t>(constrain(gained_val, 0.0, 255.0));  // 0-255 közé korlátozzuk a wabuf számára
     }
 
     // 3. Burkológörbe kirajzolása
@@ -1045,7 +1047,8 @@ void MiniAudioFft::drawTuningAid() {
         // Az adat tárolása a wabuf első sorában, a belső indexen
         if (!pAudioProcessor) continue;
         if (internal_x < width) {  // Biztosítjuk, hogy ne írjunk a wabuf szélességén kívülre
-            wabuf[0][internal_x] = static_cast<int>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
+            wabuf[0][internal_x] =
+                static_cast<uint8_t>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
         }
     }
 

@@ -134,7 +134,7 @@ class MiniAudioFft {
 
     // Pufferek a különböző módokhoz
     int Rpeak[MiniAudioFftConstants::LOW_RES_BANDS + 1];  // Csúcsértékek az alacsony felbontású spektrumhoz
-    std::vector<std::vector<int>> wabuf;                  // Vízeséshez és burkológörbéhez, méretezése a konstruktorban történik
+    std::vector<std::vector<uint8_t>> wabuf;              // Vízeséshez és burkológörbéhez, méretezése a konstruktorban történik
     // Az osciSamples mostantól az AudioProcessor része
     TFT_eSprite sprGraph;  // Sprite a grafikonokhoz (Waterfall, TuningAid)
     bool spriteCreated;    // Jelzi, hogy a sprGraph létre van-e hozva
