@@ -75,6 +75,10 @@ MiniAudioFft::~MiniAudioFft() {
         // A spriteCreated false-ra állítása itt nem szükséges, mert a destruktor lefutott.
         spriteCreated = false;
     }
+    if (pAudioProcessor) {
+        delete pAudioProcessor;
+        pAudioProcessor = nullptr;
+    }
 }
 
 /**
