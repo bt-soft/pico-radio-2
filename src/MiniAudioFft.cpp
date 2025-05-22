@@ -72,8 +72,6 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
 MiniAudioFft::~MiniAudioFft() {
     if (spriteCreated) {
         sprGraph.deleteSprite();
-        // A spriteCreated false-ra állítása itt nem szükséges, mert a destruktor lefutott.
-        spriteCreated = false;
     }
     if (pAudioProcessor) {
         delete pAudioProcessor;
