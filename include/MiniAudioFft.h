@@ -6,24 +6,17 @@
 
 #include <vector>  // std::vector használatához
 
+#include "AudioProcessor.h"
 #include "defines.h"  // AUDIO_INPUT_PIN és színek eléréséhez
-
-// A 10kHz-es SAMPLING_FREQUENCY miatt az FFT eljárás 0 Hz-től 5 kHz-ig terjedő sávszélességben képes mérni a frekvenciakomponenseket.
-// A grafikus megjelenítők ebből tipikusan a kb. 78 Hz-től 4.96 kHz-ig terjedő tartományt ábrázolják.
 
 // Konstansok a MiniAudioFft komponenshez
 namespace MiniAudioFftConstants {
-constexpr uint16_t FFT_SAMPLES = 256;                        // Minták száma az FFT-hez (2 hatványának kell lennie)
-constexpr double SAMPLING_FREQUENCY = 40000.0;               // Mintavételezési frekvencia Hz-ben (a tényleges mért sebesség alapján ~40kHz)
-constexpr float AMPLITUDE_SCALE = 40.0f;                     // Skálázási faktor az FFT eredményekhez (tovább csökkentve az érzékenység növeléséhez)
-constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 200.0f;  // Ez alatti frekvenciákat csillapítjuk
-constexpr float LOW_FREQ_ATTENUATION_FACTOR = 10.0f;         // Ezzel a faktorral osztjuk az alacsony frekvenciák magnitúdóját
 
 // Belső tömbök maximális méretei, ha a komponens mérete nagyobb lenne.
 // A tényleges rajzolás a komponens w,h méreteihez van vágva/skálázva.
-constexpr int MAX_INTERNAL_WIDTH = 86;   // Oszcilloszkóp és magas felb. spektrum belső bufferéhez
-constexpr int MAX_INTERNAL_HEIGHT = 80;  // Vízesés és burkológörbe belső buffer magassága
-constexpr int LOW_RES_BANDS = 24;        // Alacsony felbontású spektrum sávjainak száma (csökkentve 24-re)
+constexpr int MAX_INTERNAL_WIDTH = AudioProcessorConstants::MAX_INTERNAL_WIDTH;  // Oszcilloszkóp és magas felb. spektrum belső bufferéhez
+constexpr int MAX_INTERNAL_HEIGHT = 80;                                          // Vízesés és burkológörbe belső buffer magassága
+constexpr int LOW_RES_BANDS = 24;                                                // Alacsony felbontású spektrum sávjainak száma (csökkentve 24-re)
 // A HIGH_RES_BINS_TO_DISPLAY és OSCI_SAMPLES_TO_DRAW a komponens aktuális szélességéből adódik.
 // A WF_WIDTH és WF_HEIGHT a komponens aktuális szélességéből és magasságából (csökkentve a kijelzővel) adódik.
 
@@ -73,12 +66,10 @@ const uint16_t WATERFALL_COLORS[16] = {
 };  // A színek változatlanok
 constexpr int MAX_WATERFALL_COLOR_INPUT_VALUE = 20000;  // Maximális bemeneti érték a vízesés színkonverziójához
 
-// Konstansok az Auto Gain módhoz
-constexpr float FFT_AUTO_GAIN_TARGET_PEAK = 1500.0f;  // Cél csúcsérték az Auto Gain módhoz (a +/-2047 tartományból)
-constexpr float FFT_AUTO_GAIN_MIN_FACTOR = 0.1f;      // Minimális erősítési faktor Auto módban
-constexpr float FFT_AUTO_GAIN_MAX_FACTOR = 10.0f;     // Maximális erősítési faktor Auto módban
-
 }  // namespace MiniAudioFftConstants
+
+// Forward declaration
+class AudioProcessor;
 
 class MiniAudioFft {
    public:  // Publikus enum a könnyebb elérhetőségért, ha külsőleg is hivatkoznánk rá
@@ -138,16 +129,12 @@ class MiniAudioFft {
     float currentConfiguredMaxDisplayAudioFreqHz;  // Az AM/FM módnak megfelelő maximális frekvencia
     float& activeFftGainConfigRef;                 // Referencia az aktív FFT erősítés konfigurációra (AM vagy FM)
 
-    ArduinoFFT<double> FFT;                             // FFT objektum
-    double vReal[MiniAudioFftConstants::FFT_SAMPLES];   // Valós rész az FFT bemenetéhez/kimenetéhez
-    double vImag[MiniAudioFftConstants::FFT_SAMPLES];   // Képzetes rész az FFT-hez
-    double RvReal[MiniAudioFftConstants::FFT_SAMPLES];  // FFT magnitúdók tárolására
+    AudioProcessor* pAudioProcessor;  // Pointer az új audio feldolgozó osztályra
 
     // Pufferek a különböző módokhoz
-    int Rpeak[MiniAudioFftConstants::LOW_RES_BANDS + 1];         // Csúcsértékek az alacsony felbontású spektrumhoz
-    std::vector<std::vector<int>> wabuf;                         // Vízeséshez és burkológörbéhez, méretezése a konstruktorban történik
-    int osciSamples[MiniAudioFftConstants::MAX_INTERNAL_WIDTH];  // Oszcilloszkóp minták
-
+    int Rpeak[MiniAudioFftConstants::LOW_RES_BANDS + 1];  // Csúcsértékek az alacsony felbontású spektrumhoz
+    std::vector<std::vector<int>> wabuf;                  // Vízeséshez és burkológörbéhez, méretezése a konstruktorban történik
+    // Az osciSamples mostantól az AudioProcessor része
     TFT_eSprite sprGraph;  // Sprite a grafikonokhoz (Waterfall, TuningAid)
     bool spriteCreated;    // Jelzi, hogy a sprGraph létre van-e hozva
 
@@ -167,11 +154,6 @@ class MiniAudioFft {
      * @brief Letörli a komponens teljes területét.
      */
     void clearArea();
-    /**
-     * @brief Elvégzi az FFT mintavételezést és számítást.
-     * @param collectOsciSamples Igaz, ha az oszcilloszkóp számára is kell mintákat gyűjteni.
-     */
-    void performFFT(bool collectOsciSamples);
 
     // Az egyes módok kirajzoló függvényei
     void drawSpectrumLowRes();
