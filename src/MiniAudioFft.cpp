@@ -593,17 +593,11 @@ void MiniAudioFft::drawSpectrumLowRes() {
     int current_draw_x_on_screen = posX + x_offset;
 
     // Grafikon területének törlése (csak a grafikon sávja)
-    // Ezt a fő `clearArea` már elvégezte, vagy a `loop` frissíti az oszlopokat.
-    // Itt csak a csúcsokat töröljük.
+    // A csúcsok "esését" kezeljük, de a tényleges törlést a teljes oszlop törlése végzi.
     for (int band_idx = 0; band_idx < bands_to_display_on_screen; band_idx++) {
-        if (Rpeak[band_idx] > 0) {
-            int xP = current_draw_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
-            int yP = posY + graphH - Rpeak[band_idx];  // Y a grafikon területén belül
-            int erase_h = std::min(2, posY + graphH - yP);
-            if (yP < posY + graphH && erase_h > 0) {
-                tft.fillRect(xP, yP, dynamic_bar_width_pixels, erase_h, TFT_BLACK);
-            }
-        }
+        // A csúcsjelzők explicit törlése (fillRect) itt már nem szükséges,
+        // mert a teljes oszlopot töröljük alább, mielőtt újrarajzolnánk.
+        // Csak a csúcsérték csökkentése marad.
         if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
     }
 
