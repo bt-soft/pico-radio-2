@@ -94,7 +94,8 @@ class MiniAudioFft {
      * @param h A komponens magassága.
      * @param configuredMaxDisplayAudioFreq Az adott képernyőmódhoz (AM/FM) konfigurált maximális megjelenítendő audio frekvencia.
      * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
-     * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.     */
+     * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.
+     * */
     MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef);
     ~MiniAudioFft();
 

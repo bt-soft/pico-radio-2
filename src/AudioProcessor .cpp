@@ -3,10 +3,18 @@
 #include "AudioProcessor.h"
 #include "defines.h"  // DEBUG makróhoz, ha szükséges
 
-AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double samplingRate)
-    : FFT(), activeFftGainConfigRef(gainConfigRef), audioInputPin(audioPin), samplingFrequency_(samplingRate) {
-    // Bin szélesség kiszámítása a kapott mintavételezési frekvencia alapján
-    binWidthHz_ = static_cast<float>(samplingFrequency_) / AudioProcessorConstants::FFT_SAMPLES;
+AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double targetSamplingFrequency)
+    : FFT(), activeFftGainConfigRef(gainConfigRef), audioInputPin(audioPin), targetSamplingFrequency_(targetSamplingFrequency), binWidthHz_(0.0f) {
+    if (targetSamplingFrequency_ > 0) {
+        sampleIntervalMicros_ = static_cast<uint32_t>(1000000.0 / targetSamplingFrequency_);
+        binWidthHz_ = static_cast<float>(targetSamplingFrequency_) / AudioProcessorConstants::FFT_SAMPLES;
+    } else {
+        sampleIntervalMicros_ = 25;  // Fallback to 40kHz
+        binWidthHz_ = (1000000.0f / sampleIntervalMicros_) / AudioProcessorConstants::FFT_SAMPLES;
+        DEBUG("AudioProcessor: Warning - targetSamplingFrequency is zero, using fallback.");
+    }
+    DEBUG("AudioProcessor: Target Fs: %.1f Hz, Sample Interval: %lu us, Bin Width: %.2f Hz\n", targetSamplingFrequency_, sampleIntervalMicros_, binWidthHz_);
+
     // Oszcilloszkóp minták inicializálása középpontra (ADC nyers érték)
     for (int i = 0; i < AudioProcessorConstants::MAX_INTERNAL_WIDTH; ++i) {
         osciSamples[i] = 2048;
@@ -23,6 +31,7 @@ AudioProcessor::~AudioProcessor() {
 
 void AudioProcessor::process(bool collectOsciSamples) {
     int osci_sample_idx = 0;
+    uint32_t loopStartTimeMicros;
     double max_abs_sample_for_auto_gain = 0.0;
 
     // Ha az FFT ki van kapcsolva (-1.0f), akkor töröljük a puffereket és visszatérünk
@@ -35,7 +44,9 @@ void AudioProcessor::process(bool collectOsciSamples) {
     }
 
     // 1. Mintavételezés és középre igazítás, opcionális oszcilloszkóp mintagyűjtés
+    // A teljes mintavételezési ciklus idejét is mérhetnénk, de az egyes minták időzítése fontosabb.
     for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
+        loopStartTimeMicros = micros();
         uint32_t sum = 0;
         for (int j = 0; j < 4; j++) {  // 4 minta átlagolása
             sum += analogRead(audioInputPin);
@@ -57,6 +68,12 @@ void AudioProcessor::process(bool collectOsciSamples) {
             if (std::abs(vReal[i]) > max_abs_sample_for_auto_gain) {
                 max_abs_sample_for_auto_gain = std::abs(vReal[i]);
             }
+        }
+
+        // Időzítés a cél mintavételezési frekvencia eléréséhez
+        uint32_t processingTimeMicros = micros() - loopStartTimeMicros;
+        if (processingTimeMicros < sampleIntervalMicros_) {
+            delayMicroseconds(sampleIntervalMicros_ - processingTimeMicros);
         }
     }
 

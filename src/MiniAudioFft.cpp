@@ -24,6 +24,7 @@ constexpr uint32_t MODE_INDICATOR_TIMEOUT_MS = 20000;  // 20 másodperc
  * @param configuredMaxDisplayAudioFreq Az adott képernyőmódhoz (AM/FM) konfigurált maximális megjelenítendő audio frekvencia.
  * @param configModeField Referencia a Config_t megfelelő uint8_t mezőjére, ahova a módot menteni kell.
  * @param fftGainConfigRef Referencia a Config_t megfelelő float mezőjére az FFT erősítés konfigurációjához.
+ * @param targetAudioProcessorSamplingRate Az AudioProcessor számára beállítandó cél mintavételezési frekvencia.
  */
 MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float configuredMaxDisplayAudioFreq, uint8_t& configDisplayModeFieldRef, float& fftGainConfigRef)
     : tft(tft),
@@ -55,12 +56,7 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
     // Pufferek nullázása
     memset(Rpeak, 0, sizeof(Rpeak));
 
-    // AudioProcessor példányosítása a kívánt mintavételezési frekvenciával.
-    pAudioProcessor = new AudioProcessor(activeFftGainConfigRef,               // Az FFT erősítés konfiguráció referenciája
-                                         AUDIO_INPUT_PIN,                      // Az audio bemeneti pin
-                                         configuredMaxDisplayAudioFreq * 2.0f  // Mintavételezési frekvencia
-
-    );
+    pAudioProcessor = new AudioProcessor(activeFftGainConfigRef, AUDIO_INPUT_PIN, configuredMaxDisplayAudioFreq * 2.0f);
 }
 
 /**
