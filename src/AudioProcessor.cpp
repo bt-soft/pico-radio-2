@@ -108,6 +108,16 @@ void AudioProcessor::process(bool collectOsciSamples) {
         for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
             vReal[i] *= smoothed_auto_gain_factor_;
         }
+
+#ifdef __DEBUG
+        static unsigned long lastGainPrintTime = 0;
+        if (millis() - lastGainPrintTime >= 1000) {
+            if (activeFftGainConfigRef == 0.0f) { // Csak auto gain módban írjuk ki
+                DEBUG("AudioProcessor: Smoothed Auto Gain Factor: %.2f\n", smoothed_auto_gain_factor_);
+            }
+            lastGainPrintTime = millis();
+        }
+#endif
     }
     // 3. Ablakozás, FFT számítás, magnitúdó
     FFT.windowing(vReal, AudioProcessorConstants::FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);

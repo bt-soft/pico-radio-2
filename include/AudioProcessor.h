@@ -13,7 +13,7 @@ constexpr float LOW_FREQ_ATTENUATION_THRESHOLD_HZ = 200.0f;  // Ez alatti frekve
 constexpr float LOW_FREQ_ATTENUATION_FACTOR = 10.0f;         // Ezzel a faktorral osztjuk az alacsony frekvenciák magnitúdóját
 
 // Konstansok az Auto Gain módhoz
-constexpr float FFT_AUTO_GAIN_TARGET_PEAK = 1500.0f;  // Cél csúcsérték az Auto Gain módhoz (a +/-2047 tartományból)
+constexpr float FFT_AUTO_GAIN_TARGET_PEAK = 500.0f;  // Cél csúcsérték az Auto Gain módhoz (a +/-2047 tartományból) - CSÖKKENTVE
 constexpr float FFT_AUTO_GAIN_MIN_FACTOR = 0.1f;      // Minimális erősítési faktor Auto módban
 constexpr float FFT_AUTO_GAIN_MAX_FACTOR = 10.0f;     // Maximális erősítési faktor Auto módban
 constexpr float AUTO_GAIN_ATTACK_COEFF = 0.5f;   // Erősítés csökkentésének sebessége (0.0-1.0, nagyobb = gyorsabb)
