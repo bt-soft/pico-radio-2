@@ -30,7 +30,7 @@ constexpr float MAX_DISPLAY_AUDIO_FREQ_FM_HZ = 15000.0f;  // Maximális megjelen
 constexpr uint32_t TOUCH_DEBOUNCE_MS = 300;  // Érintés "debounce" ideje milliszekundumban
 
 // Evenlope
-constexpr float ENVELOPE_INPUT_GAIN = 0.1f;         // Erősítési faktor a burkológörbe bemenetéhez
+constexpr float ENVELOPE_INPUT_GAIN = 0.05f;        // Erősítési faktor a burkológörbe bemenetéhez (csökkentve a vastagság miatt)
 constexpr float ENVELOPE_SMOOTH_FACTOR = 0.25f;     // Simítási faktor a burkológörbéhez
 constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagságának skálázója
 

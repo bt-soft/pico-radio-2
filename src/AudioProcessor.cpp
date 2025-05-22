@@ -1,10 +1,14 @@
 #include <cmath>  // std::abs, std::round
 
 #include "AudioProcessor.h"
-#include "defines.h"  // DEBUG makróhoz, ha szükséges
+#include "defines.h" // DEBUG makróhoz, ha szükséges
 
 AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double targetSamplingFrequency)
-    : FFT(), activeFftGainConfigRef(gainConfigRef), audioInputPin(audioPin), targetSamplingFrequency_(targetSamplingFrequency), binWidthHz_(0.0f) {
+    : FFT(), activeFftGainConfigRef(gainConfigRef), audioInputPin(audioPin),
+      targetSamplingFrequency_(targetSamplingFrequency), binWidthHz_(0.0f),
+      smoothed_auto_gain_factor_(1.0f) // Simított erősítési faktor inicializálása
+{
+
     if (targetSamplingFrequency_ > 0) {
         sampleIntervalMicros_ = static_cast<uint32_t>(1000000.0 / targetSamplingFrequency_);
         binWidthHz_ = static_cast<float>(targetSamplingFrequency_) / AudioProcessorConstants::FFT_SAMPLES;
@@ -82,16 +86,29 @@ void AudioProcessor::process(bool collectOsciSamples) {
         for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
             vReal[i] *= activeFftGainConfigRef;
         }
-    } else if (activeFftGainConfigRef == 0.0f) {     // Auto Gain (normalizálás)
+    } else if (activeFftGainConfigRef == 0.0f) {     // Auto Gain
+        float target_auto_gain_factor = 1.0f; // Alapértelmezett erősítés, ha nincs jel
+
         if (max_abs_sample_for_auto_gain > 0.001) {  // Nullával osztás és extrém erősítés elkerülése
-            float auto_gain_factor = AudioProcessorConstants::FFT_AUTO_GAIN_TARGET_PEAK / max_abs_sample_for_auto_gain;
-            auto_gain_factor = constrain(auto_gain_factor, AudioProcessorConstants::FFT_AUTO_GAIN_MIN_FACTOR, AudioProcessorConstants::FFT_AUTO_GAIN_MAX_FACTOR);
-            for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
-                vReal[i] *= auto_gain_factor;
-            }
+            target_auto_gain_factor = AudioProcessorConstants::FFT_AUTO_GAIN_TARGET_PEAK / max_abs_sample_for_auto_gain;
+            target_auto_gain_factor = constrain(target_auto_gain_factor, AudioProcessorConstants::FFT_AUTO_GAIN_MIN_FACTOR, AudioProcessorConstants::FFT_AUTO_GAIN_MAX_FACTOR);
+        }
+
+        // Az erősítési faktor simítása
+        if (target_auto_gain_factor < smoothed_auto_gain_factor_) {
+            // A jel hangosabb lett, vagy a cél erősítés alacsonyabb -> gyorsabb "attack"
+            smoothed_auto_gain_factor_ += AudioProcessorConstants::AUTO_GAIN_ATTACK_COEFF * (target_auto_gain_factor - smoothed_auto_gain_factor_);
+        } else {
+            // A jel halkabb lett, vagy a cél erősítés magasabb -> lassabb "release"
+            smoothed_auto_gain_factor_ += AudioProcessorConstants::AUTO_GAIN_RELEASE_COEFF * (target_auto_gain_factor - smoothed_auto_gain_factor_);
+        }
+        // Biztosítjuk, hogy a simított faktor is a határokon belül maradjon
+        smoothed_auto_gain_factor_ = constrain(smoothed_auto_gain_factor_, AudioProcessorConstants::FFT_AUTO_GAIN_MIN_FACTOR, AudioProcessorConstants::FFT_AUTO_GAIN_MAX_FACTOR);
+
+        for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
+            vReal[i] *= smoothed_auto_gain_factor_;
         }
     }
-
     // 3. Ablakozás, FFT számítás, magnitúdó
     FFT.windowing(vReal, AudioProcessorConstants::FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
     FFT.compute(vReal, vImag, AudioProcessorConstants::FFT_SAMPLES, FFT_FORWARD);
