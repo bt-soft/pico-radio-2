@@ -5,7 +5,7 @@
 /**
  * Konstruktor
  */
-AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band, CwDecoder *cwDecoder) : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr), pCwDecoderInstance(cwDecoder) {
+AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr) {
 
     DEBUG("AmDisplay::AmDisplay\n");
 
@@ -313,24 +313,5 @@ void AmDisplay::displayLoop() {
     // MiniAudioFft ciklus futtatása
     if (pMiniAudioFft != nullptr) {  // Ellenőrizzük, hogy létezik-e és nem nullptr
         pMiniAudioFft->loop();
-    }
-
-    //------------------- CW dekóder logika áthelyezve ide ---
-    // Csak akkor futtatjuk, ha CW módban vagyunk és van CwDecoder példány
-    if (pCwDecoderInstance != nullptr /*&& currentBand.varData.currMod == CW*/) {
-        char display_buffer[CW_DECODER_BUFFER_SIZE];  // Elég nagy buffer a kiolvasáshoz
-        size_t len = pCwDecoderInstance->get_decoded_text(display_buffer, sizeof(display_buffer));
-        if (len > 0) {
-            // Itt kellene a dekódolt szöveget megjeleníteni az AM képernyőn.
-            // Mivel ez a displayLoop, a közvetlen Serial.print ide nem ideális,
-            // de a debugoláshoz ideiglenesen maradhat, vagy egy dedikált
-            // képernyő-frissítési mechanizmusba kellene integrálni.
-            // Serial.print("CW (AmDisplay): "); // Jelöljük, hogy innen jön
-            // Serial.print(display_buffer);
-            // Serial.println();
-
-            // TODO: Implementáld a dekódolt CW szöveg megjelenítését az AM képernyőn.
-            // pl. this->drawDecodedCwText(display_buffer);
-        }
     }
 }

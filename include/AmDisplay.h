@@ -5,7 +5,6 @@
 #include "MiniAudioFft.h"
 #include "SMeter.h"
 #include "SevenSegmentFreq.h"
-#include "CwDecoder.h" // CW dekóder include
 
 /**
  *
@@ -16,7 +15,6 @@ class AmDisplay : public DisplayBase {
     SMeter *pSMeter;
     SevenSegmentFreq *pSevenSegmentFreq;
     MiniAudioFft *pMiniAudioFft;
-    CwDecoder *pCwDecoderInstance; // Pointer a CwDecoder példányra
 
    protected:
     /**
@@ -43,7 +41,7 @@ class AmDisplay : public DisplayBase {
     /**
      * Konstruktor
      */
-    AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band, CwDecoder *cwDecoder); // Módosított konstruktor
+    AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band);
 
     /**
      * Destruktor

@@ -6,21 +6,19 @@
 #include "utils.h"
 
 //------------------ TFT
-#include <TFT_eSPI.h>  // TFT_eSPI könyvtár
-TFT_eSPI tft;          // TFT objektum
+#include <TFT_eSPI.h>
+TFT_eSPI tft;
 
 //------------------- Rotary Encoder
-#define __USE_ROTARY_ENCODER_IN_HW_TIMER
 #ifdef __USE_ROTARY_ENCODER_IN_HW_TIMER
 // Pico Hardware timer a Rotary encoder olvasására
 #include <RPi_Pico_TimerInterrupt.h>
 RPI_PICO_Timer rotaryTimer(0);  // 0-ás timer használata
 #endif
-
 #include "RotaryEncoder.h"
 RotaryEncoder rotaryEncoder = RotaryEncoder(PIN_ENCODER_CLK, PIN_ENCODER_DT, PIN_ENCODER_SW, ROTARY_ENCODER_STEPS_PER_NOTCH);
 #define ROTARY_ENCODER_SERVICE_INTERVAL_IN_MSEC 1  // 1msec
-// #define SCREEN_SAVER_TIME 1000 * 60 * 5 // 5 perc - Ezt most már a configból vesszük
+
 //------------------- EEPROM Config
 #include "Config.h"
 Config config;
@@ -55,9 +53,6 @@ AmStationStore amStationStore;
 DisplayBase *pDisplay = nullptr;
 
 //---- Dekóderek
-// #define USE_MORSE_DECODER
-#include "CwDecoder.h"
-CwDecoder *pMorse_decoder = nullptr;  // Pointer a CwDecoder példányra, kezdetben nullptr
 
 /**
  * Globális változó az aktuális kijelző váltásának előjegyzése
@@ -108,7 +103,7 @@ void changeDisplay() {
                 break;
 
             case DisplayBase::DisplayType::am:
-                ::pDisplay = new AmDisplay(tft, si4735, band, pMorse_decoder);  // Átadjuk a pointert
+                ::pDisplay = new AmDisplay(tft, si4735, band);
                 break;
 
             case DisplayBase::DisplayType::freqScan:

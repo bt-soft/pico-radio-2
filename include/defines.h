@@ -18,6 +18,7 @@
 #define PIN_SI4735_RESET 10
 
 // Rotary Encoder
+#define __USE_ROTARY_ENCODER_IN_HW_TIMER
 #define PIN_ENCODER_CLK 17
 #define PIN_ENCODER_DT 16
 #define PIN_ENCODER_SW 18
