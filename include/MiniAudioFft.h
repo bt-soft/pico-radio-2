@@ -141,6 +141,7 @@ class MiniAudioFft {
 
     int highResOffset;                     // Magas felbontású spektrum eltolásához (FFT.ino 'offset')
     float envelope_prev_smoothed_max_val;  // Előző simított maximális amplitúdó az Envelope módhoz
+    int indicatorFontHeight_;              // A módkijelzőhöz használt font magassága
 
     // Belső segédfüggvények
     /**

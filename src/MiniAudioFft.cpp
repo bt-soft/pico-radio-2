@@ -41,6 +41,7 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
       activeFftGainConfigRef(fftGainConfigRef),                               // Referencia elmentése az erősítés konfigurációhoz
       highResOffset(0),
       envelope_prev_smoothed_max_val(0.0f),
+      indicatorFontHeight_(0),   // Inicializálás
       pAudioProcessor(nullptr),  // Inicializáljuk nullptr-rel
       sprGraph(&tft),            // Sprite inicializálása a TFT referenciával
       spriteCreated(false) {
@@ -57,6 +58,12 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
     memset(Rpeak, 0, sizeof(Rpeak));
 
     pAudioProcessor = new AudioProcessor(activeFftGainConfigRef, AUDIO_INPUT_PIN, configuredMaxDisplayAudioFreq * 2.0f);
+
+    // A módkijelző font magasságának kiszámítása és tárolása
+    // Ugyanazokat a beállításokat használjuk, mint a drawModeIndicator-ban
+    tft.setFreeFont();
+    tft.setTextSize(1);
+    indicatorFontHeight_ = tft.fontHeight();
 }
 
 /**
@@ -192,10 +199,7 @@ void MiniAudioFft::clearArea() {
  * @return int A módkijelző területének magassága pixelekben.
  */
 int MiniAudioFft::getIndicatorAreaHeight() const {
-    TFT_eSPI& temp_tft = const_cast<TFT_eSPI&>(tft);
-    temp_tft.setFreeFont();
-    temp_tft.setTextSize(1);
-    return temp_tft.fontHeight() + 2;  // +2 pixel margó
+    return indicatorFontHeight_ + 2;  // +2 pixel margó
 }
 
 /**
