@@ -256,22 +256,24 @@ class TftButton {
         // A kisebb font esetén lehet, hogy kicsit lejjebb kell tolni a jobb vizuális középre igazításhoz.
         pTft->drawString(label, x + w / 2, y + h / 2 + (useMiniFont_ ? 1 : 0));  // Mini font esetén +1 pixel lejjebb
 
-        // LED csík kirajzolása ha a gomb aktív vagy push, és nyomják
-        uint16_t ledColor = 0;
-        if (state == ButtonState::On) {
-            // Ha On állapotú, akkor zöld a LED csík
-            ledColor = TFT_BUTTON_LED_ON;
-        } else if (type == ButtonType::Pushable && buttonPressed) {
-            // Ha Pushable típusú és épp nyomva tartják, akkor a LED narancs
-            ledColor = TFT_BUTTON_LED_PUSHED;
-        } else if (type == ButtonType::Toggleable && state == ButtonState::Off) {
-            // Ha Toggleable típusú és Off állapotú, akkor a LED sötétzöld
-            ledColor = TFT_BUTTON_LED_OFF;  // Sötétzöld
-        }
-        // Ha kell állítani a LED színt
-        if (ledColor) {
-            constexpr uint8_t BUTTON_LED_HEIGHT = 5;
-            pTft->fillRect(x + 10, y + h - BUTTON_LED_HEIGHT - 3, w - 20, BUTTON_LED_HEIGHT, ledColor);
+        // LED csík kirajzolása, de csak akkor, ha NEM használunk mini fontot
+        if (!useMiniFont_) {
+            uint16_t ledColor = 0;
+            if (state == ButtonState::On) {
+                // Ha On állapotú, akkor zöld a LED csík
+                ledColor = TFT_BUTTON_LED_ON;
+            } else if (type == ButtonType::Pushable && buttonPressed) {
+                // Ha Pushable típusú és épp nyomva tartják, akkor a LED narancs
+                ledColor = TFT_BUTTON_LED_PUSHED;
+            } else if (type == ButtonType::Toggleable && state == ButtonState::Off) {
+                // Ha Toggleable típusú és Off állapotú, akkor a LED sötétzöld
+                ledColor = TFT_BUTTON_LED_OFF;  // Sötétzöld
+            }
+            // Ha kell állítani a LED színt
+            if (ledColor) {
+                constexpr uint8_t BUTTON_LED_HEIGHT = 5;
+                pTft->fillRect(x + 10, y + h - BUTTON_LED_HEIGHT - 3, w - 20, BUTTON_LED_HEIGHT, ledColor);
+            }
         }
     }
 

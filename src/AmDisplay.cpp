@@ -490,9 +490,12 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     currentDecodeMode = newMode;
 
     // Gombok állapotának frissítése
-    if (pDecodeOffButton) pDecodeOffButton->setState(currentDecodeMode == DecodeMode::OFF ? TftButton::ButtonState::CurrentActive : TftButton::ButtonState::Off);
-    if (pDecodeRttyButton) pDecodeRttyButton->setState(currentDecodeMode == DecodeMode::RTTY ? TftButton::ButtonState::CurrentActive : TftButton::ButtonState::Off);
-    if (pDecodeCwButton) pDecodeCwButton->setState(currentDecodeMode == DecodeMode::MORSE ? TftButton::ButtonState::CurrentActive : TftButton::ButtonState::Off);
+    // A setState() újrarajzolja a gombot, ha az állapota változik.
+    // A TftButton::ButtonState::On helyett a CurrentActive-ot használjuk a kiválasztott mód jelzésére.
+    // A többi gomb Off állapotú lesz.
+    if (pDecodeOffButton) pDecodeOffButton->setState(currentDecodeMode == DecodeMode::OFF ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
+    if (pDecodeRttyButton) pDecodeRttyButton->setState(currentDecodeMode == DecodeMode::RTTY ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
+    if (pDecodeCwButton) pDecodeCwButton->setState(currentDecodeMode == DecodeMode::MORSE ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
 
     // Gombok újrarajzolása (a setState már intézi, de biztos, ami biztos)
     // drawDecodeModeButtons(); // Vagy csak a megváltozottakat, de a setState már rajzol
@@ -517,4 +520,9 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
             appendRttyCharacter(modeMsg[i]);
         }
     }
+
+    // Mivel a konstruktorban már nem állítjuk be a kezdeti aktív gombot,
+    // itt, az első setDecodeMode híváskor (ami a konstruktor végén történhetne,
+    // vagy az első drawScreen előtt) biztosítjuk, hogy az "Off" gomb legyen az alapértelmezett aktív.
+    // Ezt a konstruktor végére is tehetnénk: setDecodeMode(DecodeMode::OFF);
 }
