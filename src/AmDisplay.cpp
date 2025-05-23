@@ -8,7 +8,8 @@
  * @param si4735 Referencia az SI4735 rádió chip objektumra.
  * @param band Referencia a Band objektumra.
  */
-AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr) {
+AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
+    : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr), decoderModeGroup(tft) {  // decoderModeGroup inicializálása
 
     DEBUG("AmDisplay::AmDisplay\n");
 
@@ -62,14 +63,12 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
 
     // Dekódolási módváltó gombok létrehozása
     uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
-    // A RadioButton konstruktora már beállítja a mini fontot
-    RadioButton *rbOff = new RadioButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "Off", &decoderModeGroup);
-    RadioButton *rbRtty = new RadioButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "RTTY", &decoderModeGroup);
-    RadioButton *rbCw = new RadioButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "CW", &decoderModeGroup);
+    decoderModeStartId_ = nextButtonId; // Elmentjük a kezdő ID-t
 
-    decoderModeGroup.addButton(rbOff);
-    decoderModeGroup.addButton(rbRtty);
-    decoderModeGroup.addButton(rbCw);
+    std::vector<String> decoderLabels = {"Off", "RTTY", "CW"};
+    decoderModeGroup.createButtons(decoderLabels, nextButtonId);
+    // A RadioButton konstruktora már beállítja a mini fontot és a group-ot.
+    // A pozíciókat és méreteket a drawDecodeModeButtons fogja beállítani.
 
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
@@ -191,22 +190,44 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
         // Képernyő váltás SSTV módra
         ::newDisplay = DisplayBase::DisplayType::sstv;
     } else {
-        // A RadioButtonGroup::handleTouch már lefutott, és a TftButton eseménykezelője
-        // a `event` változóban átadta a megnyomott gomb adatait.
-        // Most a RadioButtonGroup-nak kell kiválasztania a gombot,
-        // és az AmDisplay-nek be kell állítania a megfelelő dekódolási módot.
 
-        // Először a RadioButtonGroup válassza ki a gombot az ID alapján.
+        // A RadioButtonGroup NEM a DisplayBase::buildScreenButtons-szal lett létrehozva,
+        // így az eseményét nem a DisplayBase::loop fogja közvetlenül ideadni.
+        // A RadioButtonGroup::handleTouch-t kell meghívni az AmDisplay::handleTouch-ban,
+        // és az alapján kell itt dönteni.
+        // A `event.id` és `event.label` itt a DisplayBase által kezelt gombokra vonatkozik.
+        // A RadioButton-ok eseményét az AmDisplay::handleTouch-ban kell elkapni.
+        // Mivel a RadioButton-ok nem TftButton-ok, a `event` itt nem rájuk vonatkozik.
+        // A RadioButtonGroup::handleTouch-nak kellene jeleznie, hogy melyik gomb lett megnyomva.
+        // A jelenlegi RadioButtonGroup::handleTouch visszaadja a megnyomott gomb ID-ját.
+        // Ezt az AmDisplay::handleTouch-ban kellene eltárolni és itt felhasználni,
+        // VAGY a RadioButtonGroup::selectButton-t közvetlenül a handleTouch-ban hívni.
+
+        // A RadioButtonGroup.selectButton-t már a handleTouch-ban hívtuk.
         // Ez beállítja a gombok vizuális állapotát (On/Off).
-        decoderModeGroup.selectButton(event.id);
 
-        // Majd az AmDisplay állítsa be a belső dekódolási módot.
-        if (STREQ(event.label, "Off"))
-            setDecodeMode(DecodeMode::OFF);
-        else if (STREQ(event.label, "RTTY"))
-            setDecodeMode(DecodeMode::RTTY);
-        else if (STREQ(event.label, "CW"))
-            setDecodeMode(DecodeMode::MORSE);
+        // Itt már csak a belső `currentDecodeMode`-ot kell beállítani, ha a `decoderModeGroup.handleTouch`
+        // jelzett egy eseményt. Ezt a `setDecodeMode`-ban tesszük meg a kiválasztott index alapján.
+        // A `processScreenButtonTouchEvent`-nek nem kell foglalkoznia a RadioButton-okkal,
+        // ha a `handleTouch` már kezeli őket.
+
+        // Ha a RadioButtonGroup eseményét itt akarjuk kezelni, akkor a
+        // RadioButtonGroup::handleTouch-nak egy ButtonTouchEvent-szerű struktúrát kellene visszaadnia,
+        // vagy az AmDisplay-nek kellene egy tagváltozóban tárolnia a legutóbb megnyomott RadioButton ID-ját.
+
+        // Egyszerűbb, ha a RadioButtonGroup::handleTouch közvetlenül hívja a setDecodeMode-ot
+        // a megfelelő móddal, miután a gombot kiválasztotta.
+        // Vagy az AmDisplay::handleTouch hívja a setDecodeMode-ot.
+
+        // A jelenlegi struktúra szerint az AmDisplay::handleTouch hívja a decoderModeGroup.handleTouch-ot,
+        // ami kiválasztja a gombot. A setDecodeMode-ot is ott kellene hívni.
+        // Vagy a processScreenButtonTouchEvent-nek kellene tudnia, hogy a RadioButton-ok
+        // melyik ID-tartományba esnek.
+
+        // Tegyük fel, hogy az AmDisplay::handleTouch már beállította a `currentDecodeMode`-ot
+        // a `setDecodeMode` hívásával, miután a `decoderModeGroup.handleTouch` lefutott.
+        // Így itt nincs teendő a RadioButton-okkal.
+
         // TODO: Ezt robosztusabbá kell tenni, pl. a RadioButtonGroup adjon vissza egy eseményt,
         // vagy a gomboknak legyen egy egyedi azonosítójuk a móddal.
     }
@@ -223,8 +244,14 @@ bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         return true;
     }
 
-    if (decoderModeGroup.handleTouch(touched, tx, ty)) {
-        return true;  // A RadioButtonGroup kezelte
+    uint8_t pressedRadioBtnId = 0xFF;
+    if (decoderModeGroup.handleTouch(touched, tx, ty, pressedRadioBtnId)) {
+        // A decoderModeGroup.handleTouch már kiválasztotta a gombot.
+        // Most az AmDisplay-nek be kell állítania a belső módot.
+        if (pressedRadioBtnId != 0xFF) {  // Ha tényleg egy rádiógomb lett megnyomva
+            setDecodeModeBasedOnButtonId(pressedRadioBtnId);
+        }
+        return true;
     }
 
     // A frekvencia kijelző kezeli a touch eseményeket SSB/CW módban
@@ -417,7 +444,7 @@ void AmDisplay::displayLoop() {
  * Pozicionálja a szövegterület mellett.
  */
 void AmDisplay::drawDecodeModeButtons() {
-    decoderModeGroup.setPositions(decodeModeButtonsX, rttyTextAreaY, DECODER_MODE_BTN_GAP_Y);
+    decoderModeGroup.setPositionsAndSize(decodeModeButtonsX, rttyTextAreaY, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, DECODER_MODE_BTN_GAP_Y);
     decoderModeGroup.draw();
 }
 
@@ -485,16 +512,21 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
 
     currentDecodeMode = newMode;
 
-    // A RadioButtonGroup kezeli a gombok állapotát
+    // A RadioButtonGroup.selectButtonByIndex frissíti a gombok vizuális állapotát
     switch (newMode) {
         case DecodeMode::OFF:
             decoderModeGroup.selectButtonByIndex(0);  // Feltételezve, hogy az "Off" az első
+            // DEBUG("Decode Mode set to OFF\n");
             break;
         case DecodeMode::RTTY:
             decoderModeGroup.selectButtonByIndex(1);  // "RTTY" a második
+            // DEBUG("Decode Mode set to RTTY\n");
             break;
         case DecodeMode::MORSE:
             decoderModeGroup.selectButtonByIndex(2);  // "CW" a harmadik
+            // DEBUG("Decode Mode set to MORSE\n");
+            break;
+        default:
             break;
     }
     // Gombok újrarajzolása (a setState már intézi, de biztos, ami biztos)
@@ -525,4 +557,21 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     // itt, az első setDecodeMode híváskor (ami a konstruktor végén történhetne,
     // vagy az első drawScreen előtt) biztosítjuk, hogy az "Off" gomb legyen az alapértelmezett aktív.
     // Ezt a konstruktor végére is tehetnénk: setDecodeMode(DecodeMode::OFF);
+}
+
+/**
+ * @brief Beállítja a dekódolási módot egy RadioButton ID alapján.
+ * Ezt a handleTouch hívja.
+ */
+void AmDisplay::setDecodeModeBasedOnButtonId(uint8_t buttonId) {
+    // Itt feltételezzük, hogy a RadioButton-ok ID-i sorfolytonosak,
+    // és az első gomb ("Off") ID-ja ismert.
+    // Vagy a RadioButtonGroup adjon vissza egy indexet vagy egyértelműbb azonosítót.
+    // A decoderModeStartId_ alapján azonosítjuk a gombokat.
+    if (buttonId == decoderModeStartId_ + 0) // Első gomb: Off
+        setDecodeMode(DecodeMode::OFF);
+    else if (buttonId == decoderModeStartId_ + 1) // Második gomb: RTTY
+        setDecodeMode(DecodeMode::RTTY);
+    else if (buttonId == decoderModeStartId_ + 2) // Harmadik gomb: MORSE
+        setDecodeMode(DecodeMode::MORSE);
 }
