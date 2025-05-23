@@ -53,7 +53,8 @@ class AmDisplay : public DisplayBase {
     void drawRttyTextAreaBackground();
     void appendRttyCharacter(char c);
     void updateRttyTextDisplay();
-    void clearRttyTextBuffer(); // Új segédfüggvény
+    void clearRttyTextBufferOnly(); // Csak a puffert törli
+    void clearRttyTextBufferAndDisplay(); // Törli a puffert és frissíti a kijelzőt
     void drawDecodeModeButtons();
     void setDecodeMode(DecodeMode newMode);
 

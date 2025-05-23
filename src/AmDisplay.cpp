@@ -530,8 +530,8 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     // Gombok újrarajzolása (a setState már intézi, de biztos, ami biztos)
     // drawDecodeModeButtons(); // Vagy csak a megváltozottakat, de a setState már rajzol
 
-    // Szöveg pufferek törlése (az updateRttyTextDisplay majd újrarajzolja üresen, ha nincs üzenet)
-    clearRttyTextBuffer();
+    // Szöveg pufferek törlése és a terület újrarajzolása üresen
+    clearRttyTextBufferAndDisplay();
 
     const char *modeMsg = nullptr;
     if (currentDecodeMode == DecodeMode::RTTY)
@@ -544,6 +544,12 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
         for (int i = 0; modeMsg[i] != '\0'; ++i) {
             appendRttyCharacter(modeMsg[i]);
         }
+        // Miután az összes karaktert hozzáadtuk a bufferhez, egyszer frissítjük a kijelzőt
+        // De az appendRttyCharacter már nem hívja az updateRttyTextDisplay-t.
+        // Vagy az appendRttyCharacter-t módosítjuk, vagy itt hívjuk meg egyszer.
+        // Ha az appendRttyCharacter-t módosítjuk, akkor itt kell egy updateRttyTextDisplay() hívás.
+        // Maradjunk annál, hogy az appendRttyCharacter frissít, de a setDecodeMode-ban
+        // a modeMsg kiírása után nem kell külön update.
     }
 
     // Mivel a konstruktorban már nem állítjuk be a kezdeti aktív gombot,
@@ -554,13 +560,15 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
 
 /**
  * @brief Törli az RTTY szöveg puffereit.
+ * És opcionálisan frissíti a kijelzőt.
  */
-void AmDisplay::clearRttyTextBuffer() {
+void AmDisplay::clearRttyTextBufferAndDisplay() {
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
         rttyDisplayLines[i] = "";
     }
     rttyCurrentLineBuffer = "";
     rttyCurrentLineIndex = 0;
+    updateRttyTextDisplay(); // Törlés után azonnal frissítjük a kijelzőt üresre
 }
 
 /**
