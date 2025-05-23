@@ -53,7 +53,8 @@ const Config_t DEFAULT_CONFIG = {
     .miniAudioFftModeFm = static_cast<uint8_t>(MiniAudioFft::DisplayMode::SpectrumLowRes),
 
     // MiniAudioFft erősítés
-    .miniAudioFftConfigAm = 0.0f,  // Auto Gain
-    .miniAudioFftConfigFm = 0.0f,  // Auto Gain
-    .miniAudioFftConfigAnalyzer = 0.0f, // Analyzerhez alapértelmezetten Auto Gain
+    .miniAudioFftConfigAm = 0.0f,        // Auto Gain
+    .miniAudioFftConfigFm = 0.0f,        // Auto Gain
+    .miniAudioFftConfigAnalyzer = 0.0f,  // Analyzerhez alapértelmezetten Auto Gain
+    .miniAudioFftConfigRtty = 0.0f,      // RTTY-hez alapértelmezetten Auto Gain
 };

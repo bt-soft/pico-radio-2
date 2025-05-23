@@ -64,6 +64,7 @@ struct Config_t {
     float miniAudioFftConfigFm;  // -1.0f: Disabled, 0.0f: Auto, >0.0f: Manual Gain Factor
 
     float miniAudioFftConfigAnalyzer;  // MiniAudioFft erősítés konfigurációja az Analyzerhez
+    float miniAudioFftConfigRtty;      // MiniAudioFft erősítés konfigurációja az RTTY-hez
 };
 
 // Alapértelmezett konfigurációs adatok (readonly, const)

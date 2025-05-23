@@ -81,7 +81,7 @@ constexpr uint8_t InitialPrevSpoint = 0xFF;  // Érvénytelen érték, hogy az e
  */
 class SMeter {
    private:
-    TFT_eSPI &tft;
+    TFT_eSPI& tft;
     uint32_t smeterX;            // S-Meter komponens bal felső sarkának X koordinátája
     uint32_t smeterY;            // S-Meter komponens bal felső sarkának Y koordinátája
     uint8_t prev_spoint_bars;    // Előző S-pont érték a grafikus sávokhoz
@@ -273,7 +273,7 @@ class SMeter {
      * @param smeterX Az S-Meter komponens bal felső sarkának X koordinátája.
      * @param smeterY Az S-Meter komponens bal felső sarkának Y koordinátája.
      */
-    SMeter(TFT_eSPI &tft, uint8_t smeterX, uint8_t smeterY)
+    SMeter(TFT_eSPI& tft, uint8_t smeterX, uint8_t smeterY)
         : tft(tft), smeterX(smeterX), smeterY(smeterY), prev_spoint_bars(SMeterConstants::InitialPrevSpoint), prev_rssi_for_text(0xFF), prev_snr_for_text(0xFF) {
         // prev_text_buffer[0] = '\0';  // Erre már nincs szükség
         // Inicializáljuk a pozíciós változókat, de a tényleges értékeket a drawSmeterScale-ben számoljuk ki
@@ -325,26 +325,26 @@ class SMeter {
         text_y_pos = smeterY + ScaleEndYOffset + 2;
         uint16_t current_x_calc = smeterX + RssiLabelXOffset;
 
-        tft.setFreeFont(); // Biztosítjuk a helyes fontot a textWidth-hez
+        tft.setFreeFont();  // Biztosítjuk a helyes fontot a textWidth-hez
         tft.setTextSize(1);
-        tft.setTextColor(TFT_GREEN, TFT_COLOR_BACKGROUND); // Feliratok színe
+        tft.setTextColor(TFT_GREEN, TFT_COLOR_BACKGROUND);  // Feliratok színe
         tft.setTextDatum(TL_DATUM);
-        text_h = tft.fontHeight(); // Szöveg magassága a törléshez
+        text_h = tft.fontHeight();  // Szöveg magassága a törléshez
 
         // RSSI Felirat
         const char* rssi_label_text = "RSSI: ";
         tft.drawString(rssi_label_text, current_x_calc, text_y_pos);
         rssi_label_x_pos = current_x_calc;
         rssi_value_x_pos = current_x_calc + tft.textWidth(rssi_label_text);
-        rssi_value_max_w = tft.textWidth("XXX dBuV"); // Max lehetséges szélesség
-        current_x_calc = rssi_value_x_pos + rssi_value_max_w + 10; // 10px rés
+        rssi_value_max_w = tft.textWidth("XXX dBuV");               // Max lehetséges szélesség
+        current_x_calc = rssi_value_x_pos + rssi_value_max_w + 10;  // 10px rés
 
         // SNR Felirat
         const char* snr_label_text = "SNR: ";
         tft.drawString(snr_label_text, current_x_calc, text_y_pos);
         snr_label_x_pos = current_x_calc;
         snr_value_x_pos = current_x_calc + tft.textWidth(snr_label_text);
-        snr_value_max_w = tft.textWidth("XXX dB"); // Max lehetséges szélesség
+        snr_value_max_w = tft.textWidth("XXX dB");  // Max lehetséges szélesség
     }
 
     /**
@@ -362,16 +362,16 @@ class SMeter {
         bool rssi_changed = (rssi != prev_rssi_for_text);
         bool snr_changed = (snr != prev_snr_for_text);
 
-        if (!rssi_changed && !snr_changed) return; // Ha semmi sem változott, kilépünk
+        if (!rssi_changed && !snr_changed) return;  // Ha semmi sem változott, kilépünk
 
         // Font és egyéb beállítások az értékekhez
         tft.setFreeFont();
         tft.setTextSize(1);
-        tft.setTextDatum(TL_DATUM); // Balra igazítjuk az értékeket a label után
-        tft.setTextColor(TFT_WHITE, TFT_COLOR_BACKGROUND); // Értékek színe: fehér, háttér: fekete (felülíráshoz)
+        tft.setTextDatum(TL_DATUM);                         // Balra igazítjuk az értékeket a label után
+        tft.setTextColor(TFT_WHITE, TFT_COLOR_BACKGROUND);  // Értékek színe: fehér, háttér: fekete (felülíráshoz)
 
         if (rssi_changed) {
-            char rssi_str_buff[12]; // "XXX dBuV" + null
+            char rssi_str_buff[12];  // "XXX dBuV" + null
             snprintf(rssi_str_buff, sizeof(rssi_str_buff), "%3d dBuV", rssi);
             // Régi érték területének törlése
             tft.fillRect(rssi_value_x_pos, text_y_pos, rssi_value_max_w, text_h, TFT_COLOR_BACKGROUND);
@@ -380,7 +380,7 @@ class SMeter {
         }
 
         if (snr_changed) {
-            char snr_str_buff[10]; // "XXX dB" + null
+            char snr_str_buff[10];  // "XXX dB" + null
             snprintf(snr_str_buff, sizeof(snr_str_buff), "%3d dB", snr);
             // Régi érték területének törlése
             tft.fillRect(snr_value_x_pos, text_y_pos, snr_value_max_w, text_h, TFT_COLOR_BACKGROUND);
@@ -392,6 +392,7 @@ class SMeter {
         if (rssi_changed) {
             prev_rssi_for_text = rssi;
         }
+
         if (snr_changed) {
             prev_snr_for_text = snr;
         }

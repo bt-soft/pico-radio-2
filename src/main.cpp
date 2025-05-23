@@ -49,7 +49,7 @@ AmStationStore amStationStore;
 #include "MemoryDisplay.h"
 #include "ScreenSaverDisplay.h"
 #include "SetupDisplay.h"
-#include "SstvDisplay.h"  // ÚJ SSTV Display include
+#include "SstvDisplay.h"
 DisplayBase *pDisplay = nullptr;
 
 //---- Dekóderek
