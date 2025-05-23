@@ -41,6 +41,8 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
     rttyTextAreaX = DECODER_TEXT_AREA_X_START;
     rttyTextAreaY = 150;
+    rttyTextAreaW = decodeModeButtonsX - DECODER_MODE_BTN_GAP_X - rttyTextAreaX;
+    rttyTextAreaH = 80;  // Kezdeti magasság
 
     // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
     // Feltételezzük, hogy a "Mute" gomb az első a függőleges sorban és létezik.
@@ -48,18 +50,9 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     TftButton *firstVerticalButton = DisplayBase::findButtonByLabel("Mute");
     uint16_t mainVerticalButtonsStartX = tft.width() - SCRN_BTN_W - SCREEN_VBTNS_X_MARGIN;  // Alapértelmezett, ha nem található
     if (firstVerticalButton) {
-        mainVerticalButtonsStartX = firstVerticalButton->x;  // Pontosabb X pozíció
+        mainVerticalButtonsStartX = firstVerticalButton->getX();  // Pontosabb X pozíció a getterrel
     }
-
     decodeModeButtonsX = mainVerticalButtonsStartX - DECODER_MODE_BTN_GAP_X - DECODER_MODE_BTN_W;
-    rttyTextAreaW = decodeModeButtonsX - DECODER_MODE_BTN_GAP_X - rttyTextAreaX;
-
-    // RTTY szövegterület magassága
-    // A magasságot úgy korlátozzuk, hogy a horizontális gombok felett legyen hely
-    uint16_t bottomHorizontalButtonsY = tft.height() - (SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2);
-    rttyTextAreaH = bottomHorizontalButtonsY - rttyTextAreaY - DECODER_TEXT_AREA_Y_MARGIN_BOTTOM;
-    // Biztosítjuk, hogy a magasság ne legyen negatív vagy túl kicsi
-    if (rttyTextAreaH < RTTY_MAX_TEXT_LINES * 10) rttyTextAreaH = RTTY_MAX_TEXT_LINES * 10;  // Minimum magasság
 
     // Dekódolt szöveg pufferek inicializálása
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
@@ -70,15 +63,12 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Dekódolási módváltó gombok létrehozása
     uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
     pDecodeOffButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "Off", TftButton::ButtonType::Pushable);
+    pDecodeOffButton->setMiniFont(true);
+    pDecodeOffButton->setState(TftButton::ButtonState::CurrentActive);
     pDecodeRttyButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "RTTY", TftButton::ButtonType::Pushable);
+    pDecodeRttyButton->setMiniFont(true);
     pDecodeCwButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "CW", TftButton::ButtonType::Pushable);
-
-    if (pDecodeOffButton) {
-        pDecodeOffButton->setMiniFont(true);
-        pDecodeOffButton->setState(TftButton::ButtonState::CurrentActive);
-    }
-    if (pDecodeRttyButton) pDecodeRttyButton->setMiniFont(true);
-    if (pDecodeCwButton) pDecodeCwButton->setMiniFont(true);
+    pDecodeCwButton->setMiniFont(true);
 
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
