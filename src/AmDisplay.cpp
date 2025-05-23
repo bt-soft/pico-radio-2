@@ -30,11 +30,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
         {"SSTV", TftButton::ButtonType::Pushable},                                // SSTV GOMB
         {"AntC", TftButton::ButtonType::Pushable},                                //
     };
-
-    // RTTY/CW módválasztó gomb létrehozása (nem a buildHorizontalScreenButtons része)
-    // Ezt a gombot manuálisan hozzuk létre és pozicionáljuk a szövegterület mellé.
-    // Az ID-jét a SCRN_HBTNS_ID_START + a horizontális gombok száma után adjuk meg.
-    // A pontos ID-t a buildHorizontalScreenButtons hívása után tudjuk meghatározni.
+    uint8_t horizontalButtonCount = ARRAY_ITEM_COUNT(horizontalButtonsData);
 
     // MiniAudioFft és RTTY dekóder inicializálása
     // Az AudioProcessor a MiniAudioFftConfigAm gain config referenciát használja.
@@ -42,11 +38,28 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigAm, AUDIO_INPUT_PIN, MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
     pRttyDecoder = new RttyDecoder(*pAudioProcessor);  // RTTY dekóder inicializálása az AudioProcessorral
 
-    // RTTY szövegterület koordinátái
-    rttyTextAreaX = RTTY_TEXT_AREA_X_MARGIN;
-    rttyTextAreaY = 150;  // RSSI/SNR alatt legyen
-    rttyTextAreaW = 370;  // Szélesség
-    rttyTextAreaH = 80;   // Magasság
+    // Szövegterület és módváltó gombok pozícióinak kiszámítása
+    rttyTextAreaX = DECODER_TEXT_AREA_X_START;
+    rttyTextAreaY = 150;
+
+    // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
+    // Feltételezzük, hogy a "Mute" gomb az első a függőleges sorban és létezik.
+    // Ha nem, akkor egy fix értékkel kell számolni.
+    TftButton *firstVerticalButton = DisplayBase::findButtonByLabel("Mute");
+    uint16_t mainVerticalButtonsStartX = tft.width() - SCRN_BTN_W - SCREEN_VBTNS_X_MARGIN;  // Alapértelmezett, ha nem található
+    if (firstVerticalButton) {
+        mainVerticalButtonsStartX = firstVerticalButton->x;  // Pontosabb X pozíció
+    }
+
+    decodeModeButtonsX = mainVerticalButtonsStartX - DECODER_MODE_BTN_GAP_X - DECODER_MODE_BTN_W;
+    rttyTextAreaW = decodeModeButtonsX - DECODER_MODE_BTN_GAP_X - rttyTextAreaX;
+
+    // RTTY szövegterület magassága
+    // A magasságot úgy korlátozzuk, hogy a horizontális gombok felett legyen hely
+    uint16_t bottomHorizontalButtonsY = tft.height() - (SCRN_BTN_H + SCREEN_HBTNS_Y_MARGIN * 2);
+    rttyTextAreaH = bottomHorizontalButtonsY - rttyTextAreaY - DECODER_TEXT_AREA_Y_MARGIN_BOTTOM;
+    // Biztosítjuk, hogy a magasság ne legyen negatív vagy túl kicsi
+    if (rttyTextAreaH < RTTY_MAX_TEXT_LINES * 10) rttyTextAreaH = RTTY_MAX_TEXT_LINES * 10;  // Minimum magasság
 
     // Dekódolt szöveg pufferek inicializálása
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
@@ -54,14 +67,18 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     }
     rttyCurrentLineBuffer = "";
 
-    // RTTY/CW módválasztó gomb létrehozása
-    // A pontos pozíciót a drawScreen-ben számoljuk ki.
-    uint16_t modeButtonWidth = SCRN_BTN_W / 2;                                                        // Kisebb gomb
-    pRttyCwModeButton = new TftButton(SCRN_HBTNS_ID_START + ARRAY_ITEM_COUNT(horizontalButtonsData),  // ID a horizontális gombok után
-                                      tft, 0, 0, modeButtonWidth, SCRN_BTN_H / 2,                     // Helyőrző pozíció és méret
-                                      currentDecodeMode == DecodeMode::RTTY ? "RTTY" : "CW",          // Kezdeti felirat
-                                      TftButton::ButtonType::Pushable);                               // Pushable, mert vált a módok között
-    if (pRttyCwModeButton) pRttyCwModeButton->setMiniFont(true);                                      // Kisebb betűtípus beállítása
+    // Dekódolási módváltó gombok létrehozása
+    uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
+    pDecodeOffButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "Off", TftButton::ButtonType::Pushable);
+    pDecodeRttyButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "RTTY", TftButton::ButtonType::Pushable);
+    pDecodeCwButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "CW", TftButton::ButtonType::Pushable);
+
+    if (pDecodeOffButton) {
+        pDecodeOffButton->setMiniFont(true);
+        pDecodeOffButton->setState(TftButton::ButtonState::CurrentActive);
+    }
+    if (pDecodeRttyButton) pDecodeRttyButton->setMiniFont(true);
+    if (pDecodeCwButton) pDecodeCwButton->setMiniFont(true);
 
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
@@ -93,6 +110,10 @@ AmDisplay::~AmDisplay() {
     if (pRttyDecoder) {
         delete pRttyDecoder;
     }
+    // Dekódoló gombok törlése
+    if (pDecodeOffButton) delete pDecodeOffButton;
+    if (pDecodeRttyButton) delete pDecodeRttyButton;
+    if (pDecodeCwButton) delete pDecodeCwButton;
 }
 
 /**
@@ -118,8 +139,8 @@ void AmDisplay::drawScreen() {
     float currFreq = band.getCurrentBand().varData.currFreq;  // A Rotary változtatásakor már eltettük a Band táblába
     pSevenSegmentFreq->freqDispl(currFreq);
 
-    // RTTY/CW módválasztó gomb pozicionálása és kirajzolása
-    drawRttyCwModeButton();
+    // Dekódolási módválasztó gombok pozicionálása és kirajzolása
+    drawDecodeModeButtons();
 
     // RTTY szövegterület hátterének és tartalmának kirajzolása
     drawRttyTextAreaBackground();
@@ -180,8 +201,12 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
     } else if (STREQ("SSTV", event.label)) {
         // Képernyő váltás SSTV módra
         ::newDisplay = DisplayBase::DisplayType::sstv;
-    } else if (event.id == pRttyCwModeButton->getId()) {  // RTTY/CW módválasztó gomb
-        toggleRttyCwMode();                               // Váltás a módok között
+    } else if (pDecodeOffButton && event.id == pDecodeOffButton->getId()) {
+        setDecodeMode(DecodeMode::OFF);
+    } else if (pDecodeRttyButton && event.id == pDecodeRttyButton->getId()) {
+        setDecodeMode(DecodeMode::RTTY);
+    } else if (pDecodeCwButton && event.id == pDecodeCwButton->getId()) {
+        setDecodeMode(DecodeMode::MORSE);
     }
 }
 
@@ -196,9 +221,11 @@ bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         return true;
     }
 
-    // RTTY/CW módválasztó gomb touch kezelése (manuálisan)
-    if (pRttyCwModeButton && pRttyCwModeButton->handleTouch(touched, tx, ty)) {
-        return true;  // Kezeltük a gombnyomást, a processScreenButtonTouchEvent fogja feldolgozni
+    // Dekódolási módválasztó gombok touch kezelése
+    if (pDecodeOffButton && pDecodeOffButton->handleTouch(touched, tx, ty)) return true;
+    if (pDecodeRttyButton && pDecodeRttyButton->handleTouch(touched, tx, ty)) return true;
+    if (pDecodeCwButton && pDecodeCwButton->handleTouch(touched, tx, ty)) {
+        return true;
     }
 
     // A frekvencia kijelző kezeli a touch eseményeket SSB/CW módban
@@ -387,17 +414,24 @@ void AmDisplay::displayLoop() {
 }
 
 /**
- * @brief Kirajzolja az RTTY/CW módválasztó gombot.
+ * @brief Kirajzolja a dekódolási módválasztó gombokat.
  * Pozicionálja a szövegterület mellett.
  */
-void AmDisplay::drawRttyCwModeButton() {
-    if (pRttyCwModeButton) {
-        // A gomb X pozíciója a szövegterület jobb szélétől jobbra
-        uint16_t buttonX = rttyTextAreaX + rttyTextAreaW + 5;  // 5px rés
-        // A gomb Y pozíciója a szövegterület tetejéhez igazítva
-        uint16_t buttonY = rttyTextAreaY;
-        pRttyCwModeButton->setPosition(buttonX, buttonY);
-        pRttyCwModeButton->draw();
+void AmDisplay::drawDecodeModeButtons() {
+    uint16_t currentY = rttyTextAreaY;
+    if (pDecodeOffButton) {
+        pDecodeOffButton->setPosition(decodeModeButtonsX, currentY);
+        pDecodeOffButton->draw();
+        currentY += DECODER_MODE_BTN_H + DECODER_MODE_BTN_GAP_Y;
+    }
+    if (pDecodeRttyButton) {
+        pDecodeRttyButton->setPosition(decodeModeButtonsX, currentY);
+        pDecodeRttyButton->draw();
+        currentY += DECODER_MODE_BTN_H + DECODER_MODE_BTN_GAP_Y;
+    }
+    if (pDecodeCwButton) {
+        pDecodeCwButton->setPosition(decodeModeButtonsX, currentY);
+        pDecodeCwButton->draw();
     }
 }
 
@@ -457,22 +491,21 @@ void AmDisplay::updateRttyTextDisplay() {
 }
 
 /**
- * @brief Vált az RTTY és CW dekódolási módok között.
+ * @brief Beállítja a dekódolási módot és frissíti a gombok állapotát.
+ * @param newMode Az új dekódolási mód.
  */
-void AmDisplay::toggleRttyCwMode() {
-    if (currentDecodeMode == DecodeMode::RTTY) {
-        currentDecodeMode = DecodeMode::MORSE;
-        if (pRttyCwModeButton) pRttyCwModeButton->setLabel("CW");
-        // TODO: RTTY dekóder resetelése/leállítása
-        // TODO: CW dekóder inicializálása/indítása
-    } else {  // MORSE
-        currentDecodeMode = DecodeMode::RTTY;
-        if (pRttyCwModeButton) pRttyCwModeButton->setLabel("RTTY");
-        // TODO: CW dekóder resetelése/leállítása
-        // TODO: RTTY dekóder inicializálása/indítása
-    }
-    // Módválasztó gomb újrarajzolása
-    if (pRttyCwModeButton) pRttyCwModeButton->draw();
+void AmDisplay::setDecodeMode(DecodeMode newMode) {
+    if (currentDecodeMode == newMode) return;  // Nincs változás
+
+    currentDecodeMode = newMode;
+
+    // Gombok állapotának frissítése
+    if (pDecodeOffButton) pDecodeOffButton->setState(currentDecodeMode == DecodeMode::OFF ? TftButton::ButtonState::CurrentActive : TftButton::ButtonState::Off);
+    if (pDecodeRttyButton) pDecodeRttyButton->setState(currentDecodeMode == DecodeMode::RTTY ? TftButton::ButtonState::CurrentActive : TftButton::ButtonState::Off);
+    if (pDecodeCwButton) pDecodeCwButton->setState(currentDecodeMode == DecodeMode::MORSE ? TftButton::ButtonState::CurrentActive : TftButton::ButtonState::Off);
+
+    // Gombok újrarajzolása (a setState már intézi, de biztos, ami biztos)
+    // drawDecodeModeButtons(); // Vagy csak a megváltozottakat, de a setState már rajzol
 
     // Szövegterület törlése és frissítése az új módhoz
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
@@ -482,9 +515,16 @@ void AmDisplay::toggleRttyCwMode() {
     rttyCurrentLineIndex = 0;
     updateRttyTextDisplay();
 
-    // Opcionális: Kiírhatjuk a módváltást a szövegterületre
-    const char *modeMsg = (currentDecodeMode == DecodeMode::RTTY) ? "--- RTTY Mode ---\n" : "--- CW Mode ---\n";
-    for (int i = 0; modeMsg[i] != '\0'; ++i) {
-        appendRttyCharacter(modeMsg[i]);
+    const char *modeMsg = nullptr;
+    if (currentDecodeMode == DecodeMode::RTTY)
+        modeMsg = "--- RTTY Mode ---\n";
+    else if (currentDecodeMode == DecodeMode::MORSE)
+        modeMsg = "--- CW Mode ---\n";
+    // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
+
+    if (modeMsg) {
+        for (int i = 0; modeMsg[i] != '\0'; ++i) {
+            appendRttyCharacter(modeMsg[i]);
+        }
     }
 }
