@@ -488,7 +488,8 @@ void AmDisplay::appendRttyCharacter(char c) {
         rttyCurrentLineBuffer += c;
     }
 
-    updateRttyTextDisplay();
+    // Az updateRttyTextDisplay() hívását kivettük innen,
+    // hogy ne frissüljön minden egyes karakter után a teljes kijelző.
 }
 
 /**
@@ -554,14 +555,10 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
         for (int i = 0; modeMsg[i] != '\0'; ++i) {
             appendRttyCharacter(modeMsg[i]);
         }
-        // Miután az összes karaktert hozzáadtuk a bufferhez, egyszer frissítjük a kijelzőt
-        // De az appendRttyCharacter már nem hívja az updateRttyTextDisplay-t.
-        // Vagy az appendRttyCharacter-t módosítjuk, vagy itt hívjuk meg egyszer.
-        // Ha az appendRttyCharacter-t módosítjuk, akkor itt kell egy updateRttyTextDisplay() hívás.
-        // Maradjunk annál, hogy az appendRttyCharacter frissít, de a setDecodeMode-ban
-        // a modeMsg kiírása után nem kell külön update.
+        // Miután az összes karaktert hozzáadtuk a bufferhez (az appendRttyCharacter már nem frissít),
+        // egyszer frissítjük a kijelzőt, hogy a modeMsg megjelenjen.
+        updateRttyTextDisplay();
     }
-
     // Mivel a konstruktorban már nem állítjuk be a kezdeti aktív gombot,
     // itt, az első setDecodeMode híváskor (ami a konstruktor végén történhetne,
     // vagy az első drawScreen előtt) biztosítjuk, hogy az "Off" gomb legyen az alapértelmezett aktív.
