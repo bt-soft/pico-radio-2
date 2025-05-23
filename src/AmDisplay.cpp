@@ -9,7 +9,10 @@
  * @param band Referencia a Band objektumra.
  */
 AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
-    : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr), decoderModeGroup(tft) {  // decoderModeGroup inicializálása
+    : DisplayBase(tft, si4735, band),
+      pMiniAudioFft(nullptr),
+      decoderModeGroup(tft),
+      currentDecodeMode(DecodeMode::OFF) { // currentDecodeMode inicializálása OFF-ra
 
     DEBUG("AmDisplay::AmDisplay\n");
 
@@ -68,11 +71,18 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     std::vector<String> decoderLabels = {"Off", "RTTY", "CW"};
     decoderModeGroup.createButtons(decoderLabels, nextButtonId);
     // A RadioButton konstruktora már beállítja a mini fontot és a group-ot.
-    // A pozíciókat és méreteket a drawDecodeModeButtons fogja beállítani.
+    // A pozíciókat és méreteket a drawDecodeModeButtons fogja beállítani a drawScreen-ben.
+
+    // Kezdetben az "Off" gomb legyen kiválasztva vizuálisan.
+    // A currentDecodeMode már OFF-ra van állítva.
+    decoderModeGroup.selectButtonByIndex(0); // "Off" gomb kiválasztása
 
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
+
+    // Biztosítjuk, hogy a szövegterület kezdetben tiszta legyen az OFF módnak megfelelően.
+    clearRttyTextBufferAndDisplay();
 }
 
 /**
