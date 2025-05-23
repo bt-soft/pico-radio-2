@@ -61,6 +61,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
                                       tft, 0, 0, modeButtonWidth, SCRN_BTN_H / 2,                     // Helyőrző pozíció és méret
                                       currentDecodeMode == DecodeMode::RTTY ? "RTTY" : "CW",          // Kezdeti felirat
                                       TftButton::ButtonType::Pushable);                               // Pushable, mert vált a módok között
+    if (pRttyCwModeButton) pRttyCwModeButton->setMiniFont(true);                                      // Kisebb betűtípus beállítása
 
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.

@@ -67,6 +67,7 @@ class TftButton {
     ButtonState oldState;              // Előző állapota
     ButtonType type;                   // Típusa
     bool buttonPressed;                // Flag a gomb nyomva tartásának követésére
+    bool useMiniFont_ = false;         // Kisebb betűtípust használjon-e a felirathoz
     unsigned long pressStartTime = 0;  // Mikor nyomták le a gombot
 
     /**
@@ -178,6 +179,12 @@ class TftButton {
     }
 
     /**
+     * Beállítja, hogy a gomb felirata kisebb ("mini") betűtípussal jelenjen-e meg.
+     * @param mini Igaz, ha kisebb betűtípust kell használni.
+     */
+    inline void setMiniFont(bool mini) { useMiniFont_ = mini; }
+
+    /**
      * A button kirajzolása
      */
     void draw() {
@@ -225,12 +232,19 @@ class TftButton {
         // Az (x, y) koordináta a szöveg középpontja
         pTft->setTextDatum(MC_DATUM);
 
-        // Fontváltás a gomb feliratozásához
-        pTft->setFreeFont(&FreeSansBold9pt7b);
-        pTft->setTextSize(1);
+        // Betűtípus beállítása a felirathoz
+        if (useMiniFont_) {
+            pTft->setFreeFont();  // Alapértelmezett (kisebb) font
+            pTft->setTextSize(1);
+        } else {
+            pTft->setFreeFont(&FreeSansBold9pt7b);
+            pTft->setTextSize(1);
+        }
         pTft->setTextPadding(0);
-        constexpr uint8_t BUTTON_LABEL_MARGIN_TOP = 3;  // A felirat a gomb felső részéhez képest
-        pTft->drawString(label, x + w / 2, y - BUTTON_LABEL_MARGIN_TOP + h / 2);
+        // A felirat Y pozíciójának finomhangolása, hogy középen legyen
+        // A setTextDatum(MC_DATUM) miatt a h/2 a szöveg közepét jelenti.
+        // A kisebb font esetén lehet, hogy kicsit lejjebb kell tolni a jobb vizuális középre igazításhoz.
+        pTft->drawString(label, x + w / 2, y + h / 2 + (useMiniFont_ ? 1 : 0));  // Mini font esetén +1 pixel lejjebb
 
         // LED csík kirajzolása ha a gomb aktív vagy push, és nyomják
         uint16_t ledColor = 0;
