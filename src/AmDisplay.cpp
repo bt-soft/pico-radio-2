@@ -9,10 +9,7 @@
  * @param band Referencia a Band objektumra.
  */
 AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
-    : DisplayBase(tft, si4735, band),
-      pMiniAudioFft(nullptr),
-      decoderModeGroup(tft),
-      currentDecodeMode(DecodeMode::OFF) { // currentDecodeMode inicializálása OFF-ra
+    : DisplayBase(tft, si4735, band), pMiniAudioFft(nullptr), decoderModeGroup(tft), currentDecodeMode(DecodeMode::OFF) {  // currentDecodeMode inicializálása OFF-ra
 
     DEBUG("AmDisplay::AmDisplay\n");
 
@@ -66,7 +63,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
 
     // Dekódolási módváltó gombok létrehozása
     uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
-    decoderModeStartId_ = nextButtonId; // Elmentjük a kezdő ID-t
+    decoderModeStartId_ = nextButtonId;  // Elmentjük a kezdő ID-t
 
     std::vector<String> decoderLabels = {"Off", "RTTY", "CW"};
     decoderModeGroup.createButtons(decoderLabels, nextButtonId);
@@ -75,7 +72,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
 
     // Kezdetben az "Off" gomb legyen kiválasztva vizuálisan.
     // A currentDecodeMode már OFF-ra van állítva.
-    decoderModeGroup.selectButtonByIndex(0); // "Off" gomb kiválasztása
+    decoderModeGroup.selectButtonByIndex(0);  // "Off" gomb kiválasztása
 
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
@@ -549,20 +546,25 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
         modeMsg = "--- RTTY Mode ---\n";
     else if (currentDecodeMode == DecodeMode::MORSE)
         modeMsg = "--- CW Mode ---\n";
-    // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
 
-    if (modeMsg) {
-        for (int i = 0; modeMsg[i] != '\0'; ++i) {
-            appendRttyCharacter(modeMsg[i]);
+    if (currentDecodeMode == DecodeMode::RTTY && pRttyDecoder) {
+        pRttyDecoder->startAutoDetect();  // Automatikus frekvencia detektálás indítása RTTY módba lépéskor
+        modeMsg = "--- CW Mode ---\n";
+        // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
+
+        if (modeMsg) {
+            for (int i = 0; modeMsg[i] != '\0'; ++i) {
+                appendRttyCharacter(modeMsg[i]);
+            }
+            // Miután az összes karaktert hozzáadtuk a bufferhez (az appendRttyCharacter már nem frissít),
+            // egyszer frissítjük a kijelzőt, hogy a modeMsg megjelenjen.
+            updateRttyTextDisplay();
         }
-        // Miután az összes karaktert hozzáadtuk a bufferhez (az appendRttyCharacter már nem frissít),
-        // egyszer frissítjük a kijelzőt, hogy a modeMsg megjelenjen.
-        updateRttyTextDisplay();
+        // Mivel a konstruktorban már nem állítjuk be a kezdeti aktív gombot,
+        // itt, az első setDecodeMode híváskor (ami a konstruktor végén történhetne,
+        // vagy az első drawScreen előtt) biztosítjuk, hogy az "Off" gomb legyen az alapértelmezett aktív.
+        // Ezt a konstruktor végére is tehetnénk: setDecodeMode(DecodeMode::OFF);
     }
-    // Mivel a konstruktorban már nem állítjuk be a kezdeti aktív gombot,
-    // itt, az első setDecodeMode híváskor (ami a konstruktor végén történhetne,
-    // vagy az első drawScreen előtt) biztosítjuk, hogy az "Off" gomb legyen az alapértelmezett aktív.
-    // Ezt a konstruktor végére is tehetnénk: setDecodeMode(DecodeMode::OFF);
 }
 
 /**
@@ -575,7 +577,7 @@ void AmDisplay::clearRttyTextBufferAndDisplay() {
     }
     rttyCurrentLineBuffer = "";
     rttyCurrentLineIndex = 0;
-    updateRttyTextDisplay(); // Törlés után azonnal frissítjük a kijelzőt üresre
+    updateRttyTextDisplay();  // Törlés után azonnal frissítjük a kijelzőt üresre
 }
 
 /**
@@ -587,10 +589,10 @@ void AmDisplay::setDecodeModeBasedOnButtonId(uint8_t buttonId) {
     // és az első gomb ("Off") ID-ja ismert.
     // Vagy a RadioButtonGroup adjon vissza egy indexet vagy egyértelműbb azonosítót.
     // A decoderModeStartId_ alapján azonosítjuk a gombokat.
-    if (buttonId == decoderModeStartId_ + 0) // Első gomb: Off
+    if (buttonId == decoderModeStartId_ + 0)  // Első gomb: Off
         setDecodeMode(DecodeMode::OFF);
-    else if (buttonId == decoderModeStartId_ + 1) // Második gomb: RTTY
+    else if (buttonId == decoderModeStartId_ + 1)  // Második gomb: RTTY
         setDecodeMode(DecodeMode::RTTY);
-    else if (buttonId == decoderModeStartId_ + 2) // Harmadik gomb: MORSE
+    else if (buttonId == decoderModeStartId_ + 2)  // Harmadik gomb: MORSE
         setDecodeMode(DecodeMode::MORSE);
 }

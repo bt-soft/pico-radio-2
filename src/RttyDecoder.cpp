@@ -1,8 +1,16 @@
 #include "RttyDecoder.h"
 
 #include <cmath>  // abs, round, constrain
+#include <algorithm> // std::sort, std::max, std::min
 
-RttyDecoder::RttyDecoder(AudioProcessor& audioProcessor) : audioProcessor(audioProcessor), figsShift(false) { initBaudotToAscii(); }
+RttyDecoder::RttyDecoder(AudioProcessor& audioProcessor)
+    : audioProcessor(audioProcessor),
+      figsShift_(false),
+      rttyMarkFreqHz_(2295.0f),  // Alapértelmezett Mark (gyakran a magasabb)
+      rttySpaceFreqHz_(2125.0f) // Alapértelmezett Space (gyakran az alacsonyabb)
+{
+    initBaudotToAscii();
+}
 
 RttyDecoder::~RttyDecoder() {}
 
@@ -14,15 +22,30 @@ char RttyDecoder::decodeNextCharacter() {
     const double* magnitudeData = audioProcessor.getMagnitudeData();
     float binWidthHz = audioProcessor.getBinWidthHz();
     if (binWidthHz == 0) return '\0';  // Hiba elkerülése
-    if (!magnitudeData) return '\0';   // Biztonsági ellenőrzés
+    if (!magnitudeData) return '\0';   // Biztonsági ellenőrzés (bár process() után elvileg nem lehet null)
+
+    if (autoDetectModeActive_) {
+        if (attemptAutoDetectFrequencies()) {
+            DEBUG("RTTY: Auto-detect successful. Mark: %.1f Hz, Space: %.1f Hz\n", rttyMarkFreqHz_, rttySpaceFreqHz_);
+            autoDetectModeActive_ = false;
+            // Reset RTTY state machine as frequencies changed
+            currentState = IDLE;
+            figsShift_ = false; // Reset figs shift
+            return '\0'; // Don't decode a char immediately after successful detection
+        } else if (millis() - autoDetectStartTime_ > AUTO_DETECT_DURATION_MS) {
+            DEBUG("RTTY: Auto-detect timed out. Using default/previous frequencies (Mark: %.1f, Space: %.1f).\n", rttyMarkFreqHz_, rttySpaceFreqHz_);
+            autoDetectModeActive_ = false;
+            // Optionally, revert to default frequencies if they were changed optimistically
+            // For now, we keep whatever was last set or the defaults.
+        } else {
+            return '\0'; // Still trying to auto-detect
+        }
+    }
 
     // Mark és Space frekvenciákhoz tartozó FFT bin indexek kiszámítása
-    int markBin = static_cast<int>(round(RTTY_MARK_FREQ_HZ / binWidthHz));
-    int spaceBin = static_cast<int>(round(RTTY_SPACE_FREQ_HZ / binWidthHz));
+    // Ezeket a getSignalState már használja a frissített rttyMarkFreqHz_ és rttySpaceFreqHz_ alapján.
+    // Itt közvetlenül nem használjuk őket, a getSignalState szolgáltatja az eredményt.
 
-    // Biztosítjuk, hogy a bin indexek a magnitúdó tömb határain belül legyenek
-    markBin = constrain(markBin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
-    spaceBin = constrain(spaceBin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
 
     // RTTY dekódolási állapotgép (nagyon egyszerűsített)
     unsigned long currentTime = millis();
@@ -86,7 +109,7 @@ char RttyDecoder::decodeNextCharacter() {
 
                 if (bitsReceived == 5) {
                     // Mind az 5 adatbitet megkaptuk, átlépés a stop bit állapotba
-                    currentState = RECEIVING_STOP_BIT;
+                    currentState = RECEIVING_STOP_BIT; // Nincs teendő, a lastBitTime már jó
                     // lastBitTime már be van állítva a stop bit időtartamának kezdetére
                     DEBUG("RTTY: Received 5 data bits. Waiting for stop bit.\n");
                 }
@@ -117,7 +140,7 @@ char RttyDecoder::decodeNextCharacter() {
 
                 if (stopBitIsMark) {  // Stop bit Mark (ahogy várható)
                     // Stop bit megérkezett, dekódoljuk a bájtot
-                    char decodedChar = decodeBaudot(currentByte, figsShift);
+                    char decodedChar = decodeBaudot(currentByte, figsShift_);
 
                     // Visszaállítás IDLE állapotba a következő karakterhez
                     currentState = IDLE;
@@ -135,6 +158,71 @@ char RttyDecoder::decodeNextCharacter() {
     return '\0';  // Nincs kész karakter
 }
 
+// Automatikus frekvencia detektálás indítása
+void RttyDecoder::startAutoDetect() {
+    autoDetectModeActive_ = true;
+    autoDetectStartTime_ = millis();
+    currentState = IDLE; // Reset state machine
+    figsShift_ = false;
+    DEBUG("RTTY: Starting automatic frequency detection...\n");
+}
+
+bool RttyDecoder::attemptAutoDetectFrequencies() {
+    const double* magnitudeData = audioProcessor.getMagnitudeData();
+    float binWidthHz = audioProcessor.getBinWidthHz();
+
+    if (binWidthHz == 0 || !magnitudeData) return false;
+
+    std::vector<PeakInfo> peaks;
+    int min_bin = static_cast<int>(round(MIN_RTTY_FREQ_HZ_FOR_DETECT / binWidthHz));
+    int max_bin = static_cast<int>(round(MAX_RTTY_FREQ_HZ_FOR_DETECT / binWidthHz));
+    min_bin = constrain(min_bin, 1, AudioProcessorConstants::FFT_SAMPLES / 2 - 2);
+    max_bin = constrain(max_bin, min_bin, AudioProcessorConstants::FFT_SAMPLES / 2 - 2);
+
+    for (int i = min_bin; i <= max_bin; ++i) {
+        if (magnitudeData[i] > magnitudeData[i - 1] && magnitudeData[i] > magnitudeData[i + 1] && magnitudeData[i] > AUTO_DETECT_MIN_PEAK_MAGNITUDE) {
+            peaks.push_back({i * binWidthHz, magnitudeData[i]});
+        }
+    }
+
+    if (peaks.size() < 2) return false;
+
+    // Csúcsok rendezése magnitúdó szerint csökkenő sorrendben
+    std::sort(peaks.begin(), peaks.end(), [](const PeakInfo& a, const PeakInfo& b) {
+        return a.mag > b.mag;
+    });
+
+    // Legfeljebb az 5 legerősebb csúcsot vizsgáljuk páronként
+    int peaks_to_check = std::min((int)peaks.size(), 5);
+    PeakInfo best_peak1 = {0, 0}, best_peak2 = {0, 0};
+    double max_combined_mag = 0;
+    bool found_pair = false;
+
+    for (int i = 0; i < peaks_to_check; ++i) {
+        for (int j = i + 1; j < peaks_to_check; ++j) {
+            float freq_diff = std::abs(peaks[i].freq - peaks[j].freq);
+            if (std::abs(freq_diff - RTTY_TARGET_SHIFT_HZ) < AUTO_DETECT_SHIFT_TOLERANCE_HZ) {
+                double combined_mag = peaks[i].mag + peaks[j].mag;
+                if (combined_mag > max_combined_mag) {
+                    max_combined_mag = combined_mag;
+                    best_peak1 = peaks[i];
+                    best_peak2 = peaks[j];
+                    found_pair = true;
+                }
+            }
+        }
+    }
+
+    if (found_pair) {
+        // Gyakran a Mark frekvencia a magasabb
+        rttyMarkFreqHz_ = std::max(best_peak1.freq, best_peak2.freq);
+        rttySpaceFreqHz_ = std::min(best_peak1.freq, best_peak2.freq);
+        return true;
+    }
+
+    return false;
+}
+
 // Ez a függvény frissíti az isSignalPresent és isMarkTone tagváltozókat
 // a jelenlegi audio adatok alapján.
 void RttyDecoder::getSignalState(bool& outIsSignalPresent, bool& outIsMarkTone) {
@@ -148,8 +236,8 @@ void RttyDecoder::getSignalState(bool& outIsSignalPresent, bool& outIsMarkTone) 
     }
 
     // Mark és Space frekvenciákhoz tartozó FFT bin indexek kiszámítása
-    int markBin = static_cast<int>(round(RTTY_MARK_FREQ_HZ / binWidthHz));
-    int spaceBin = static_cast<int>(round(RTTY_SPACE_FREQ_HZ / binWidthHz));
+    int markBin = static_cast<int>(round(rttyMarkFreqHz_ / binWidthHz));
+    int spaceBin = static_cast<int>(round(rttySpaceFreqHz_ / binWidthHz));
 
     // Biztosítjuk, hogy a bin indexek a magnitúdó tömb határain belül legyenek
     markBin = constrain(markBin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
