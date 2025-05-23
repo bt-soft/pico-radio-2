@@ -127,11 +127,12 @@ void AmDisplay::drawScreen() {
     float currFreq = band.getCurrentBand().varData.currFreq;  // A Rotary változtatásakor már eltettük a Band táblába
     pSevenSegmentFreq->freqDispl(currFreq);
 
-    // Dekódolási módválasztó gombok pozicionálása és kirajzolása
-    drawDecodeModeButtons();
-
     // RTTY szövegterület hátterének és tartalmának kirajzolása
     drawRttyTextAreaBackground();
+    // Kezdeti RTTY szöveg kijelzés (üres) - ez is hívhatja a drawRttyTextAreaBackground-ot
+    updateRttyTextDisplay();
+    // Dekódolási módválasztó gombok pozicionálása és kirajzolása a szövegterület UTÁN
+    drawDecodeModeButtons();
 
     // Gombok kirajzolása
     DisplayBase::drawScreenButtons();
@@ -153,9 +154,6 @@ void AmDisplay::drawScreen() {
         pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
         pMiniAudioFft->forceRedraw();
     }
-
-    // Kezdeti RTTY szöveg kijelzés (üres)
-    updateRttyTextDisplay();
 }
 
 /**
@@ -532,13 +530,8 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     // Gombok újrarajzolása (a setState már intézi, de biztos, ami biztos)
     // drawDecodeModeButtons(); // Vagy csak a megváltozottakat, de a setState már rajzol
 
-    // Szövegterület törlése és frissítése az új módhoz
-    for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
-        rttyDisplayLines[i] = "";
-    }
-    rttyCurrentLineBuffer = "";
-    rttyCurrentLineIndex = 0;
-    updateRttyTextDisplay();
+    // Szöveg pufferek törlése (az updateRttyTextDisplay majd újrarajzolja üresen, ha nincs üzenet)
+    clearRttyTextBuffer();
 
     const char *modeMsg = nullptr;
     if (currentDecodeMode == DecodeMode::RTTY)
@@ -557,6 +550,17 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     // itt, az első setDecodeMode híváskor (ami a konstruktor végén történhetne,
     // vagy az első drawScreen előtt) biztosítjuk, hogy az "Off" gomb legyen az alapértelmezett aktív.
     // Ezt a konstruktor végére is tehetnénk: setDecodeMode(DecodeMode::OFF);
+}
+
+/**
+ * @brief Törli az RTTY szöveg puffereit.
+ */
+void AmDisplay::clearRttyTextBuffer() {
+    for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
+        rttyDisplayLines[i] = "";
+    }
+    rttyCurrentLineBuffer = "";
+    rttyCurrentLineIndex = 0;
 }
 
 /**

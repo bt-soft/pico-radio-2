@@ -53,6 +53,7 @@ class AmDisplay : public DisplayBase {
     void drawRttyTextAreaBackground();
     void appendRttyCharacter(char c);
     void updateRttyTextDisplay();
+    void clearRttyTextBuffer(); // Új segédfüggvény
     void drawDecodeModeButtons();
     void setDecodeMode(DecodeMode newMode);
 
