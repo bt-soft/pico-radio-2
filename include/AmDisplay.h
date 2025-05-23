@@ -3,6 +3,7 @@
 
 #include "DisplayBase.h"
 #include "MiniAudioFft.h"
+#include "RadioButton.h"  // Új RadioButton include
 #include "RttyDecoder.h"  // RTTY dekóder osztály
 #include "SMeter.h"
 #include "SevenSegmentFreq.h"
@@ -34,10 +35,8 @@ class AmDisplay : public DisplayBase {
     uint8_t rttyCurrentLineIndex = 0;
     String rttyCurrentLineBuffer = "";
 
-    // Dekódolási módválasztó gombok
-    TftButton *pDecodeOffButton = nullptr;
-    TftButton *pDecodeRttyButton = nullptr;
-    TftButton *pDecodeCwButton = nullptr;
+    // Dekódolási módválasztó rádiógomb csoport
+    RadioButtonGroup decoderModeGroup;
     enum class DecodeMode { OFF, RTTY, MORSE };
     DecodeMode currentDecodeMode = DecodeMode::OFF;  // Kezdetben kikapcsolva
 

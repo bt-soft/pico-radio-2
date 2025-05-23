@@ -178,6 +178,10 @@ class TftButton {
      */
     inline uint16_t getY() const { return y; }
 
+    inline uint16_t getH() const { return h; }
+
+    inline uint16_t getW() const { return w; }
+
     /**
      * Button x/y pozíciójának beállítása
      * @param x

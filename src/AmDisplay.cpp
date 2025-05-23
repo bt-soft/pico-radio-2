@@ -41,7 +41,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
     rttyTextAreaX = DECODER_TEXT_AREA_X_START;
     rttyTextAreaY = 150;
-    rttyTextAreaW = decodeModeButtonsX - DECODER_MODE_BTN_GAP_X - rttyTextAreaX;
+    rttyTextAreaW = 330;
     rttyTextAreaH = 80;  // Kezdeti magasság
 
     // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
@@ -62,17 +62,17 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band) : DisplayBase(tf
 
     // Dekódolási módváltó gombok létrehozása
     uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
-    pDecodeOffButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "Off", TftButton::ButtonType::Pushable);
-    pDecodeOffButton->setMiniFont(true);
-    pDecodeOffButton->setState(TftButton::ButtonState::CurrentActive);
-    pDecodeRttyButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "RTTY", TftButton::ButtonType::Pushable);
-    pDecodeRttyButton->setMiniFont(true);
-    pDecodeCwButton = new TftButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "CW", TftButton::ButtonType::Pushable);
-    pDecodeCwButton->setMiniFont(true);
+    // A RadioButton konstruktora már beállítja a mini fontot
+    RadioButton *rbOff = new RadioButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "Off", &decoderModeGroup);
+    RadioButton *rbRtty = new RadioButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "RTTY", &decoderModeGroup);
+    RadioButton *rbCw = new RadioButton(nextButtonId++, tft, 0, 0, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, "CW", &decoderModeGroup);
+
+    decoderModeGroup.addButton(rbOff);
+    decoderModeGroup.addButton(rbRtty);
+    decoderModeGroup.addButton(rbCw);
 
     // Horizontális képernyőgombok legyártása:
     // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
-    // A pRttyCwModeButton nincs benne ebben a tömbben, manuálisan kezeljük.
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
 }
 
@@ -100,10 +100,9 @@ AmDisplay::~AmDisplay() {
     if (pRttyDecoder) {
         delete pRttyDecoder;
     }
-    // Dekódoló gombok törlése
-    if (pDecodeOffButton) delete pDecodeOffButton;
-    if (pDecodeRttyButton) delete pDecodeRttyButton;
-    if (pDecodeCwButton) delete pDecodeCwButton;
+
+    // A decoderModeGroup (RadioButtonGroup) destruktora automatikusan lefut,
+    // és az felszabadítja a benne tárolt RadioButton objektumokat.
 }
 
 /**
@@ -191,12 +190,25 @@ void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event
     } else if (STREQ("SSTV", event.label)) {
         // Képernyő váltás SSTV módra
         ::newDisplay = DisplayBase::DisplayType::sstv;
-    } else if (pDecodeOffButton && event.id == pDecodeOffButton->getId()) {
-        setDecodeMode(DecodeMode::OFF);
-    } else if (pDecodeRttyButton && event.id == pDecodeRttyButton->getId()) {
-        setDecodeMode(DecodeMode::RTTY);
-    } else if (pDecodeCwButton && event.id == pDecodeCwButton->getId()) {
-        setDecodeMode(DecodeMode::MORSE);
+    } else {
+        // A RadioButtonGroup::handleTouch már lefutott, és a TftButton eseménykezelője
+        // a `event` változóban átadta a megnyomott gomb adatait.
+        // Most a RadioButtonGroup-nak kell kiválasztania a gombot,
+        // és az AmDisplay-nek be kell állítania a megfelelő dekódolási módot.
+
+        // Először a RadioButtonGroup válassza ki a gombot az ID alapján.
+        // Ez beállítja a gombok vizuális állapotát (On/Off).
+        decoderModeGroup.selectButton(event.id);
+
+        // Majd az AmDisplay állítsa be a belső dekódolási módot.
+        if (STREQ(event.label, "Off"))
+            setDecodeMode(DecodeMode::OFF);
+        else if (STREQ(event.label, "RTTY"))
+            setDecodeMode(DecodeMode::RTTY);
+        else if (STREQ(event.label, "CW"))
+            setDecodeMode(DecodeMode::MORSE);
+        // TODO: Ezt robosztusabbá kell tenni, pl. a RadioButtonGroup adjon vissza egy eseményt,
+        // vagy a gomboknak legyen egy egyedi azonosítójuk a móddal.
     }
 }
 
@@ -211,11 +223,8 @@ bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         return true;
     }
 
-    // Dekódolási módválasztó gombok touch kezelése
-    if (pDecodeOffButton && pDecodeOffButton->handleTouch(touched, tx, ty)) return true;
-    if (pDecodeRttyButton && pDecodeRttyButton->handleTouch(touched, tx, ty)) return true;
-    if (pDecodeCwButton && pDecodeCwButton->handleTouch(touched, tx, ty)) {
-        return true;
+    if (decoderModeGroup.handleTouch(touched, tx, ty)) {
+        return true;  // A RadioButtonGroup kezelte
     }
 
     // A frekvencia kijelző kezeli a touch eseményeket SSB/CW módban
@@ -408,21 +417,8 @@ void AmDisplay::displayLoop() {
  * Pozicionálja a szövegterület mellett.
  */
 void AmDisplay::drawDecodeModeButtons() {
-    uint16_t currentY = rttyTextAreaY;
-    if (pDecodeOffButton) {
-        pDecodeOffButton->setPosition(decodeModeButtonsX, currentY);
-        pDecodeOffButton->draw();
-        currentY += DECODER_MODE_BTN_H + DECODER_MODE_BTN_GAP_Y;
-    }
-    if (pDecodeRttyButton) {
-        pDecodeRttyButton->setPosition(decodeModeButtonsX, currentY);
-        pDecodeRttyButton->draw();
-        currentY += DECODER_MODE_BTN_H + DECODER_MODE_BTN_GAP_Y;
-    }
-    if (pDecodeCwButton) {
-        pDecodeCwButton->setPosition(decodeModeButtonsX, currentY);
-        pDecodeCwButton->draw();
-    }
+    decoderModeGroup.setPositions(decodeModeButtonsX, rttyTextAreaY, DECODER_MODE_BTN_GAP_Y);
+    decoderModeGroup.draw();
 }
 
 /**
@@ -489,14 +485,18 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
 
     currentDecodeMode = newMode;
 
-    // Gombok állapotának frissítése
-    // A setState() újrarajzolja a gombot, ha az állapota változik.
-    // A TftButton::ButtonState::On helyett a CurrentActive-ot használjuk a kiválasztott mód jelzésére.
-    // A többi gomb Off állapotú lesz.
-    if (pDecodeOffButton) pDecodeOffButton->setState(currentDecodeMode == DecodeMode::OFF ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
-    if (pDecodeRttyButton) pDecodeRttyButton->setState(currentDecodeMode == DecodeMode::RTTY ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
-    if (pDecodeCwButton) pDecodeCwButton->setState(currentDecodeMode == DecodeMode::MORSE ? TftButton::ButtonState::On : TftButton::ButtonState::Off);
-
+    // A RadioButtonGroup kezeli a gombok állapotát
+    switch (newMode) {
+        case DecodeMode::OFF:
+            decoderModeGroup.selectButtonByIndex(0);  // Feltételezve, hogy az "Off" az első
+            break;
+        case DecodeMode::RTTY:
+            decoderModeGroup.selectButtonByIndex(1);  // "RTTY" a második
+            break;
+        case DecodeMode::MORSE:
+            decoderModeGroup.selectButtonByIndex(2);  // "CW" a harmadik
+            break;
+    }
     // Gombok újrarajzolása (a setState már intézi, de biztos, ami biztos)
     // drawDecodeModeButtons(); // Vagy csak a megváltozottakat, de a setState már rajzol
 
