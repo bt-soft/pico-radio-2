@@ -2,6 +2,10 @@
 
 #include <Arduino.h>
 
+#include "core_communication.h"  // Parancsok definíciója
+#include "defines.h"             // DEBUG makróhoz
+#include "pico/multicore.h"      // FIFO kommunikációhoz
+
 /**
  * @brief Konstruktor az AmDisplay osztályhoz.
  * @param tft Referencia a TFT kijelző objektumra.
@@ -36,6 +40,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     // MiniAudioFft és RTTY dekóder inicializálása
     // A targetSamplingFrequency 12000 Hz (2 * 6000 Hz) az AM FFT-hez és RTTY-hez.
     // Az RTTY dekóderhez a config.data.miniAudioFftConfigRtty erősítési beállítást használjuk.
+    // Ezek a példányok Core0-n maradnak, de a feldolgozást Core1-re delegáljuk.
     pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigRtty, AUDIO_INPUT_PIN, MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
     pRttyDecoder = new RttyDecoder(*pAudioProcessor);  // RTTY dekóder inicializálása az AudioProcessorral
     pCwDecoder = new CwDecoder(AUDIO_INPUT_PIN);       // CW dekóder inicializálása
@@ -47,12 +52,10 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     rttyTextAreaH = 80;  // Kezdeti magasság
 
     // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
-    // Feltételezzük, hogy a "Mute" gomb az első a függőleges sorban és létezik.
-    // Ha nem, akkor egy fix értékkel kell számolni.
     TftButton *firstVerticalButton = DisplayBase::findButtonByLabel("Mute");
-    uint16_t mainVerticalButtonsStartX = tft.width() - SCRN_BTN_W - SCREEN_VBTNS_X_MARGIN;  // Alapértelmezett, ha nem található
+    uint16_t mainVerticalButtonsStartX = tft.width() - SCRN_BTN_W - SCREEN_VBTNS_X_MARGIN;
     if (firstVerticalButton) {
-        mainVerticalButtonsStartX = firstVerticalButton->getX();  // Pontosabb X pozíció a getterrel
+        mainVerticalButtonsStartX = firstVerticalButton->getX();
     }
     decodeModeButtonsX = mainVerticalButtonsStartX - DECODER_MODE_BTN_GAP_X - DECODER_MODE_BTN_W;
 
@@ -64,22 +67,15 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
 
     // Dekódolási módváltó gombok létrehozása
     uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
-    decoderModeStartId_ = nextButtonId;  // Elmentjük a kezdő ID-t
+    decoderModeStartId_ = nextButtonId;
 
     std::vector<String> decoderLabels = {"Off", "RTTY", "CW"};
     decoderModeGroup.createButtons(decoderLabels, nextButtonId);
-    // A RadioButton konstruktora már beállítja a mini fontot és a group-ot.
-    // A pozíciókat és méreteket a drawDecodeModeButtons fogja beállítani a drawScreen-ben.
+    decoderModeGroup.selectButtonByIndex(0);
 
-    // Kezdetben az "Off" gomb legyen kiválasztva vizuálisan.
-    // A currentDecodeMode már OFF-ra van állítva.
-    decoderModeGroup.selectButtonByIndex(0);  // "Off" gomb kiválasztása
+    // Horizontális képernyőgombok legyártása
+    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);
 
-    // Horizontális képernyőgombok legyártása:
-    // Összefűzzük a kötelező gombokat az AM-specifikus (és AFWdt, BFO) gombokkal.
-    DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);  // isMandatoryNeed = true
-
-    // Biztosítjuk, hogy a szövegterület kezdetben tiszta legyen az OFF módnak megfelelően.
     clearRttyTextBufferAndDisplay();
 }
 
@@ -89,80 +85,41 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
  */
 AmDisplay::~AmDisplay() {
     DEBUG("AmDisplay::~AmDisplay\n");
-    // SMeter trölése
-    if (pSMeter) {
-        delete pSMeter;
-    }
-
-    // Frekvencia kijelző törlése
-    if (pSevenSegmentFreq) {
-        delete pSevenSegmentFreq;
-    }
-
-    // MiniAudioFft törlése
-    if (pMiniAudioFft) {
-        delete pMiniAudioFft;
-    }
-    // RttyDecoder törlése
-    if (pRttyDecoder) {
-        delete pRttyDecoder;
-    }
-    // CwDecoder törlése
-    if (pCwDecoder) {
-        delete pCwDecoder;
-    }
-
-    // A decoderModeGroup (RadioButtonGroup) destruktora automatikusan lefut,
-    // és az felszabadítja a benne tárolt RadioButton objektumokat.
+    if (pSMeter) delete pSMeter;
+    if (pSevenSegmentFreq) delete pSevenSegmentFreq;
+    if (pMiniAudioFft) delete pMiniAudioFft;
+    if (pAudioProcessor) delete pAudioProcessor;  // AudioProcessor törlése
+    if (pRttyDecoder) delete pRttyDecoder;
+    if (pCwDecoder) delete pCwDecoder;
 }
 
 /**
  * @brief Képernyő kirajzolása.
- * (Az esetleges dialóg eltűnése után a teljes képernyőt újra rajzoljuk)
  */
 void AmDisplay::drawScreen() {
     tft.setFreeFont();
     tft.fillScreen(TFT_COLOR_BACKGROUND);
-
     DisplayBase::dawStatusLine();
-
-    // RSSI skála kirajzoltatása
     pSMeter->drawSmeterScale();
-
-    // RSSI aktuális érték
     si4735.getCurrentReceivedSignalQuality();
     uint8_t rssi = si4735.getCurrentRSSI();
     uint8_t snr = si4735.getCurrentSNR();
     pSMeter->showRSSI(rssi, snr, band.getCurrentBand().varData.currMod == FM);
-
-    // Frekvencia
-    float currFreq = band.getCurrentBand().varData.currFreq;  // A Rotary változtatásakor már eltettük a Band táblába
+    float currFreq = band.getCurrentBand().varData.currFreq;
     pSevenSegmentFreq->freqDispl(currFreq);
-
-    // RTTY szövegterület hátterének és tartalmának kirajzolása
     drawRttyTextAreaBackground();
-    // Kezdeti RTTY szöveg kijelzés (üres) - ez is hívhatja a drawRttyTextAreaBackground-ot
     updateRttyTextDisplay();
-    // Dekódolási módválasztó gombok pozicionálása és kirajzolása a szövegterület UTÁN
     drawDecodeModeButtons();
-
-    // Gombok kirajzolása
     DisplayBase::drawScreenButtons();
 
-    // MiniAudioFft korábbi példányának törlése, ha létezik
     if (pMiniAudioFft != nullptr) {
         delete pMiniAudioFft;
         pMiniAudioFft = nullptr;
     }
-
-    // MiniAudioFft kirajzolása (kezdeti)
-    if (config.data.miniAudioFftConfigAm >= 0.0f) {  // Csak akkor példányosítjuk, ha engedélyezve van
+    if (config.data.miniAudioFftConfigAm >= 0.0f) {
         using namespace DisplayConstants;
-
-        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h,
-                                         MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ,  // AM módhoz 6kHz
-                                         config.data.miniAudioFftModeAm, config.data.miniAudioFftConfigAm);
-        // Beállítjuk a kezdeti módot a configból
+        pMiniAudioFft = new MiniAudioFft(tft, mini_fft_x, mini_fft_y, mini_fft_w, mini_fft_h, MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ, config.data.miniAudioFftModeAm,
+                                         config.data.miniAudioFftConfigAm);
         pMiniAudioFft->setInitialMode(static_cast<MiniAudioFft::DisplayMode>(config.data.miniAudioFftModeAm));
         pMiniAudioFft->forceRedraw();
     }
@@ -172,110 +129,42 @@ void AmDisplay::drawScreen() {
  * Képernyő menügomb esemény feldolgozása
  */
 void AmDisplay::processScreenButtonTouchEvent(TftButton::ButtonTouchEvent &event) {
-
     if (STREQ("AntC", event.label)) {
-        // If zero, the tuning capacitor value is selected automatically.
-        // AM - the tuning capacitance is manually set as 95 fF x ANTCAP + 7 pF.  ANTCAP manual range is 1–6143;
-        // FM - the valid range is 0 to 191.
-
-        // Antenna kapacitás állítása
         int maxValue = band.getCurrentBand().varData.currMod == FM ? Si4735Utils::MAX_ANT_CAP_FM : Si4735Utils::MAX_ANT_CAP_AM;
-
-        int antCapValue = band.getCurrentBand().varData.antCap;  // Az aktuális érték a Band táblából
-
-        DisplayBase::pDialog =
-            new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Antenna Tuning capacitor"), F("Capacitor value [pF]:"), &antCapValue, (int)0, (int)maxValue,
-                                  (int)0,  // A rotary encoder értéke lesz a step
-                                  [this](int newValue) {
-                                      // Az új érték beállítása a Band táblába
-                                      band.getCurrentBand().varData.antCap = newValue;
-
-                                      // Az új érték beállítása a Si4735-be
-                                      Si4735Utils::si4735.setTuneFrequencyAntennaCapacitor(newValue);
-
-                                      // Frissítjük a státusvonalban a kiírást
-                                      DisplayBase::drawAntCapStatus(true);
-                                  });
+        int antCapValue = band.getCurrentBand().varData.antCap;
+        DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Antenna Tuning capacitor"), F("Capacitor value [pF]:"), &antCapValue, (int)0,
+                                                     (int)maxValue, (int)0, [this](int newValue) {
+                                                         band.getCurrentBand().varData.antCap = newValue;
+                                                         Si4735Utils::si4735.setTuneFrequencyAntennaCapacitor(newValue);
+                                                         DisplayBase::drawAntCapStatus(true);
+                                                     });
     } else if (STREQ("SSTV", event.label)) {
-        // Képernyő váltás SSTV módra
         ::newDisplay = DisplayBase::DisplayType::sstv;
-    } else {
-
-        // A RadioButtonGroup NEM a DisplayBase::buildScreenButtons-szal lett létrehozva,
-        // így az eseményét nem a DisplayBase::loop fogja közvetlenül ideadni.
-        // A RadioButtonGroup::handleTouch-t kell meghívni az AmDisplay::handleTouch-ban,
-        // és az alapján kell itt dönteni.
-        // A `event.id` és `event.label` itt a DisplayBase által kezelt gombokra vonatkozik.
-        // A RadioButton-ok eseményét az AmDisplay::handleTouch-ban kell elkapni.
-        // Mivel a RadioButton-ok nem TftButton-ok, a `event` itt nem rájuk vonatkozik.
-        // A RadioButtonGroup::handleTouch-nak kellene jeleznie, hogy melyik gomb lett megnyomva.
-        // A jelenlegi RadioButtonGroup::handleTouch visszaadja a megnyomott gomb ID-ját.
-        // Ezt az AmDisplay::handleTouch-ban kellene eltárolni és itt felhasználni,
-        // VAGY a RadioButtonGroup::selectButton-t közvetlenül a handleTouch-ban hívni.
-
-        // A RadioButtonGroup.selectButton-t már a handleTouch-ban hívtuk.
-        // Ez beállítja a gombok vizuális állapotát (On/Off).
-
-        // Itt már csak a belső `currentDecodeMode`-ot kell beállítani, ha a `decoderModeGroup.handleTouch`
-        // jelzett egy eseményt. Ezt a `setDecodeMode`-ban tesszük meg a kiválasztott index alapján.
-        // A `processScreenButtonTouchEvent`-nek nem kell foglalkoznia a RadioButton-okkal,
-        // ha a `handleTouch` már kezeli őket.
-
-        // Ha a RadioButtonGroup eseményét itt akarjuk kezelni, akkor a
-        // RadioButtonGroup::handleTouch-nak egy ButtonTouchEvent-szerű struktúrát kellene visszaadnia,
-        // vagy az AmDisplay-nek kellene egy tagváltozóban tárolnia a legutóbb megnyomott RadioButton ID-ját.
-
-        // Egyszerűbb, ha a RadioButtonGroup::handleTouch közvetlenül hívja a setDecodeMode-ot
-        // a megfelelő móddal, miután a gombot kiválasztotta.
-        // Vagy az AmDisplay::handleTouch hívja a setDecodeMode-ot.
-
-        // A jelenlegi struktúra szerint az AmDisplay::handleTouch hívja a decoderModeGroup.handleTouch-ot,
-        // ami kiválasztja a gombot. A setDecodeMode-ot is ott kellene hívni.
-        // Vagy a processScreenButtonTouchEvent-nek kellene tudnia, hogy a RadioButton-ok
-        // melyik ID-tartományba esnek.
-
-        // Tegyük fel, hogy az AmDisplay::handleTouch már beállította a `currentDecodeMode`-ot
-        // a `setDecodeMode` hívásával, miután a `decoderModeGroup.handleTouch` lefutott.
-        // Így itt nincs teendő a RadioButton-okkal.
-
-        // TODO: Ezt robosztusabbá kell tenni, pl. a RadioButtonGroup adjon vissza egy eseményt,
-        // vagy a gomboknak legyen egy egyedi azonosítójuk a móddal.
     }
 }
 
 /**
  * @brief Touch (nem képrnyő button) esemény lekezelése.
- * A további gui elemek vezérléséhez
  */
 bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
-
-    // Ha nincs dialog és van MiniAudioFft, akkor a MiniAudioFft kezelje az érintést
-    if (!DisplayBase::pDialog && pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {  // Ellenőrizzük, hogy létezik-e
+    if (!DisplayBase::pDialog && pMiniAudioFft && pMiniAudioFft->handleTouch(touched, tx, ty)) {
         return true;
     }
-
     uint8_t pressedRadioBtnId = 0xFF;
     if (decoderModeGroup.handleTouch(touched, tx, ty, pressedRadioBtnId)) {
-        // A decoderModeGroup.handleTouch már kiválasztotta a gombot.
-        // Most az AmDisplay-nek be kell állítania a belső módot.
-        if (pressedRadioBtnId != 0xFF) {  // Ha tényleg egy rádiógomb lett megnyomva
+        if (pressedRadioBtnId != 0xFF) {
             setDecodeModeBasedOnButtonId(pressedRadioBtnId);
         }
         return true;
     }
-
-    // A frekvencia kijelző kezeli a touch eseményeket SSB/CW módban
     uint8_t currMod = band.getCurrentBand().varData.currMod;
-    if (currMod == LSB or currMod == USB or currMod == CW) {
+    if (currMod == LSB || currMod == USB || currMod == CW) {
         bool handled = pSevenSegmentFreq->handleTouch(touched, tx, ty);
-
         if (handled) {
-            DisplayBase::drawStepStatus();  // Frissítjük a státusvonalban a kiírást
+            DisplayBase::drawStepStatus();
         }
-
         return handled;
     }
-
     return false;
 }
 
@@ -283,177 +172,128 @@ bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
  * @brief Rotary encoder esemény lekezelése.
  */
 bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
-
     BandTable &currentBand = band.getCurrentBand();
     uint8_t currMod = currentBand.varData.currMod;
     uint16_t currentFrequency = si4735.getFrequency();
-
     bool isSsbCwMode = (currMod == LSB || currMod == USB || currMod == CW);
 
     if (isSsbCwMode) {
-        // Manuális BFO Logika
-        if (rtv::bfoOn) {  // --- BFO Finomhangolás ---
-            // BFO módban a manuális BFO offsetet állítjuk
-            int16_t step = config.data.currentBFOStep;  // BFO lépésköz a configból
-
-            // Hozzáadás/kivonás a lépésközhöz az irány alapján
+        if (rtv::bfoOn) {
+            int16_t step = config.data.currentBFOStep;
             config.data.currentBFOmanu += (encoderState.direction == RotaryEncoder::Direction::Up) ? step : -step;
-
-            // Korlátozás +/- 999 Hz között (vagy amilyen tartományt szeretnél)
             config.data.currentBFOmanu = constrain(config.data.currentBFOmanu, -999, 999);
-
-            // Kijelző frissítés kérése (a BFO érték megjelenítéséhez) a végén van
-
-        } else {  // --- Normál SSB/CW Durva Hangolás (BFO OFF) ---
+        } else {
             if (encoderState.direction == RotaryEncoder::Direction::Up) {
-                // Felfelé hangolásnál
-                rtv::freqDec = rtv::freqDec - rtv::freqstep;  // rtv::freqstep itt 1000, 100 vagy 10 lehet
+                rtv::freqDec = rtv::freqDec - rtv::freqstep;
                 uint32_t freqTot = (uint32_t)(currentFrequency * 1000) + (rtv::freqDec * -1);
                 if (freqTot > (uint32_t)(currentBand.pConstData->maximumFreq * 1000)) {
                     si4735.setFrequency(currentBand.pConstData->maximumFreq);
                     rtv::freqDec = 0;
                 }
-
-                if (rtv::freqDec <= -16000) {  // Felfelé átfordulás ága
+                if (rtv::freqDec <= -16000) {
                     rtv::freqDec = rtv::freqDec + 16000;
                     int16_t freqPlus16 = currentFrequency + 16;
                     Si4735Utils::hardwareAudioMuteOn();
                     si4735.setFrequency(freqPlus16);
                     delay(10);
                 }
-
             } else {
-                // Lefelé hangolásnál
                 rtv::freqDec = rtv::freqDec + rtv::freqstep;
                 uint32_t freqTot = (uint32_t)(currentFrequency * 1000) - rtv::freqDec;
                 if (freqTot < (uint32_t)(currentBand.pConstData->minimumFreq * 1000)) {
                     si4735.setFrequency(currentBand.pConstData->minimumFreq);
                     rtv::freqDec = 0;
                 }
-
-                if (rtv::freqDec >= 16000) {  // Lefelé átfordulás ága
+                if (rtv::freqDec >= 16000) {
                     rtv::freqDec = rtv::freqDec - 16000;
                     int16_t freqMin16 = currentFrequency - 16;
                     Si4735Utils::hardwareAudioMuteOn();
                     si4735.setFrequency(freqMin16);
-                    delay(10);  // fontos, mert az BFO 0 értéknél elcsúszhat a beállított ferekvenciától a kijelzett érték
+                    delay(10);
                 }
             }
-            config.data.currentBFO = rtv::freqDec;                 // freqDec a durva hangolás mértéke
-            currentBand.varData.lastBFO = config.data.currentBFO;  // Mentsük el a durva hangolást
+            config.data.currentBFO = rtv::freqDec;
+            currentBand.varData.lastBFO = config.data.currentBFO;
         }
-
-        // --- Közös BFO beállítás és AGC ellenőrzés SSB/CW módhoz ---
         const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
         int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
         si4735.setSSBBfo(bfoToSet);
-        checkAGC();  // AGC ellenőrzése BFO beállítás után
-
+        checkAGC();
     } else {
-        // AM - sima frekvencia léptetés sávhatár ellenőrzéssel
-        // Használjuk a rotary encoder gyorsítását (encoderState.value)
-        // és a SÁVHOZ BEÁLLÍTOTT LÉPÉSKÖZT (currentBand.varData.currStep)
-
-        // 1. Lépésköz lekérdezése az aktuális sávból (ez már kHz-ben van)
         uint16_t configuredStep = currentBand.varData.currStep;
-
-        // 2. Teljes frekvenciaváltozás kiszámítása
-        //    encoderState.value: Hány "logikai" lépést tett az enkóder (gyorsítással)
-        //    configuredStep: Az egy logikai lépéshez tartozó frekvenciaváltozás (pl. 9 kHz)
-        //    Fontos: int32_t-t használunk a túlcsordulás elkerülésére a szorzásnál
         int32_t change = (int32_t)encoderState.value * configuredStep;
-
-        // 3. Új frekvencia kiszámítása
-        //    Szintén int32_t-t használunk, hogy a sávhatárokon kívüli értékeket is kezelni tudjuk
         int32_t newFrequency = (int32_t)currentFrequency + change;
-
-        // 4. Sávhatárok lekérdezése
         uint16_t minFreq = currentBand.pConstData->minimumFreq;
         uint16_t maxFreq = currentBand.pConstData->maximumFreq;
-
-        // 5. Ellenőrzés és korlátozás a sávhatárokra
-        if (newFrequency < minFreq) {
+        if (newFrequency < minFreq)
             newFrequency = minFreq;
-        } else if (newFrequency > maxFreq) {
+        else if (newFrequency > maxFreq)
             newFrequency = maxFreq;
-        }
-
-        // 6. Új frekvencia beállítása, csak ha változott
-        //    Az összehasonlításhoz és a setFrequency híváshoz vissza kell kasztolni uint16_t-re
         if ((uint16_t)newFrequency != currentFrequency) {
             si4735.setFrequency((uint16_t)newFrequency);
-            // Mivel setFrequency-t használunk, az AGC-t is ellenőrizni kellhet,
-            // bár valószínűleg AM módban az automatikus AGC jól működik.
-            Si4735Utils::checkAGC();  // Szükség esetén
+            Si4735Utils::checkAGC();
         }
     }
-
-    // Elmentjük a beállított frekvenciát a Band táblába
     currentBand.varData.currFreq = si4735.getFrequency();
-
-    // Beállítjuk, hogy kell majd új frekvenciakijelzés
     DisplayBase::frequencyChanged = true;
-
     return true;
 }
 
 /**
- * @brief Esemény nélküli display loop -> Adatok periódikus megjelenítése és RTTY dekódolás.
-
+ * @brief Esemény nélküli display loop -> Adatok periódikus megjelenítése és dekódolás.
  */
 void AmDisplay::displayLoop() {
-
-    // Ha van dialóg, akkor nem frissítjük a komponenseket
     if (DisplayBase::pDialog != nullptr) {
         return;
     }
-
     BandTable &currentBand = band.getCurrentBand();
-    // uint8_t currMod = currentBand.varData.currMod;  // Aktuális mód lekérdezése
-
-    // Néhány adatot csak ritkábban frissítünk
-    static uint32_t elapsedTimedValues = 0;  // Kezdőérték nulla
+    static uint32_t elapsedTimedValues = 0;
     if ((millis() - elapsedTimedValues) >= SCREEN_COMPS_REFRESH_TIME_MSEC) {
-
-        // RSSI
         si4735.getCurrentReceivedSignalQuality();
         uint8_t rssi = si4735.getCurrentRSSI();
         uint8_t snr = si4735.getCurrentSNR();
         pSMeter->showRSSI(rssi, snr, currentBand.varData.currMod == FM);
-
-        // Frissítjük az időbélyeget
         elapsedTimedValues = millis();
     }
-
-    // A Frekvenciát azonnal frissítjuk, de csak ha változott
     if (DisplayBase::frequencyChanged) {
         pSevenSegmentFreq->freqDispl(currentBand.varData.currFreq);
-        DisplayBase::frequencyChanged = false;  // Reset
+        DisplayBase::frequencyChanged = false;
     }
-
-    // MiniAudioFft ciklus futtatása
-    if (pMiniAudioFft != nullptr) {  // Ellenőrizzük, hogy létezik-e és nem nullptr
+    if (pMiniAudioFft != nullptr) {
         pMiniAudioFft->loop();
     }
-    // RTTY dekódolás futtatása, ha az RTTY mód aktív
-    if (currentDecodeMode == DecodeMode::RTTY && pRttyDecoder && !rtv::muteStat) {
-        char decodedChar = pRttyDecoder->decodeNextCharacter();
-        if (decodedChar != '\0') {
-            appendRttyCharacter(decodedChar);
+
+    // RTTY dekódolás Core1-re delegálva
+    if (currentDecodeMode == DecodeMode::RTTY && !rtv::muteStat) {
+        if (multicore_fifo_wready()) {
+            DEBUG("Core0: Sending CORE1_CMD_PROCESS_AUDIO_RTTY\n");
+            multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_RTTY);
+        }
+        if (multicore_fifo_rvalid()) {
+            char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
+            if (decodedChar != '\0') {
+                appendRttyCharacter(decodedChar);
+            }
         }
     }
 
-    // CW dekódolás futtatása, ha a CW mód aktív
-    if (currentDecodeMode == DecodeMode::MORSE && pCwDecoder && !rtv::muteStat) {
-        char decodedChar = pCwDecoder->decodeNextCharacter();
-        if (decodedChar != '\0') { appendRttyCharacter(decodedChar); }
-        // TODO: CW dekódolási logika
+    // CW dekódolás Core1-re delegálva
+    if (currentDecodeMode == DecodeMode::MORSE && !rtv::muteStat) {
+        if (multicore_fifo_wready()) {
+            // DEBUG("Core0: Sending CORE1_CMD_PROCESS_AUDIO_CW\n"); // Kikommentelve a log spam csökkentése érdekében
+            multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_CW);
+        }
+        if (multicore_fifo_rvalid()) {
+            char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
+            if (decodedChar != '\0') {
+                appendRttyCharacter(decodedChar);
+            }
+        }
     }
 }
 
 /**
  * @brief Kirajzolja a dekódolási módválasztó gombokat.
- * Pozicionálja a szövegterület mellett.
  */
 void AmDisplay::drawDecodeModeButtons() {
     decoderModeGroup.setPositionsAndSize(decodeModeButtonsX, rttyTextAreaY, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, DECODER_MODE_BTN_GAP_Y);
@@ -470,12 +310,10 @@ void AmDisplay::drawRttyTextAreaBackground() {
 
 /**
  * @brief Hozzáfűz egy karaktert az RTTY kijelző pufferéhez és frissíti a kijelzőt.
- * @param c A hozzáfűzendő karakter.
  */
 void AmDisplay::appendRttyCharacter(char c) {
     if (c == '\n' || rttyCurrentLineBuffer.length() >= RTTY_LINE_BUFFER_SIZE - 1) {
         if (rttyCurrentLineIndex >= RTTY_MAX_TEXT_LINES - 1) {
-            // Görgetés
             for (int i = 0; i < RTTY_MAX_TEXT_LINES - 1; ++i) {
                 rttyDisplayLines[i] = rttyDisplayLines[i + 1];
             }
@@ -485,101 +323,93 @@ void AmDisplay::appendRttyCharacter(char c) {
             rttyCurrentLineIndex++;
         }
         rttyCurrentLineBuffer = "";
-        if (c != '\n') {  // Ha sortörés miatt volt, de nem explicit '\n'
+        if (c != '\n') {
             rttyCurrentLineBuffer += c;
         }
-    } else if (c >= 32 && c <= 126) {  // Csak nyomtatható karakterek
+    } else if (c >= 32 && c <= 126) {
         rttyCurrentLineBuffer += c;
     }
-
-    // Az updateRttyTextDisplay() hívását kivettük innen,
-    // hogy ne frissüljön minden egyes karakter után a teljes kijelző.
+    // Frissítjük a kijelzőt minden karakter után (vagy csak bizonyos időközönként/teljes sor után)
+    updateRttyTextDisplay();
 }
 
 /**
  * @brief Frissíti az RTTY szövegterület tartalmát a puffer alapján.
  */
 void AmDisplay::updateRttyTextDisplay() {
-    drawRttyTextAreaBackground();                  // Töröljük a területet
-    tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);  // Jól olvasható szín
-    tft.setTextDatum(TL_DATUM);                    // Bal felső igazítás
-    tft.setFreeFont();                             // Standard font
-    tft.setTextSize(1);                            // Vagy 2, ha nagyobb betűk kellenek
-
-    uint16_t charHeight = tft.fontHeight();  // Betűmagasság lekérdezése
-    if (charHeight == 0) charHeight = 16;    // Alapértelmezett, ha a fontHeight 0-t adna
-
+    drawRttyTextAreaBackground();
+    tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
+    tft.setTextDatum(TL_DATUM);
+    tft.setFreeFont();
+    tft.setTextSize(1);
+    uint16_t charHeight = tft.fontHeight();
+    if (charHeight == 0) charHeight = 16;
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
         tft.drawString(rttyDisplayLines[i], rttyTextAreaX + 2, rttyTextAreaY + 2 + i * charHeight);
     }
-    // Aktuális, még be nem fejezett sor kirajzolása
     tft.drawString(rttyCurrentLineBuffer, rttyTextAreaX + 2, rttyTextAreaY + 2 + rttyCurrentLineIndex * charHeight);
 }
 
 /**
  * @brief Beállítja a dekódolási módot és frissíti a gombok állapotát.
- * @param newMode Az új dekódolási mód.
  */
 void AmDisplay::setDecodeMode(DecodeMode newMode) {
-    if (currentDecodeMode == newMode) return;  // Nincs változás
+    if (currentDecodeMode == newMode && newMode != DecodeMode::RTTY) {  // RTTY-nél mindig fusson le az auto-detect miatt
+                                                                        // Ha RTTY-re váltunk, akkor is le kell futnia, hogy az auto-detect elinduljon
+        if (newMode != DecodeMode::RTTY) return;
+    }
 
     currentDecodeMode = newMode;
+    Core1Command core1_cmd_set_mode = CORE1_CMD_SET_MODE_OFF;  // Alapértelmezett
 
-    // A RadioButtonGroup.selectButtonByIndex frissíti a gombok vizuális állapotát
     switch (newMode) {
         case DecodeMode::OFF:
-            decoderModeGroup.selectButtonByIndex(0);  // Feltételezve, hogy az "Off" az első
-            // DEBUG("Decode Mode set to OFF\n");
+            decoderModeGroup.selectButtonByIndex(0);
+            core1_cmd_set_mode = CORE1_CMD_SET_MODE_OFF;
             break;
         case DecodeMode::RTTY:
-            decoderModeGroup.selectButtonByIndex(1);  // "RTTY" a második
-            // DEBUG("Decode Mode set to RTTY\n");
+            decoderModeGroup.selectButtonByIndex(1);
+            core1_cmd_set_mode = CORE1_CMD_SET_MODE_RTTY;
+            if (pRttyDecoder) {                   // Csak akkor, ha létezik
+                pRttyDecoder->startAutoDetect();  // Automatikus frekvencia detektálás indítása
+            }
             break;
         case DecodeMode::MORSE:
-            decoderModeGroup.selectButtonByIndex(2);  // "CW" a harmadik
-            // DEBUG("Decode Mode set to MORSE\n");
+            decoderModeGroup.selectButtonByIndex(2);
+            core1_cmd_set_mode = CORE1_CMD_SET_MODE_CW;
             if (pCwDecoder) {
-                pCwDecoder->resetDecoderState(); // CW dekóder állapotának nullázása
+                pCwDecoder->resetDecoderState();
             }
             break;
         default:
             break;
     }
-    // Gombok újrarajzolása (a setState már intézi, de biztos, ami biztos)
-    // drawDecodeModeButtons(); // Vagy csak a megváltozottakat, de a setState már rajzol
 
-    // Szöveg pufferek törlése és a terület újrarajzolása üresen
+    // Parancs küldése Core1-nek a módváltásról
+    DEBUG("Core0: Sending mode change command to Core1: 0x%lX\n", static_cast<uint32_t>(core1_cmd_set_mode));
+    multicore_fifo_push_blocking(static_cast<uint32_t>(core1_cmd_set_mode));
+
     clearRttyTextBufferAndDisplay();
-
     const char *modeMsg = nullptr;
     if (currentDecodeMode == DecodeMode::RTTY)
         modeMsg = "--- RTTY Mode ---\n";
     else if (currentDecodeMode == DecodeMode::MORSE)
         modeMsg = "--- CW Mode ---\n";
+    // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
 
-    if (currentDecodeMode == DecodeMode::RTTY && pRttyDecoder) {
-        pRttyDecoder->startAutoDetect();  // Automatikus frekvencia detektálás indítása RTTY módba lépéskor
-        modeMsg = "--- RTTY Mode ---\n";
-        // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
-
-        if (modeMsg) {
-            for (int i = 0; modeMsg[i] != '\0'; ++i) {
-                appendRttyCharacter(modeMsg[i]);
-            }
-            // Miután az összes karaktert hozzáadtuk a bufferhez (az appendRttyCharacter már nem frissít),
-            // egyszer frissítjük a kijelzőt, hogy a modeMsg megjelenjen.
-            updateRttyTextDisplay();
+    if (modeMsg) {
+        for (int i = 0; modeMsg[i] != '\0'; ++i) {
+            // Itt az appendRttyCharacter már nem frissít minden karakter után,
+            // ezért a ciklus után kell egy updateRttyTextDisplay()
+            // De mivel az appendRttyCharacter most már frissít, ez így jó.
+            appendRttyCharacter(modeMsg[i]);
         }
-        // Mivel a konstruktorban már nem állítjuk be a kezdeti aktív gombot,
-        // itt, az első setDecodeMode híváskor (ami a konstruktor végén történhetne,
-        // vagy az első drawScreen előtt) biztosítjuk, hogy az "Off" gomb legyen az alapértelmezett aktív.
-        // Ezt a konstruktor végére is tehetnénk: setDecodeMode(DecodeMode::OFF);
+        // updateRttyTextDisplay(); // Ha az appendRttyCharacter nem frissítene
     }
 }
 
 /**
- * @brief Törli az RTTY szöveg puffereit.
- * És opcionálisan frissíti a kijelzőt.
+ * @brief Törli az RTTY szöveg puffereit és frissíti a kijelzőt.
  */
 void AmDisplay::clearRttyTextBufferAndDisplay() {
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
@@ -587,22 +417,17 @@ void AmDisplay::clearRttyTextBufferAndDisplay() {
     }
     rttyCurrentLineBuffer = "";
     rttyCurrentLineIndex = 0;
-    updateRttyTextDisplay();  // Törlés után azonnal frissítjük a kijelzőt üresre
+    updateRttyTextDisplay();
 }
 
 /**
  * @brief Beállítja a dekódolási módot egy RadioButton ID alapján.
- * Ezt a handleTouch hívja.
  */
 void AmDisplay::setDecodeModeBasedOnButtonId(uint8_t buttonId) {
-    // Itt feltételezzük, hogy a RadioButton-ok ID-i sorfolytonosak,
-    // és az első gomb ("Off") ID-ja ismert.
-    // Vagy a RadioButtonGroup adjon vissza egy indexet vagy egyértelműbb azonosítót.
-    // A decoderModeStartId_ alapján azonosítjuk a gombokat.
-    if (buttonId == decoderModeStartId_ + 0)  // Első gomb: Off
+    if (buttonId == decoderModeStartId_ + 0)
         setDecodeMode(DecodeMode::OFF);
-    else if (buttonId == decoderModeStartId_ + 1)  // Második gomb: RTTY
+    else if (buttonId == decoderModeStartId_ + 1)
         setDecodeMode(DecodeMode::RTTY);
-    else if (buttonId == decoderModeStartId_ + 2)  // Harmadik gomb: MORSE
+    else if (buttonId == decoderModeStartId_ + 2)
         setDecodeMode(DecodeMode::MORSE);
 }

@@ -2,6 +2,7 @@
 
 #include "PicoSensorUtils.h"
 #include "defines.h"
+#include "pico/multicore.h"  // Core1 kezeléséhez
 #include "rtVars.h"
 #include "utils.h"
 
@@ -50,6 +51,7 @@ AmStationStore amStationStore;
 #include "ScreenSaverDisplay.h"
 #include "SetupDisplay.h"
 #include "SstvDisplay.h"
+#include "core1_logic.h"  // Core1 belépési pontja
 DisplayBase *pDisplay = nullptr;
 
 //---- Dekóderek
@@ -162,13 +164,25 @@ bool rotaryTimerHardwareInterruptHandler(struct repeating_timer *t) {
  */
 void setup() {
 #ifdef __DEBUG
+    // A soros portot minél előbb inicializáljuk, hogy a Core1 indítási üzenetei is látszódjanak
     Serial.begin(115200);
-    pinMode(LED_BUILTIN, OUTPUT);
+    // Rövid várakozás, hogy a soros monitor csatlakozhasson, mielőtt a Core1 logokat küldene
+    delay(1000);
+    DEBUG("Core0: Setup started. Launching Core1...\n");
+    Serial.begin(115200);
 #endif
 
     // Beeper
     pinMode(PIN_BEEPER, OUTPUT);
     digitalWrite(PIN_BEEPER, LOW);
+
+    // --- Core1 indítása KORÁBBAN ---
+    // Indítsuk el a Core1-et még az EEPROM műveletek előtt, hogy a lockout működhessen.
+    multicore_launch_core1(core1_main);
+    DEBUG("Core0: Core1 launched. Draining FIFO and delaying...\n");
+    multicore_fifo_drain();  // Drain Core0's TX FIFO (Core1's RX) after launch
+    delay(100);              // Növelt várakozás, hogy a Core1 elindulhasson és készen álljon a lockout-ra
+    // --- Core1 indítás VÉGE ---
 
     // TFT LED háttérvilágítás kimenet
     pinMode(PIN_TFT_BACKGROUND_LED, OUTPUT);

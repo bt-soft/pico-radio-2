@@ -2,6 +2,7 @@
 #define CWDECODER_H
 
 #include <Arduino.h>  // millis(), analogRead(), etc.
+#include <cmath>      // round, sin, cos, sqrt, abs, min, max - szükséges a constexpr számításokhoz
 
 #include "defines.h"  // AUDIO_INPUT_PIN, DEBUG
 
@@ -14,38 +15,38 @@ class CwDecoder {
     void resetDecoderState();  // To be called when switching to CW mode
 
    private:
-    // Goertzel filter parameters
-    // Sampling_freq = 8912.0; N_SAMPLES = 48; Target_freq = 930.0;
-    // K_CONSTANT = round(48 * 930 / 8912) = round(5.0089) = 5
-    static const float TARGET_FREQ;
-    static const float SAMPLING_FREQ;
-    static const short N_SAMPLES;
-    static const short K_CONSTANT;
-    static const float OMEGA;
-    static const float SINE_OMEGA;
-    static const float COS_OMEGA;
-    static const float COEFF;
-    static const unsigned long SAMPLING_PERIOD_US;  // 1_000_000 / SAMPLING_FREQ
+    // Goertzel filter parameters for 750Hz
+    static constexpr float TARGET_FREQ = 750.0f;
+    static constexpr float SAMPLING_FREQ = 8400.0f;
+    static constexpr short N_SAMPLES = 45;  // Adjusted for better 750Hz tuning with 8400Hz Fs
+    // K_CONSTANT = round(45 * 750 / 8400) = round(4.0178) = 4
+    // Actual filter center frequency: (4 / 45) * 8400 = 746.67 Hz
+    static constexpr short K_CONSTANT = static_cast<short>(round(N_SAMPLES * TARGET_FREQ / SAMPLING_FREQ));
+    static constexpr float OMEGA = (2.0 * PI * K_CONSTANT) / N_SAMPLES;
+    static constexpr float SINE_OMEGA = sin(OMEGA);
+    static constexpr float COS_OMEGA = cos(OMEGA);
+    static constexpr float COEFF = 2.0 * COS_OMEGA;
+    static const unsigned long SAMPLING_PERIOD_US;  // Defined in .cpp
 
     float q0, q1, q2;
-    short testData[48];  // N_SAMPLES, casted from analogRead
+    short testData[N_SAMPLES];  // Adjusted size
 
     // Morse timing and state
-    static const float THRESHOLD;
-    short noiseBlankerLoops_;  // Number of confirmations for tone/no-tone
+    static constexpr float THRESHOLD = 250.0f;  // Threshold for Goertzel magnitude
+    static constexpr unsigned long MIN_MORSE_ELEMENT_DURATION_MS = 25; // Minimum duration for a valid Morse element (ms)
+    short noiseBlankerLoops_;                   // Number of confirmations for tone/no-tone
 
     unsigned long startReferenceMs_;
     unsigned long currentReferenceMs_;
     unsigned long leadingEdgeTimeMs_;
     unsigned long trailingEdgeTimeMs_;
-    unsigned long toneDurationHistory_[6];
+    unsigned long rawToneDurations_[6];
     short toneIndex_;
     unsigned long toneMaxDurationMs_;
     unsigned long toneMinDurationMs_;
 
     unsigned long currentLetterStartTimeMs_;
     short symbolCountForWpm_;
-    // short wpm_; // Not directly used for output char
 
     bool decoderStarted_;     // True if the first leading edge of a character has been detected
     bool measuringTone_;      // True if currently measuring a tone (between leading and trailing edge)

@@ -119,15 +119,14 @@ class EepromManager {
         EepromManager<T> storage(dataRef);
 
         DEBUG("[%s] Saving data to EEPROM at address %d (Size: %d B)...", className, address, sizeof(T));
-
         EEPROM.put(address, storage.data);
         EEPROM.put(address + sizeof(T), storage.crc);
 
         if (EEPROM.commit()) {
-            DEBUG(" OK (CRC: %d)\n", storage.crc);
+            DEBUG("Save OK (CRC: %d)\n", storage.crc);
             return storage.crc;
         } else {
-            DEBUG(" FAILED!\n");
+            DEBUG("Save FAILED!\n");
             return 0;
         }
     }
