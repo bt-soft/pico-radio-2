@@ -271,20 +271,20 @@ void AmDisplay::displayLoop() {
         }
         if (multicore_fifo_rvalid()) {
             char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
+            DEBUG("Core0: RTTY decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
             if (decodedChar != '\0') {
                 appendRttyCharacter(decodedChar);
             }
         }
     }
-
     // CW dekódolás Core1-re delegálva
     if (currentDecodeMode == DecodeMode::MORSE && !rtv::muteStat) {
         if (multicore_fifo_wready()) {
-            // DEBUG("Core0: Sending CORE1_CMD_PROCESS_AUDIO_CW\n"); // Kikommentelve a log spam csökkentése érdekében
             multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_CW);
         }
         if (multicore_fifo_rvalid()) {
             char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
+            DEBUG("Core0: CW decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
             if (decodedChar != '\0') {
                 appendRttyCharacter(decodedChar);
             }
@@ -312,7 +312,15 @@ void AmDisplay::drawRttyTextAreaBackground() {
  * @brief Hozzáfűz egy karaktert az RTTY kijelző pufferéhez és frissíti a kijelzőt.
  */
 void AmDisplay::appendRttyCharacter(char c) {
+    DEBUG("AmDisplay::appendRttyCharacter: kapott karakter: '%c' (%d), buffer: '%s'\n", c, c, rttyCurrentLineBuffer.c_str());
+    // Először adjuk hozzá a karaktert a bufferhez, ha nyomtatható és nem '\n'
+    if (c >= 32 && c <= 126 && c != '\n') {
+        rttyCurrentLineBuffer += c;
+        DEBUG("AmDisplay::appendRttyCharacter: buffer after append: '%s'\n", rttyCurrentLineBuffer.c_str());
+    }
+    // Ezután ellenőrizzük, hogy sort kell-e váltani
     if (c == '\n' || rttyCurrentLineBuffer.length() >= RTTY_LINE_BUFFER_SIZE - 1) {
+        DEBUG("AmDisplay::appendRttyCharacter: line break, index=%d, buffer='%s'\n", rttyCurrentLineIndex, rttyCurrentLineBuffer.c_str());
         if (rttyCurrentLineIndex >= RTTY_MAX_TEXT_LINES - 1) {
             for (int i = 0; i < RTTY_MAX_TEXT_LINES - 1; ++i) {
                 rttyDisplayLines[i] = rttyDisplayLines[i + 1];
@@ -323,13 +331,7 @@ void AmDisplay::appendRttyCharacter(char c) {
             rttyCurrentLineIndex++;
         }
         rttyCurrentLineBuffer = "";
-        if (c != '\n') {
-            rttyCurrentLineBuffer += c;
-        }
-    } else if (c >= 32 && c <= 126) {
-        rttyCurrentLineBuffer += c;
     }
-    // Frissítjük a kijelzőt minden karakter után (vagy csak bizonyos időközönként/teljes sor után)
     updateRttyTextDisplay();
 }
 
@@ -337,6 +339,7 @@ void AmDisplay::appendRttyCharacter(char c) {
  * @brief Frissíti az RTTY szövegterület tartalmát a puffer alapján.
  */
 void AmDisplay::updateRttyTextDisplay() {
+    DEBUG("AmDisplay::updateRttyTextDisplay: index=%d, buffer='%s'\n", rttyCurrentLineIndex, rttyCurrentLineBuffer.c_str());
     drawRttyTextAreaBackground();
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
     tft.setTextDatum(TL_DATUM);
@@ -345,9 +348,16 @@ void AmDisplay::updateRttyTextDisplay() {
     uint16_t charHeight = tft.fontHeight();
     if (charHeight == 0) charHeight = 16;
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
-        tft.drawString(rttyDisplayLines[i], rttyTextAreaX + 2, rttyTextAreaY + 2 + i * charHeight);
+        if (i == rttyCurrentLineIndex) {
+            if (!rttyCurrentLineBuffer.isEmpty()) {
+                tft.drawString(rttyCurrentLineBuffer, rttyTextAreaX + 2, rttyTextAreaY + 2 + i * charHeight);
+            }
+        } else {
+            if (!rttyDisplayLines[i].isEmpty()) {
+                tft.drawString(rttyDisplayLines[i], rttyTextAreaX + 2, rttyTextAreaY + 2 + i * charHeight);
+            }
+        }
     }
-    tft.drawString(rttyCurrentLineBuffer, rttyTextAreaX + 2, rttyTextAreaY + 2 + rttyCurrentLineIndex * charHeight);
 }
 
 /**
@@ -390,22 +400,23 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     multicore_fifo_push_blocking(static_cast<uint32_t>(core1_cmd_set_mode));
 
     clearRttyTextBufferAndDisplay();
-    const char *modeMsg = nullptr;
-    if (currentDecodeMode == DecodeMode::RTTY)
-        modeMsg = "--- RTTY Mode ---\n";
-    else if (currentDecodeMode == DecodeMode::MORSE)
-        modeMsg = "--- CW Mode ---\n";
-    // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
 
-    if (modeMsg) {
-        for (int i = 0; modeMsg[i] != '\0'; ++i) {
-            // Itt az appendRttyCharacter már nem frissít minden karakter után,
-            // ezért a ciklus után kell egy updateRttyTextDisplay()
-            // De mivel az appendRttyCharacter most már frissít, ez így jó.
-            appendRttyCharacter(modeMsg[i]);
-        }
-        // updateRttyTextDisplay(); // Ha az appendRttyCharacter nem frissítene
-    }
+    // const char *modeMsg = nullptr;
+    // if (currentDecodeMode == DecodeMode::RTTY)
+    //     modeMsg = "--- RTTY Mode ---\n";
+    // else if (currentDecodeMode == DecodeMode::MORSE)
+    //     modeMsg = "--- CW Mode ---\n";
+    // // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
+
+    // if (modeMsg) {
+    //     for (int i = 0; modeMsg[i] != '\0'; ++i) {
+    //         // Itt az appendRttyCharacter már nem frissít minden karakter után,
+    //         // ezért a ciklus után kell egy updateRttyTextDisplay()
+    //         // De mivel az appendRttyCharacter most már frissít, ez így jó.
+    //         appendRttyCharacter(modeMsg[i]);
+    //     }
+    //     // updateRttyTextDisplay(); // Ha az appendRttyCharacter nem frissítene
+    // }
 }
 
 /**

@@ -34,7 +34,7 @@ void core1_main() {
         // Várakozás parancsra Core0-tól
         if (multicore_fifo_rvalid()) {
             uint32_t raw_command = multicore_fifo_pop_blocking();
-            //DEBUG("Core1: Popped command: 0x%lX\n", raw_command);  // Log the popped command
+            // DEBUG("Core1: Popped command: 0x%lX\n", raw_command);  // Log the popped command
 
             Core1Command command = static_cast<Core1Command>(raw_command);
             char char_to_send_back = '\0';
@@ -76,8 +76,6 @@ void core1_main() {
 
                 case CORE1_CMD_PROCESS_AUDIO_CW:
                     if (core1_current_mode == Core1ActiveMode::MODE_CW) {
-                        // DEBUG("Core1: Processing CW audio\n"); // Ezt kikommentálva hagyjuk, hogy ne árassza el a logot
-                        // KÉSŐBB: Itt hívnánk a Core1-en futó CW dekódert
                         if (core1_cw_decoder) {
                             char_to_send_back = core1_cw_decoder->decodeNextCharacter();
                         } else {

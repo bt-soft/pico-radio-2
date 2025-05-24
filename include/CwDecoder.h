@@ -28,18 +28,16 @@ class CwDecoder {
     static const unsigned long SAMPLING_PERIOD_US;   // Defined in .cpp
 
     float q0, q1, q2;
-    short testData[N_SAMPLES];  // Adjusted size
-
-    // Morse timing and state
-    static constexpr float THRESHOLD = 250.0f;                          // Threshold for Goertzel magnitude
-    static constexpr unsigned long MIN_MORSE_ELEMENT_DURATION_MS = 25;  // Minimum duration for a valid Morse element (ms)
-    short noiseBlankerLoops_;                                           // Number of confirmations for tone/no-tone
+    short testData[N_SAMPLES];  // Adjusted size    // Morse timing and state
+    static constexpr float THRESHOLD =
+        150.0f;  // Alacsonyabb küszöb a jobb érzékeléshez    static constexpr unsigned long MIN_MORSE_ELEMENT_DURATION_MS = 25;  // Minimum duration for a valid Morse element (ms)
+    short noiseBlankerLoops_;  // Number of confirmations for tone/no-tone
 
     unsigned long startReferenceMs_;
     unsigned long currentReferenceMs_;
     unsigned long leadingEdgeTimeMs_;
     unsigned long trailingEdgeTimeMs_;
-    unsigned long rawToneDurations_[6];
+    unsigned long rawToneDurations_[6];  // Morse karakterek maximum 6 elem hosszúak
     short toneIndex_;
     unsigned long toneMaxDurationMs_;
     unsigned long toneMinDurationMs_;
@@ -62,9 +60,7 @@ class CwDecoder {
     short treeCount_;
 
     // Audio input
-    int audioInputPin_;
-
-    // Private methods
+    int audioInputPin_;  // Private methods
     bool goertzelProcess();
     bool sampleWithNoiseBlanking();
     void processDot();
@@ -72,7 +68,8 @@ class CwDecoder {
     char getCharFromTree();
     void resetMorseTree();
     void updateReferenceTimings(unsigned long duration);
-    void initialize();  // Common initialization logic
+    void initialize();                // Common initialization logic
+    char processCollectedElements();  // Process collected Morse elements
 };
 
 #endif  // CWDECODER_H
