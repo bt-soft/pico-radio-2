@@ -4,6 +4,10 @@
 
 #include "defines.h"  // DEBUG
 
+#ifdef __DEBUG
+#define CW_DEBUG  // CW működés debug engedélyezése de csak DEBUG módban
+#endif
+
 // Goertzel filter parameters are now constexpr in CwDecoder.h
 
 const unsigned long CwDecoder::SAMPLING_PERIOD_US = static_cast<unsigned long>(1000000.0f / CwDecoder::SAMPLING_FREQ);
@@ -56,7 +60,9 @@ void CwDecoder::initialize() {
 
 void CwDecoder::resetDecoderState() {
     initialize();
+#ifdef CW_DEBUG
     DEBUG("CW Decoder state reset.\n");
+#endif
 }
 
 bool CwDecoder::goertzelProcess() {
@@ -123,7 +129,9 @@ void CwDecoder::processDot() {
     treeCount_--;
     symbolCountForWpm_ += 2;
     if (treeCount_ < 0) {
+#ifdef CW_DEBUG
         DEBUG("CW Decoder: Tree error (dot)\n");
+#endif
         resetMorseTree();
         currentReferenceMs_ = startReferenceMs_;
         toneMinDurationMs_ = 9999L;
@@ -141,7 +149,9 @@ void CwDecoder::processDash() {
     treeCount_--;
     symbolCountForWpm_ += 4;
     if (treeCount_ < 0) {
+#ifdef CW_DEBUG
         DEBUG("CW Decoder: Tree error (dash)\n");
+#endif
         resetMorseTree();
         currentReferenceMs_ = startReferenceMs_;
         toneMinDurationMs_ = 9999L;
@@ -192,7 +202,9 @@ void CwDecoder::updateReferenceTimings(unsigned long duration) {
     unsigned long upperBound = DOT_MAX_MS * 1.5f;   // Pl. 200 * 1.5 = 300ms.
     currentReferenceMs_ = constrain(currentReferenceMs_, lowerBound, upperBound);
 
+#ifdef CW_DEBUG
     DEBUG("CW: Ref frissítve - min: %lu, max: %lu, ref: %lu, új elem: %lu\n", toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_, duration);
+#endif
 }
 
 char CwDecoder::decodeNextCharacter() {
@@ -222,7 +234,9 @@ char CwDecoder::decodeNextCharacter() {
             toneMaxDurationMs_ = 0L;
             currentReferenceMs_ = startReferenceMs_;
             memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
+#ifdef CW_DEBUG
             DEBUG("CW: Reset inactivity miatt\n");
+#endif
             inInactiveState = true;  // Beállítjuk, hogy kiírtuk
         }
         return '\0';
@@ -233,15 +247,19 @@ char CwDecoder::decodeNextCharacter() {
         decoderStarted_ = true;
         inInactiveState = false;  // Újra aktívak vagyunk, reseteljük a flag-et
         measuringTone_ = true;
+#ifdef CW_DEBUG
         DEBUG("CW: Első él, idő: %lu\n", currentTimeMs);
-
+#endif
     } else if (decoderStarted_ && measuringTone_ && !currentToneState) {
         trailingEdgeTimeMs_ = currentTimeMs;
         unsigned long duration = trailingEdgeTimeMs_ - leadingEdgeTimeMs_;
+#ifdef CW_DEBUG
         DEBUG("CW: Hang vége, tartam: %lu ms\n", duration);
-
+#endif
         if (toneIndex_ >= 6) {
+#ifdef CW_DEBUG
             DEBUG("CW: Tömb tele (%d elem), kényszer dekódolás hang végén\n", toneIndex_);
+#endif
             decodedChar = processCollectedElements();
             memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
             resetMorseTree();
@@ -252,40 +270,55 @@ char CwDecoder::decodeNextCharacter() {
             rawToneDurations_[toneIndex_] = duration;
             toneIndex_++;
             updateReferenceTimings(duration);
+#ifdef CW_DEBUG
             DEBUG("CW: Elem hozzáadva [%d]: %lu ms, ref: %lu ms\n", toneIndex_ - 1, duration, currentReferenceMs_);
+#endif
         } else {
+#ifdef CW_DEBUG
             if (duration > DASH_MAX_MS) {
+
                 DEBUG("CW: TÚL HOSSZÚ elem: %lu ms (max: %lu, index: %d)\n", duration, DASH_MAX_MS, toneIndex_);
             } else if (duration < DOT_MIN_MS) {
                 DEBUG("CW: TÚL RÖVID elem: %lu ms (min: %lu, index: %d)\n", duration, DOT_MIN_MS, toneIndex_);
             }
+#endif
         }
         measuringTone_ = false;
     } else if (decoderStarted_ && !measuringTone_ && currentToneState) {
         unsigned long gapDuration = currentTimeMs - trailingEdgeTimeMs_;
         if (toneIndex_ >= 6) {
+#ifdef CW_DEBUG
             DEBUG("CW: Tömb tele (%d elem), kényszer dekódolás\n", toneIndex_);
+#endif
             decodedChar = processCollectedElements();
             memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
             resetMorseTree();
             toneIndex_ = 0;
         }
         if (gapDuration >= charGapMs && toneIndex_ > 0) {
+#ifdef CW_DEBUG
             DEBUG("CW: Karakterhatár detektálva, gap: %lu ms (küszöb: %lu ms)\n", gapDuration, charGapMs);
+#endif
             decodedChar = processCollectedElements();
             resetMorseTree();
             toneIndex_ = 0;
             memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
             leadingEdgeTimeMs_ = currentTimeMs;
             measuringTone_ = true;
+#ifdef CW_DEBUG
             DEBUG("CW: Karakterhatár, gap: %lu ms\n", gapDuration);
+#endif
         } else if (gapDuration >= ELEMENT_GAP_MIN_MS || toneIndex_ == 0) {
             leadingEdgeTimeMs_ = currentTimeMs;
             measuringTone_ = true;
         } else {
+#ifdef CW_DEBUG
             DEBUG("CW: Rövid gap: %lu ms (küszöb: %lu)\n", gapDuration, charGapMs);
+#endif
             if (toneIndex_ >= 1 && gapDuration >= 150) {
+#ifdef CW_DEBUG
                 DEBUG("CW: 1+ elem 150ms+ gap-pel - karakterhatár feltételezés\n");
+#endif
                 decodedChar = processCollectedElements();
                 memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
                 resetMorseTree();
@@ -297,39 +330,51 @@ char CwDecoder::decodeNextCharacter() {
     } else if (decoderStarted_ && !measuringTone_ && !currentToneState) {
         unsigned long spaceDuration = currentTimeMs - trailingEdgeTimeMs_;
         if ((spaceDuration > charGapMs && toneIndex_ > 0) || toneIndex_ >= 6) {
+#ifdef CW_DEBUG
             if (toneIndex_ >= 6) {
                 DEBUG("CW: Tömb tele csendben (%d elem), kényszer dekódolás\n", toneIndex_);
             } else {
                 DEBUG("CW: Hosszú csend detektálva, space: %lu ms (küszöb: %lu ms)\n", spaceDuration, charGapMs);
             }
+#endif
             decodedChar = processCollectedElements();
             resetMorseTree();
             memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
             toneIndex_ = 0;
             decoderStarted_ = false;
+#ifdef CW_DEBUG
             DEBUG("CW: Hosszú csend, space: %lu ms\n", spaceDuration);
+#endif
         }
     }
 
     if (decodedChar != '\0') {
+#ifdef CW_DEBUG
         DEBUG("CW: Dekódolt karakter: '%c'\n", decodedChar);
+#endif
     }
     return decodedChar;
 }
 
 char CwDecoder::processCollectedElements() {
     if (toneIndex_ == 0) return '\0';
+#ifdef CW_DEBUG
     DEBUG("CW: Feldolgozás - %d elem, ref: %lu ms\n", toneIndex_, currentReferenceMs_);
+#endif
     resetMorseTree();
 
     for (short i = 0; i < toneIndex_; i++) {
         unsigned long duration = rawToneDurations_[i];
         if (duration < currentReferenceMs_) {
             processDot();
+#ifdef CW_DEBUG
             DEBUG("CW: [%d] Pont: %lu ms\n", i, duration);
+#endif
         } else {
             processDash();
+#ifdef CW_DEBUG
             DEBUG("CW: [%d] Vonás: %lu ms\n", i, duration);
+#endif
         }
     }
     char result = getCharFromTree();
@@ -342,7 +387,9 @@ char CwDecoder::processCollectedElements() {
         }
     } else {
         // Ha result '\0', az azt jelenti, hogy a getCharFromTree() ' '-t adott vissza, de a fa gyökerénél vagy érvénytelen indexen volt
+#ifdef CW_DEBUG
         DEBUG("CW: Ismeretlen minta - treeIndex: %d\n", treeIndex_);
+#endif
     }
     return '\0';
 }
