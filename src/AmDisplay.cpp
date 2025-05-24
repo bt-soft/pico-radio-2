@@ -278,10 +278,11 @@ void AmDisplay::displayLoop() {
         }
     }
     // CW dekódolás Core1-re delegálva
+    // A Core1 most már önállóan futtatja a CW dekódert, ha a mód be van állítva.
+    // A Core0 csak fogadja a dekódolt karaktereket.
+    // A !rtv::muteStat ellenőrzés itt is maradhat, hogy ne próbáljunk karaktert fűzni, ha némítva van.
     if (currentDecodeMode == DecodeMode::MORSE && !rtv::muteStat) {
-        if (multicore_fifo_wready()) {
-            multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_CW);
-        }
+        // Nincs szükség parancs küldésére, a Core1 önállóan dolgozik.
         if (multicore_fifo_rvalid()) {
             char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
             DEBUG("Core0: CW decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
