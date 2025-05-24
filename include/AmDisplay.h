@@ -2,6 +2,7 @@
 #define __AMDISPLAY_H
 
 #include "DisplayBase.h"
+#include "CwDecoder.h"    // CW dekóder osztály
 #include "MiniAudioFft.h"
 #include "RadioButton.h"  // Új RadioButton include
 #include "RttyDecoder.h"  // RTTY dekóder osztály
@@ -44,6 +45,7 @@ class AmDisplay : public DisplayBase {
 
     AudioProcessor *pAudioProcessor;      // Audio processor példány
     RttyDecoder *pRttyDecoder = nullptr;  // RTTY dekóder
+    CwDecoder *pCwDecoder = nullptr;      // CW dekóder
 
     // A szövegterület tényleges koordinátái és méretei (konstruktorban számolva)
     uint16_t rttyTextAreaX, rttyTextAreaY, rttyTextAreaW, rttyTextAreaH;

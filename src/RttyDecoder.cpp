@@ -1,13 +1,13 @@
 #include "RttyDecoder.h"
 
-#include <cmath>  // abs, round, constrain
-#include <algorithm> // std::sort, std::max, std::min
+#include <algorithm>  // std::sort, std::max, std::min
+#include <cmath>      // abs, round, constrain
 
 RttyDecoder::RttyDecoder(AudioProcessor& audioProcessor)
     : audioProcessor(audioProcessor),
       figsShift_(false),
       rttyMarkFreqHz_(2295.0f),  // Alapértelmezett Mark (gyakran a magasabb)
-      rttySpaceFreqHz_(2125.0f) // Alapértelmezett Space (gyakran az alacsonyabb)
+      rttySpaceFreqHz_(2125.0f)  // Alapértelmezett Space (gyakran az alacsonyabb)
 {
     initBaudotToAscii();
 }
@@ -30,22 +30,21 @@ char RttyDecoder::decodeNextCharacter() {
             autoDetectModeActive_ = false;
             // Reset RTTY state machine as frequencies changed
             currentState = IDLE;
-            figsShift_ = false; // Reset figs shift
-            return '\0'; // Don't decode a char immediately after successful detection
+            figsShift_ = false;  // Reset figs shift
+            return '\0';         // Don't decode a char immediately after successful detection
         } else if (millis() - autoDetectStartTime_ > AUTO_DETECT_DURATION_MS) {
             DEBUG("RTTY: Auto-detect timed out. Using default/previous frequencies (Mark: %.1f, Space: %.1f).\n", rttyMarkFreqHz_, rttySpaceFreqHz_);
             autoDetectModeActive_ = false;
             // Optionally, revert to default frequencies if they were changed optimistically
             // For now, we keep whatever was last set or the defaults.
         } else {
-            return '\0'; // Still trying to auto-detect
+            return '\0';  // Still trying to auto-detect
         }
     }
 
     // Mark és Space frekvenciákhoz tartozó FFT bin indexek kiszámítása
     // Ezeket a getSignalState már használja a frissített rttyMarkFreqHz_ és rttySpaceFreqHz_ alapján.
     // Itt közvetlenül nem használjuk őket, a getSignalState szolgáltatja az eredményt.
-
 
     // RTTY dekódolási állapotgép (nagyon egyszerűsített)
     unsigned long currentTime = millis();
@@ -62,7 +61,7 @@ char RttyDecoder::decodeNextCharacter() {
             if (isSignalPresent && !isMarkTone) {  // Ha van jel ÉS az Space
                 // Potenciális start bit detektálva, átmenet a várakozó állapotba
                 currentState = WAITING_FOR_START_BIT;
-                lastBitTime = currentTime;  // Rögzítjük a potenciális start bit kezdetének idejét
+                lastBitTime = currentTime;
                 DEBUG("RTTY: Potential start bit detected.\n");
             } else if (!isSignalPresent) {
                 // Nincs jel, maradjunk IDLE állapotban, vagy resetelhetnénk, ha szükséges
@@ -71,6 +70,8 @@ char RttyDecoder::decodeNextCharacter() {
 
         case WAITING_FOR_START_BIT:
             // Ellenőrizzük, hogy a jel továbbra is Space ÉS jelen van-e
+            // Itt újra lekérdezzük a jel állapotát, hogy a sampleOffsetMs idő alatti változást is figyelembe vegyük
+            getSignalState(isSignalPresent, isMarkTone);  // Friss állapot lekérdezése
             if (isSignalPresent && !isMarkTone) {
                 if (currentTime - lastBitTime >= sampleOffsetMs) {
                     // Start bit megerősítve, felkészülés az adatbitek vételére
@@ -80,10 +81,11 @@ char RttyDecoder::decodeNextCharacter() {
                     lastBitTime = currentTime;  // Időzítő resetelése az első adatbithez
                     DEBUG("RTTY: Start bit confirmed. Receiving data bits.\n");
                 }
+                // Ha az idő még nem telt el, nem csinálunk semmit, várunk a következő ciklusra.
             } else {
                 // A jel megváltozott Mark-ra, vagy eltűnt. Téves indítás, visszatérés IDLE állapotba.
                 currentState = IDLE;
-                DEBUG("RTTY: False start bit or signal lost, returning to IDLE.\n");
+                DEBUG("RTTY: False start bit or signal lost (during wait), returning to IDLE.\n");
             }
             break;
 
@@ -92,14 +94,17 @@ char RttyDecoder::decodeNextCharacter() {
             if (currentTime - lastBitTime >= bitDurationMs) {
                 lastBitTime += bitDurationMs;  // Időzítő előre léptetése a következő bithez
 
-                // Mintavételezés (ellenőrizzük, hogy Mark-e)
-                // Ha a jel eltűnt volna az adatbitek közben, isSignalPresent false lenne.
-                // Ebben az egyszerűsített dekóderben feltételezzük, hogy a jel stabil marad a bájt végéig.
-                // Egy robusztusabb dekóder itt is ellenőrizné az isSignalPresent-et és hibát jelezne/resetelne.
-                // Most az utolsó ismert isMarkTone-t használjuk, ha a jel esetleg gyenge/zajos lenne.
-                // Ideális esetben minden bit mintavételezés előtt frissítenénk az isSignalPresent és isMarkTone értékeket.
-                // De az audioProcessor.process() hívása minden bitnél túl lassú lehet.
-                uint8_t bit = isMarkTone ? 1 : 0;
+                // Újra lekérdezzük a jel állapotát minden bit vétele előtt
+                bool currentBitSignalPresent;
+                bool currentBitIsMark;
+                getSignalState(currentBitSignalPresent, currentBitIsMark);
+
+                if (!currentBitSignalPresent) {  // Ha a jel elveszett a bit vétele közben
+                    DEBUG("RTTY: Signal lost during data bit %d. Resetting.\n", bitsReceived);
+                    currentState = IDLE;
+                    return '\0';
+                }
+                uint8_t bit = currentBitIsMark ? 1 : 0;
 
                 // Bit tárolása az aktuális bájtban (Baudot LSB először)
                 currentByte |= (bit << bitsReceived);
@@ -109,16 +114,10 @@ char RttyDecoder::decodeNextCharacter() {
 
                 if (bitsReceived == 5) {
                     // Mind az 5 adatbitet megkaptuk, átlépés a stop bit állapotba
-                    currentState = RECEIVING_STOP_BIT; // Nincs teendő, a lastBitTime már jó
+                    currentState = RECEIVING_STOP_BIT;  // Nincs teendő, a lastBitTime már jó
                     // lastBitTime már be van állítva a stop bit időtartamának kezdetére
                     DEBUG("RTTY: Received 5 data bits. Waiting for stop bit.\n");
                 }
-            }
-            // Ha a jel eltűnik az adatbitek vétele közben:
-            if (!isSignalPresent && bitsReceived > 0 && bitsReceived < 5) {
-                currentState = IDLE;
-                DEBUG("RTTY: Signal lost during data bits. Resetting.\n");
-                return '\0';
             }
             // Egy igazi dekódernek folyamatosan figyelnie kellene a jelet és a bitidőzítést.
             break;
@@ -127,18 +126,18 @@ char RttyDecoder::decodeNextCharacter() {
             // Ellenőrizzük, hogy eltelt-e a szükséges stop bit időtartam (1.5 vagy 2 bit idő)
             // Standard RTTY 1.5 stop bitet használ. Ellenőrizzük legalább 1.5 bit időtartamot.
             if (currentTime - lastBitTime >= bitDurationMs * 1.5f) {
-                // Ellenőrizzük, hogy a jel Mark-e a stop bit időtartama alatt (opcionális, de jó gyakorlat)
-                // Ez az egyszerű ellenőrzés csak az állapotot nézi az időtartam végén.
-                // Itt is az utolsó ismert isMarkTone-t használjuk.
-                bool stopBitIsMark = isMarkTone;
+                // Újra lekérdezzük a jel állapotát a stop bit ellenőrzéséhez
+                bool currentStopBitSignalPresent;
+                bool currentStopBitIsMark;
+                getSignalState(currentStopBitSignalPresent, currentStopBitIsMark);
 
-                if (!isSignalPresent) {  // Ha a jel eltűnt a stop bit alatt
+                if (!currentStopBitSignalPresent) {  // Ha a jel eltűnt a stop bit alatt
                     currentState = IDLE;
                     DEBUG("RTTY: Signal lost during stop bit. Resetting.\n");
                     return '\0';
                 }
 
-                if (stopBitIsMark) {  // Stop bit Mark (ahogy várható)
+                if (currentStopBitIsMark) {  // Stop bit Mark (ahogy várható)
                     // Stop bit megérkezett, dekódoljuk a bájtot
                     char decodedChar = decodeBaudot(currentByte, figsShift_);
 
@@ -148,11 +147,10 @@ char RttyDecoder::decodeNextCharacter() {
                     return decodedChar;
                 } else {
                     // Stop bit nem volt Mark, potenciális hiba vagy zaj, visszaállítás
-                    currentState = IDLE;
                     DEBUG("RTTY: Stop bit not detected (not Mark). Resetting to IDLE.\n");
+                    currentState = IDLE;
                 }
             }
-            // Megjegyzés: Itt sem ellenőrizzük a signalPresent-et.
             break;
     }
     return '\0';  // Nincs kész karakter
@@ -162,9 +160,14 @@ char RttyDecoder::decodeNextCharacter() {
 void RttyDecoder::startAutoDetect() {
     autoDetectModeActive_ = true;
     autoDetectStartTime_ = millis();
-    currentState = IDLE; // Reset state machine
+    currentState = IDLE;  // Reset state machine
     figsShift_ = false;
     DEBUG("RTTY: Starting automatic frequency detection...\n");
+}
+
+void RttyDecoder::setMarkFrequencyIsLower(bool isLower) {
+    markFrequencyIsLower_ = isLower;
+    DEBUG("RTTY: Mark frequency set to be %s.\n", isLower ? "lower" : "higher");
 }
 
 bool RttyDecoder::attemptAutoDetectFrequencies() {
@@ -188,9 +191,7 @@ bool RttyDecoder::attemptAutoDetectFrequencies() {
     if (peaks.size() < 2) return false;
 
     // Csúcsok rendezése magnitúdó szerint csökkenő sorrendben
-    std::sort(peaks.begin(), peaks.end(), [](const PeakInfo& a, const PeakInfo& b) {
-        return a.mag > b.mag;
-    });
+    std::sort(peaks.begin(), peaks.end(), [](const PeakInfo& a, const PeakInfo& b) { return a.mag > b.mag; });
 
     // Legfeljebb az 5 legerősebb csúcsot vizsgáljuk páronként
     int peaks_to_check = std::min((int)peaks.size(), 5);
@@ -201,22 +202,35 @@ bool RttyDecoder::attemptAutoDetectFrequencies() {
     for (int i = 0; i < peaks_to_check; ++i) {
         for (int j = i + 1; j < peaks_to_check; ++j) {
             float freq_diff = std::abs(peaks[i].freq - peaks[j].freq);
+            // DEBUG("RTTY_AD: Comparing %.1fHz (%.1f) & %.1fHz (%.1f), diff=%.1fHz. TargetShift=%.1f, Tol=%.1f\n",
+            //       peaks[i].freq, peaks[i].mag, peaks[j].freq, peaks[j].mag, freq_diff, RTTY_TARGET_SHIFT_HZ, AUTO_DETECT_SHIFT_TOLERANCE_HZ);
             if (std::abs(freq_diff - RTTY_TARGET_SHIFT_HZ) < AUTO_DETECT_SHIFT_TOLERANCE_HZ) {
-                double combined_mag = peaks[i].mag + peaks[j].mag;
-                if (combined_mag > max_combined_mag) {
-                    max_combined_mag = combined_mag;
-                    best_peak1 = peaks[i];
-                    best_peak2 = peaks[j];
-                    found_pair = true;
+                // Új feltétel: a két csúcs magnitúdója ne legyen túlságosan eltérő
+                double mag_ratio = (peaks[i].mag > peaks[j].mag) ? (peaks[i].mag / std::max(0.001, peaks[j].mag)) : (peaks[j].mag / std::max(0.001, peaks[i].mag));
+                if (mag_ratio < AUTO_DETECT_MAX_MAG_RATIO) {
+                    double combined_mag = peaks[i].mag + peaks[j].mag;
+                    if (combined_mag > max_combined_mag) {
+                        max_combined_mag = combined_mag;
+                        best_peak1 = peaks[i];
+                        best_peak2 = peaks[j];
+                        found_pair = true;
+                        // DEBUG("RTTY_AD:   New best pair (ratio %.1f): %.1f Hz & %.1f Hz, combined_mag=%.1f\n", mag_ratio, best_peak1.freq, best_peak2.freq, max_combined_mag);
+                    }
+                } else {
+                    // DEBUG("RTTY_AD:   Pair rejected due to high mag ratio: %.1f (%.1fHz vs %.1fHz)\n", mag_ratio, peaks[i].freq, peaks[j].freq);
                 }
             }
         }
     }
 
     if (found_pair) {
-        // Gyakran a Mark frekvencia a magasabb
-        rttyMarkFreqHz_ = std::max(best_peak1.freq, best_peak2.freq);
-        rttySpaceFreqHz_ = std::min(best_peak1.freq, best_peak2.freq);
+        if (markFrequencyIsLower_) {
+            rttyMarkFreqHz_ = std::min(best_peak1.freq, best_peak2.freq);
+            rttySpaceFreqHz_ = std::max(best_peak1.freq, best_peak2.freq);
+        } else {
+            rttyMarkFreqHz_ = std::max(best_peak1.freq, best_peak2.freq);
+            rttySpaceFreqHz_ = std::min(best_peak1.freq, best_peak2.freq);
+        }
         return true;
     }
 
@@ -229,36 +243,46 @@ void RttyDecoder::getSignalState(bool& outIsSignalPresent, bool& outIsMarkTone) 
     // Az audioProcessor.process() már lefutott a decodeNextCharacter() elején.
     const double* magnitudeData = audioProcessor.getMagnitudeData();
     float binWidthHz = audioProcessor.getBinWidthHz();
+
+    outIsSignalPresent = false;  // Alapértelmezetten nincs jel
+    outIsMarkTone = false;       // Alapértelmezetten Space, ha a jel nem egyértelmű
+
     if (binWidthHz == 0 || !magnitudeData) {
-        outIsSignalPresent = false;
-        outIsMarkTone = false;  // Irreleváns, de legyen definiált
+        DEBUG("RTTY_AD: No binWidth (%.2f) or magnitudeData (%p)\n", binWidthHz, magnitudeData);
         return;
     }
 
     // Mark és Space frekvenciákhoz tartozó FFT bin indexek kiszámítása
-    int markBin = static_cast<int>(round(rttyMarkFreqHz_ / binWidthHz));
-    int spaceBin = static_cast<int>(round(rttySpaceFreqHz_ / binWidthHz));
+    int markCenterBin = static_cast<int>(round(rttyMarkFreqHz_ / binWidthHz));
+    int spaceCenterBin = static_cast<int>(round(rttySpaceFreqHz_ / binWidthHz));
 
-    // Biztosítjuk, hogy a bin indexek a magnitúdó tömb határain belül legyenek
-    markBin = constrain(markBin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
-    spaceBin = constrain(spaceBin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
+    // Helper lambda a magnitúdók átlagolásához NUM_BINS_TO_AVERAGE szélességben
+    auto getAverageMagnitude = [&](int centerBin) {
+        double sumMag = 0;
+        int count = 0;
+        int halfWindow = (NUM_BINS_TO_AVERAGE - 1) / 2;
+        for (int offset = -halfWindow; offset <= halfWindow; ++offset) {
+            int bin = centerBin + offset;
+            // Biztosítjuk, hogy a bin indexek a magnitúdó tömb határain belül legyenek
+            bin = constrain(bin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
+            sumMag += magnitudeData[bin];
+            count++;
+        }
+        return (count > 0) ? (sumMag / count) : 0.0;
+    };
 
-    // Mark és Space energiák összehasonlítása (egyszerű megközelítés)
-    // Egy robusztusabb dekóder itt valószínűleg szűrné vagy átlagolná az értékeket.
-    double currentMarkMagnitude = magnitudeData[markBin];
-    double currentSpaceMagnitude = magnitudeData[spaceBin];
+    double avgMarkMagnitude = getAverageMagnitude(markCenterBin);
+    double avgSpaceMagnitude = getAverageMagnitude(spaceCenterBin);
 
-    // Meghatározzuk, hogy Mark vagy Space a domináns jel
-    outIsMarkTone = currentMarkMagnitude > currentSpaceMagnitude;
+    bool markStrongEnough = avgMarkMagnitude > MIN_TONE_MAGNITUDE_THRESHOLD;
+    bool spaceStrongEnough = avgSpaceMagnitude > MIN_TONE_MAGNITUDE_THRESHOLD;
+    bool significantDifference = std::abs(avgMarkMagnitude - avgSpaceMagnitude) > TONE_DIFFERENCE_THRESHOLD;
 
-    // Egyszerű jel jelenlét ellenőrzés (elkerülendő a zaj dekódolását)
-    // Állítsuk be ezt a küszöböt a tesztelés alapján.
-    const double SIGNAL_THRESHOLD = 100.0;  // Példa küszöb, finomhangolást igényel
-    outIsSignalPresent = (currentMarkMagnitude > SIGNAL_THRESHOLD || currentSpaceMagnitude > SIGNAL_THRESHOLD);
-
-    if (!outIsSignalPresent) {
-        outIsMarkTone = false;  // Ha nincs jel, a Mark/Space állapot irreleváns vagy legyen default Space
+    if ((markStrongEnough || spaceStrongEnough) && significantDifference) {
+        outIsSignalPresent = true;
+        outIsMarkTone = avgMarkMagnitude > avgSpaceMagnitude;
     }
+ DEBUG("RTTY SignalState: MarkAvg=%.1f, SpaceAvg=%.1f, Present=%d, IsMark=%d (M:%.1f, S:%.1f)\n", avgMarkMagnitude, avgSpaceMagnitude, outIsSignalPresent, outIsMarkTone, rttyMarkFreqHz_, rttySpaceFreqHz_);
 }
 
 // Baudot -> ASCII tábla inicializálása

@@ -34,10 +34,11 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     uint8_t horizontalButtonCount = ARRAY_ITEM_COUNT(horizontalButtonsData);
 
     // MiniAudioFft és RTTY dekóder inicializálása
-    // Az AudioProcessor a MiniAudioFftConfigAm gain config referenciát használja.
     // A targetSamplingFrequency 12000 Hz (2 * 6000 Hz) az AM FFT-hez és RTTY-hez.
-    pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigAm, AUDIO_INPUT_PIN, MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
+    // Az RTTY dekóderhez a config.data.miniAudioFftConfigRtty erősítési beállítást használjuk.
+    pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigRtty, AUDIO_INPUT_PIN, MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
     pRttyDecoder = new RttyDecoder(*pAudioProcessor);  // RTTY dekóder inicializálása az AudioProcessorral
+    pCwDecoder = new CwDecoder(AUDIO_INPUT_PIN);       // CW dekóder inicializálása
 
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
     rttyTextAreaX = DECODER_TEXT_AREA_X_START;
@@ -105,6 +106,10 @@ AmDisplay::~AmDisplay() {
     // RttyDecoder törlése
     if (pRttyDecoder) {
         delete pRttyDecoder;
+    }
+    // CwDecoder törlése
+    if (pCwDecoder) {
+        delete pCwDecoder;
     }
 
     // A decoderModeGroup (RadioButtonGroup) destruktora automatikusan lefut,
@@ -438,8 +443,10 @@ void AmDisplay::displayLoop() {
         }
     }
 
-    // CW dekódolás futtatása, ha a CW mód aktív (TODO)
-    if (currentDecodeMode == DecodeMode::MORSE) {
+    // CW dekódolás futtatása, ha a CW mód aktív
+    if (currentDecodeMode == DecodeMode::MORSE && pCwDecoder && !rtv::muteStat) {
+        char decodedChar = pCwDecoder->decodeNextCharacter();
+        if (decodedChar != '\0') { appendRttyCharacter(decodedChar); }
         // TODO: CW dekódolási logika
     }
 }
@@ -531,6 +538,9 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
         case DecodeMode::MORSE:
             decoderModeGroup.selectButtonByIndex(2);  // "CW" a harmadik
             // DEBUG("Decode Mode set to MORSE\n");
+            if (pCwDecoder) {
+                pCwDecoder->resetDecoderState(); // CW dekóder állapotának nullázása
+            }
             break;
         default:
             break;
@@ -549,7 +559,7 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
 
     if (currentDecodeMode == DecodeMode::RTTY && pRttyDecoder) {
         pRttyDecoder->startAutoDetect();  // Automatikus frekvencia detektálás indítása RTTY módba lépéskor
-        modeMsg = "--- CW Mode ---\n";
+        modeMsg = "--- RTTY Mode ---\n";
         // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
 
         if (modeMsg) {

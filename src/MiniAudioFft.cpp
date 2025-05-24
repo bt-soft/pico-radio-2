@@ -439,7 +439,7 @@ void MiniAudioFft::loop() {
     if (fft_duration > max_fft_loop_duration) max_fft_loop_duration = fft_duration;
     if (draw_duration > max_draw_loop_duration) max_draw_loop_duration = draw_duration;
     if (millis() - lastInternalTimingPrint >= 5000) {
-        DEBUG("MiniAudioFft elapsed (max 5s): - FFT: %lu us, Draw (%s): %lu us\n", max_fft_loop_duration, getModeNameString(currentMode), max_draw_loop_duration);
+        //        DEBUG("MiniAudioFft elapsed (max 5s): - FFT: %lu us, Draw (%s): %lu us\n", max_fft_loop_duration, getModeNameString(currentMode), max_draw_loop_duration);
         lastInternalTimingPrint = millis();
         max_fft_loop_duration = 0;
         max_draw_loop_duration = 0;
@@ -856,7 +856,7 @@ void MiniAudioFft::drawWaterfall() {
         fft_bin_index = constrain(fft_bin_index, min_bin_for_wf_env, max_bin_for_wf_env);
 
         if (!pAudioProcessor) continue;
-    constexpr float WATERFALL_INPUT_SCALE = 0.1f;  // Csökkentve, hogy ne legyen túl fehér auto gain mellett
+        constexpr float WATERFALL_INPUT_SCALE = 0.1f;  // Csökkentve, hogy ne legyen túl fehér auto gain mellett
         wabuf[r][width - 1] = static_cast<uint8_t>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * WATERFALL_INPUT_SCALE, 0.0, 255.0));
     }
 
