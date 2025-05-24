@@ -76,6 +76,7 @@ void core1_main() {
                     } else {
                         DEBUG("Core1: FATAL - Failed to create CwDecoder instance!\n");
                     }
+                    break; 
 
                 case CORE1_CMD_PROCESS_AUDIO_RTTY:
                     if (core1_current_mode == Core1ActiveMode::MODE_RTTY) {
@@ -93,6 +94,7 @@ void core1_main() {
                     if (core1_current_mode == Core1ActiveMode::MODE_CW) {
                         if (core1_cw_decoder) {
                             char_to_send_back = core1_cw_decoder->decodeNextCharacter();
+                            DEBUG("Core1: CW Decoder processed character: '%c'\n", char_to_send_back);
                         } else {
                             DEBUG("Core1: CW Decoder not initialized for explicit processing!\n");
                             char_to_send_back = '?';  // Hiba karakter

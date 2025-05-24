@@ -5,7 +5,7 @@
 #include "defines.h"  // DEBUG
 
 #ifdef __DEBUG
-#define CW_DEBUG  // CW működés debug engedélyezése de csak DEBUG módban
+// #define CW_DEBUG  // CW működés debug engedélyezése de csak DEBUG módban
 #endif
 
 // Goertzel filter parameters are now constexpr in CwDecoder.h
@@ -382,7 +382,9 @@ char CwDecoder::processCollectedElements() {
     // Most már a szóközt is elfogadjuk érvényes karakterként
     if (result != '\0') {                        // Csak azt ellenőrizzük, hogy nem null karakter-e
         if (isprint(result) || result == ' ') {  // Nyomtatható karakter VAGY szóköz
+#ifdef CW_DEBUG
             DEBUG("CW: Érvényes karakter dekódolva: '%c'\n", result);
+#endif
             return result;
         }
     } else {
