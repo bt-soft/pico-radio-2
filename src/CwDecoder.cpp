@@ -216,8 +216,6 @@ char CwDecoder::decodeNextCharacter() {
     // Agresszívabb karakterhatár-detektálás - rövidebb küszöbök
     unsigned long charGapMs = max(200UL, currentReferenceMs_ / 2);  // Karakterhatár = referencia/2, min 200ms
 
-    DEBUG("CW: Ref=%lu, CharGap=%lu\n", currentReferenceMs_, charGapMs);
-
     bool currentToneState = sampleWithNoiseBlanking();
     unsigned long currentTimeMs = millis();
     char decodedChar = '\0';
