@@ -5,7 +5,8 @@
 #include "defines.h"  // DEBUG
 
 // CW működés debug engedélyezése de csak DEBUG módban
-#ifdef __DEBUG__444
+
+#ifdef nem__DEBUG
 #define CW_DEBUG(fmt, ...) DEBUG(fmt __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define CW_DEBUG(fmt, ...)  // Üres makró, ha __DEBUG nincs definiálva
