@@ -23,18 +23,6 @@
 // Goertzel filter paraméter a SAMPLING_FREQ-hez
 const unsigned long RttyDecoder::SAMPLING_PERIOD_US = static_cast<unsigned long>(1000000.0f / RttyDecoder::SAMPLING_FREQ);
 
-// Goertzel konstansok Mark frekvenciához (2295Hz)
-// K_MARK = round(84 * 2295 / 8400) = round(22.95) = 23
-// Tényleges Mark frekvencia: (23 / 84) * 8400 = 2300 Hz
-const short RttyDecoder::K_MARK = 23;
-const float RttyDecoder::COEFF_MARK = -0.4067f;  // 2.0f * cos((2*PI*23)/84) = 2.0f * cos(1.719) = -0.4067
-
-// Goertzel konstansok Space frekvenciához (2125Hz)
-// K_SPACE = round(84 * 2125 / 8400) = round(21.25) = 21
-// Tényleges Space frekvencia: (21 / 84) * 8400 = 2100 Hz
-const short RttyDecoder::K_SPACE = 21;
-const float RttyDecoder::COEFF_SPACE = 0.0000f;  // 2.0f * cos((2*PI*21)/84) = 2.0f * cos(π/2) = 0.0f
-
 // Baudot LTRS (Letters) tábla - ITA2 standard
 const char RttyDecoder::BAUDOT_LTRS_TABLE[32] = {
     '\0', 'E', '\n', 'A',  ' ', 'S', 'I', 'U',  // 0-7
@@ -136,22 +124,22 @@ bool RttyDecoder::processGoertzelFilters(bool& isMarkStronger) {
     q1_mark = 0;
     q2_mark = 0;
     for (short index = 0; index < N_SAMPLES; index++) {
-        q0_mark = COEFF_MARK * q1_mark - q2_mark + static_cast<float>(testData[index]);
+        q0_mark = COEFF_MARK(detectedMarkFreq_) * q1_mark - q2_mark + static_cast<float>(testData[index]);
         q2_mark = q1_mark;
         q1_mark = q0_mark;
     }
-    float markMagnitudeSquared = (q1_mark * q1_mark) + (q2_mark * q2_mark) - q1_mark * q2_mark * COEFF_MARK;
+    float markMagnitudeSquared = (q1_mark * q1_mark) + (q2_mark * q2_mark) - q1_mark * q2_mark * COEFF_MARK(detectedMarkFreq_);
     float markMagnitude = sqrt(markMagnitudeSquared);
 
     // Space frekvencia Goertzel szűrő
     q1_space = 0;
     q2_space = 0;
     for (short index = 0; index < N_SAMPLES; index++) {
-        q0_space = COEFF_SPACE * q1_space - q2_space + static_cast<float>(testData[index]);
+        q0_space = COEFF_SPACE(detectedSpaceFreq_) * q1_space - q2_space + static_cast<float>(testData[index]);
         q2_space = q1_space;
         q1_space = q0_space;
     }
-    float spaceMagnitudeSquared = (q1_space * q1_space) + (q2_space * q2_space) - q1_space * q2_space * COEFF_SPACE;
+    float spaceMagnitudeSquared = (q1_space * q1_space) + (q2_space * q2_space) - q1_space * q2_space * COEFF_SPACE(detectedSpaceFreq_);
     float spaceMagnitude = sqrt(spaceMagnitudeSquared);
 
     // Jelerősség ellenőrzése

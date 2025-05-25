@@ -562,7 +562,7 @@ void CwDecoder::updateDecoder() {
         }
     }  // Szóköz beillesztés ellenőrzése - dinamikus WPM alapú küszöbökkel
     if (decodedChar == '\0' && !measuringTone_ && !currentToneState && lastDecodedChar_ != '\0') {
-        unsigned long spaceDuration = currentTimeMs - trailingEdgeMs_;
+        unsigned long spaceDuration = currentTimeMs - trailingEdgeTimeMs_;
 
         // Dinamikus szóköz küszöb WPM alapján
         unsigned long dynamicWordGapMs;
