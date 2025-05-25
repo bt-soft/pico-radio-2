@@ -41,9 +41,9 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
 
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
     decodedTextAreaX = DECODER_TEXT_AREA_X_START;
-    decodedTextAreaY = 150;
-    decodedTextAreaW = 340;
-    decodedTextAreaH = 80;  // Kezdeti magasság
+    decodedTextAreaY = 150;  // A S-Meter alatt
+    decodedTextAreaW = 330;  // Széleség
+    decodedTextAreaH = 80;   // Magasság
 
     // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
     TftButton *firstVerticalButton = DisplayBase::findButtonByLabel("Mute");
@@ -51,7 +51,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     if (firstVerticalButton) {
         mainVerticalButtonsStartX = firstVerticalButton->getX();
     }
-    decodeModeButtonsX = mainVerticalButtonsStartX - (DECODER_MODE_BTN_GAP_X * 4) - DECODER_MODE_BTN_W;
+    decodeModeButtonsX = mainVerticalButtonsStartX - (DECODER_MODE_BTN_GAP_X * 2) - DECODER_MODE_BTN_W;  // Visszaállítva az eredeti diff alapján.
 
     // Dekódolt szöveg pufferek inicializálása (CW és RTTY)
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
@@ -332,7 +332,7 @@ void AmDisplay::redrawCurrentInputLine() {
         updateDecodedTextDisplay();
         return;
     }
-    uint16_t yPos = decodedTextAreaY + 2 + decodedTextCurrentLineIndex * decoderCharHeight_;
+    uint16_t yPos = decodedTextAreaY + 2 + decodedTextCurrentLineIndex * (decoderCharHeight_ + DECODER_LINE_GAP);
 
     // Ellenőrizzük, hogy a rajzolás a területen belül marad-e
     if (yPos + decoderCharHeight_ > decodedTextAreaY + decodedTextAreaH) {
@@ -412,8 +412,9 @@ void AmDisplay::updateDecodedTextDisplay() {
 
     // Az összes "lezárt" sor kirajzolása a decodedTextDisplayLines tömbből
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
+        uint16_t line_y_start = decodedTextAreaY + 2 + i * (decoderCharHeight_ + DECODER_LINE_GAP);
         // Ellenőrizzük, hogy a sor a megjelenítési területen belül van-e
-        if (decodedTextAreaY + 2 + i * decoderCharHeight_ + decoderCharHeight_ <= decodedTextAreaY + decodedTextAreaH) {
+        if (line_y_start + decoderCharHeight_ <= decodedTextAreaY + decodedTextAreaH) {
             // Ha az 'i' index kisebb, mint az aktuális sor indexe, akkor az egy korábbi, lezárt sor.
             // Vagy ha az 'i' index megegyezik az aktuális sor indexével, de a decodedTextDisplayLines[i] nem üres
             // (ez akkor fordulhat elő, ha pl. egy karakter hozzáfűzése után azonnal teljes frissítés történik,
@@ -421,14 +422,14 @@ void AmDisplay::updateDecodedTextDisplay() {
             // A legegyszerűbb, ha minden sort kirajzolunk a decodedTextDisplayLines-ból, ami nem üres,
             // és nem az aktuális szerkesztés alatt álló sor.
             if (i != decodedTextCurrentLineIndex && !decodedTextDisplayLines[i].isEmpty()) {
-                tft.drawString(decodedTextDisplayLines[i], decodedTextAreaX + 2, decodedTextAreaY + 2 + i * decoderCharHeight_);
+                tft.drawString(decodedTextDisplayLines[i], decodedTextAreaX + 2, line_y_start);
             }
         }
     }
 
     // Az aktuálisan szerkesztett sor (decodedTextCurrentLineBuffer) kirajzolása
     // a decodedTextCurrentLineIndex által mutatott pozícióba.
-    uint16_t currentLineYPos = decodedTextAreaY + 2 + decodedTextCurrentLineIndex * decoderCharHeight_;
+    uint16_t currentLineYPos = decodedTextAreaY + 2 + decodedTextCurrentLineIndex * (decoderCharHeight_ + DECODER_LINE_GAP);
     if (currentLineYPos + decoderCharHeight_ <= decodedTextAreaY + decodedTextAreaH) {  // Határellenőrzés
         if (!decodedTextCurrentLineBuffer.isEmpty()) {
             tft.drawString(decodedTextCurrentLineBuffer, decodedTextAreaX + 2, currentLineYPos);

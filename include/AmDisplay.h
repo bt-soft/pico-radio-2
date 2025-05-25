@@ -26,6 +26,7 @@ class AmDisplay : public DisplayBase {
     static constexpr uint8_t DECODER_TEXT_AREA_Y_MARGIN_BOTTOM = 5;     // Horizontális gombok felett
     static constexpr uint8_t RTTY_MAX_TEXT_LINES = 6;                   // Megjeleníthető sorok száma (betűmérettől függ)
     static constexpr uint8_t RTTY_LINE_BUFFER_SIZE = 55;                // Egy sor maximális karakterszáma
+    static constexpr uint8_t DECODER_LINE_GAP = 2;                      // Sorköz a dekódolt szöveg sorai között (pixel)
     static constexpr uint8_t DECODER_MODE_BTN_W = SCRN_BTN_W / 2 + 10;  // Kicsit szélesebb mini gombok
     static constexpr uint8_t DECODER_MODE_BTN_H = SCRN_BTN_H / 2;
     static constexpr uint8_t DECODER_MODE_BTN_GAP_X = 5;  // Rés a szövegterület és a gombok között
