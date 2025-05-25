@@ -14,15 +14,21 @@ class RttyDecoder {
     void updateDecoder();           // Core1 hívja ciklikusan az RTTY dekódoláshoz
     char getCharacterFromBuffer();  // Core0 kéri le a dekódolt karaktert a pufferből
     void resetDecoderState();       // Hívandó az RTTY módra váltáskor az állapot visszaállításához   private:
-    // Goertzel szűrő paraméterek Mark/Space frekvenciákhoz
+    // Goertzel szűrő paraméterek Mark/Space frekvenciákhoz (automatikus számítás)
     static constexpr float SAMPLING_FREQ = 8400.0f;
     static constexpr short N_SAMPLES = 84;  // 10ms ablak
 
-    // Goertzel konstansok (a .cpp fájlban lesznek kiszámítva)
-    static const short K_MARK;
-    static const float COEFF_MARK;
-    static const short K_SPACE;
-    static const float COEFF_SPACE;
+    static inline short K_MARK(float markFreq) { return static_cast<short>((N_SAMPLES * markFreq / SAMPLING_FREQ) + 0.5f); }
+
+    static inline float OMEGA_MARK(float markFreq) { return (2.0f * M_PI * static_cast<float>(K_MARK(markFreq))) / static_cast<float>(N_SAMPLES); }
+
+    static inline float COEFF_MARK(float markFreq) { return 2.0f * cos(OMEGA_MARK(markFreq)); }
+
+    static inline short K_SPACE(float spaceFreq) { return static_cast<short>((N_SAMPLES * spaceFreq / SAMPLING_FREQ) + 0.5f); }
+
+    static inline float OMEGA_SPACE(float spaceFreq) { return (2.0f * M_PI * static_cast<float>(K_SPACE(spaceFreq))) / static_cast<float>(N_SAMPLES); }
+
+    static inline float COEFF_SPACE(float spaceFreq) { return 2.0f * cos(OMEGA_SPACE(spaceFreq)); }
 
     static const unsigned long SAMPLING_PERIOD_US;
 

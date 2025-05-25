@@ -15,17 +15,21 @@ class CwDecoder {
     void updateDecoder();           // Core1 hívja ciklikusan a CW dekódoláshoz
     char getCharacterFromBuffer();  // Core0 kéri le a dekódolt karaktert a pufferből
     void resetDecoderState();       // Hívandó a CW módra váltáskor az állapot visszaállításáhozprivate:
-    // Goertzel szűrő paraméterek 750Hz-hez
+
+    // CW vételi hangfrekvencia
     static constexpr float TARGET_FREQ = CW_SHIFT_FREQUENCY;
+
+    // Goertzel szűrő paraméterek TARGET_FREQ-hez (automatikus számítás)
     static constexpr float SAMPLING_FREQ = 8400.0f;
-    static constexpr short N_SAMPLES = 45;  // Beállítva a jobb 750Hz hangoláshoz 8400Hz mintavételezéssel
-    // K_CONSTANT = round(45 * 750 / 8400) = round(4.0178) = 4
-    // Tényleges szűrő középfrekvencia: (4 / 45) * 8400 = 746.67 Hz
-    static constexpr short K_CONSTANT = 4;  // Előre kiszámított: round(45 * 750 / 8400)
-    static constexpr float OMEGA =
-        (2.0f * M_PI * static_cast<float>(K_CONSTANT)) / static_cast<float>(N_SAMPLES);  // COEFF értéket előre kiszámoljuk az OMEGA alapján: 2.0 * cos(0.5585) = 1.7015
-    static constexpr float COEFF = 1.7015f;                                              // Előre kiszámított érték: 2.0f * cos(OMEGA)
-    static const unsigned long SAMPLING_PERIOD_US;                                       // Definiálva a .cpp fájlban
+    static constexpr short N_SAMPLES = 45;
+
+    static inline short K_CONSTANT() { return static_cast<short>((N_SAMPLES * TARGET_FREQ / SAMPLING_FREQ) + 0.5f); }
+
+    static inline float OMEGA() { return (2.0f * M_PI * static_cast<float>(K_CONSTANT())) / static_cast<float>(N_SAMPLES); }
+
+    static inline float COEFF() { return 2.0f * cos(OMEGA()); }
+
+    static const unsigned long SAMPLING_PERIOD_US;  // Definiálva a .cpp fájlban
 
     float q0, q1, q2;
     short testData[N_SAMPLES];  // Beállított méret

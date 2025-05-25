@@ -38,13 +38,14 @@ constexpr float ENVELOPE_THICKNESS_SCALER = 0.95f;  // Burkológörbe vastagság
 constexpr float OSCI_SENSITIVITY_FACTOR = 25.0f;  // Oszcilloszkóp érzékenységi faktora (növelni a nagyobb amplitúdóhoz)
 constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;  // Oszcilloszkóp mintavételi decimációs faktora
 
-// Konstansok a hangolási segéd módhoz
-constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;                          // Célvonal színe
-constexpr float TUNING_AID_TARGET_FREQ_HZ = CW_SHIFT_FREQUENCY;                       // Célfrekvencia CW-hez (Hz)
-constexpr float CW_TUNING_AID_SPAN_HZ = 600.0f;                                       // Megjelenített sávszélesség CW hangoláshoz
-constexpr float TUNING_AID_INPUT_SCALE = 0.1f;                                        // Erősítési faktor a hangolási segéd bemenetéhez (csökkentve a "vonal" vékonyításához)
-constexpr uint16_t TUNING_AID_RTTY_SPACE_LINE_COLOR = TFT_CYAN;                       // RTTY Space vonal színe (ÚJ)
-constexpr uint16_t TUNING_AID_RTTY_MARK_LINE_COLOR = TFT_MAGENTA;                     // RTTY Mark vonal színe (ÚJ)
+// Konstansok a CW//RTTY hangolási segéd módhoz
+constexpr float TUNING_AID_TARGET_FREQ_HZ = CW_SHIFT_FREQUENCY;    // Célfrekvencia CW-hez (Hz)
+constexpr float CW_TUNING_AID_SPAN_HZ = 600.0f;                    // Megjelenített sávszélesség CW hangoláshoz
+constexpr float TUNING_AID_INPUT_SCALE = 0.1f;                     // Erősítési faktor a hangolási segéd bemenetéhez (csökkentve a "vonal" vékonyításához)
+constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;       // Célvonal színe
+constexpr uint16_t TUNING_AID_RTTY_SPACE_LINE_COLOR = TFT_CYAN;    // RTTY Space vonal színe
+constexpr uint16_t TUNING_AID_RTTY_MARK_LINE_COLOR = TFT_MAGENTA;  // RTTY Mark vonal színe
+//
 constexpr int TUNING_AID_INTERNAL_WIDTH = MiniAudioFftConstants::MAX_INTERNAL_WIDTH;  // Belső szélesség a hangolási segédhez (a komponens szélessége)
 
 // Vízesés
