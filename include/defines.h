@@ -48,7 +48,7 @@
 //--- CW mód adatai
 #define CW_DEMOD_MODE LSB  // CW demodulációs mód
 // #define CW_SHIFT_FREQUENCY 750.0f  // CW alap offset
-#define CW_SHIFT_FREQUENCY 900.0f  // CW alap offset
+#define CW_SHIFT_FREQUENCY 1000.0f  // CW alap offset
 
 //--- RTTY mód adatai
 #define RTTY_SPACE_FREQUENCY 2125.0f                                       // RTTY tér frekvencia (Hz)
