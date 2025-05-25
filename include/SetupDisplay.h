@@ -13,8 +13,9 @@ enum class ItemAction {
     SAVER_TIMEOUT,
     INACTIVE_DIGIT_LIGHT,
     BEEPER_ENABLED,
-    FFT_CONFIG_AM,  // Új, összevont
-    FFT_CONFIG_FM,  // Új, összevont
+    FFT_CONFIG_AM,       // Új, összevont
+    FFT_CONFIG_FM,       // Új, összevont
+    CW_RECEIVER_OFFSET,  // CW vételi eltolás
     FACTORY_RESET,
     NONE
 };
@@ -31,11 +32,11 @@ class SetupDisplay : public DisplayBase, public IScrollableListDataSource {
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;
 
     // Lista alapú menühöz
-    static const int MAX_SETTINGS = 9;  // Régi FFT opciók törölve, 2 új összevont
+    static const int MAX_SETTINGS = 10;  // CW_RECEIVER_OFFSET hozzáadva
     SetupList::SettingItem settingItems[MAX_SETTINGS];
     ScrollableListComponent scrollListComponent;
-    bool nestedDialogOpened = false;  // Beágyazott dialógus nyitva van-e?
-    DialogBase* pendingCloseDialog = nullptr; // Az előző dialógus, amit be kell zárni beágyazott nyitáskor
+    bool nestedDialogOpened = false;           // Beágyazott dialógus nyitva van-e?
+    DialogBase *pendingCloseDialog = nullptr;  // Az előző dialógus, amit be kell zárni beágyazott nyitáskor
 
    protected:
     /**

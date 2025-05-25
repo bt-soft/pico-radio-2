@@ -786,8 +786,8 @@ void MiniAudioFft::setTuningAidType(TuningAidType type) {
         float oldMaxFreq = currentTuningAidMaxFreqHz_;
 
         if (currentTuningAidType_ == TuningAidType::CW_TUNING) {
-            currentTuningAidMinFreqHz_ = TUNING_AID_TARGET_FREQ_HZ - (CW_TUNING_AID_SPAN_HZ / 2.0f);
-            currentTuningAidMaxFreqHz_ = TUNING_AID_TARGET_FREQ_HZ + (CW_TUNING_AID_SPAN_HZ / 2.0f);
+            currentTuningAidMinFreqHz_ = config.data.cwReceiverOffsetHz - (CW_TUNING_AID_SPAN_HZ / 2.0f);
+            currentTuningAidMaxFreqHz_ = config.data.cwReceiverOffsetHz + (CW_TUNING_AID_SPAN_HZ / 2.0f);
 
         } else if (currentTuningAidType_ == TuningAidType::RTTY_TUNING) {
             float f_space = RTTY_SPACE_FREQUENCY;
@@ -807,8 +807,8 @@ void MiniAudioFft::setTuningAidType(TuningAidType type) {
             currentTuningAidMaxFreqHz_ = center_freq + (total_span / 2.0f);
 
         } else {  // OFF_DECODER - use a default range for display but don't draw lines
-            currentTuningAidMinFreqHz_ = TUNING_AID_TARGET_FREQ_HZ - (CW_TUNING_AID_SPAN_HZ / 2.0f);
-            currentTuningAidMaxFreqHz_ = TUNING_AID_TARGET_FREQ_HZ + (CW_TUNING_AID_SPAN_HZ / 2.0f);
+            currentTuningAidMinFreqHz_ = config.data.cwReceiverOffsetHz - (CW_TUNING_AID_SPAN_HZ / 2.0f);
+            currentTuningAidMaxFreqHz_ = config.data.cwReceiverOffsetHz + (CW_TUNING_AID_SPAN_HZ / 2.0f);
         }
 
         if (currentTuningAidMinFreqHz_ < 0) currentTuningAidMinFreqHz_ = 0;
@@ -1146,11 +1146,11 @@ void MiniAudioFft::drawTuningAid() {
 
         if (displayed_span_hz > 0) {
             if (currentTuningAidType_ == TuningAidType::CW_TUNING) {
-                // CW célfrekvencia (TUNING_AID_TARGET_FREQ_HZ) középre kerül
+                // CW célfrekvencia (config.data.cwReceiverOffsetHz) középre kerül
                 int line_x_on_sprite = width / 2;
                 sprGraph.drawFastVLine(line_x_on_sprite, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
                 sprGraph.setTextColor(TUNING_AID_TARGET_LINE_COLOR, TFT_BLACK);
-                sprGraph.drawString(String(static_cast<int>(TUNING_AID_TARGET_FREQ_HZ)) + "Hz", line_x_on_sprite, graphH - 2);
+                sprGraph.drawString(String(static_cast<int>(config.data.cwReceiverOffsetHz)) + "Hz", line_x_on_sprite, graphH - 2);
 
             } else if (currentTuningAidType_ == TuningAidType::RTTY_TUNING) {
                 float f_space = RTTY_SPACE_FREQUENCY;

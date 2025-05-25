@@ -5,6 +5,7 @@
 
 #include <cmath>  // round, sin, cos, sqrt, abs, min, max - szükséges a constexpr számításokhoz
 
+#include "Config.h"
 #include "defines.h"  // AUDIO_INPUT_PIN, DEBUG
 
 class CwDecoder {
@@ -16,14 +17,11 @@ class CwDecoder {
     char getCharacterFromBuffer();  // Core0 kéri le a dekódolt karaktert a pufferből
     void resetDecoderState();       // Hívandó a CW módra váltáskor az állapot visszaállításáhozprivate:
 
-    // CW vételi hangfrekvencia
-    static constexpr float TARGET_FREQ = CW_SHIFT_FREQUENCY;
-
     // Goertzel szűrő paraméterek TARGET_FREQ-hez (automatikus számítás)
     static constexpr float SAMPLING_FREQ = 8400.0f;
     static constexpr short N_SAMPLES = 45;
 
-    static inline short K_CONSTANT() { return static_cast<short>((N_SAMPLES * TARGET_FREQ / SAMPLING_FREQ) + 0.5f); }
+    static inline short K_CONSTANT() { return static_cast<short>((N_SAMPLES * config.data.cwReceiverOffsetHz / SAMPLING_FREQ) + 0.5f); }
 
     static inline float OMEGA() { return (2.0f * M_PI * static_cast<float>(K_CONSTANT())) / static_cast<float>(N_SAMPLES); }
 

@@ -45,10 +45,10 @@
 #define SCREEN_SAVER_TIMEOUT_MAX 60
 #define SCREEN_SAVER_TIMEOUT 10  // 10 perc a képernyővédő időzítése
 
-//--- CW mód adatai
-#define CW_DEMOD_MODE LSB  // CW demodulációs mód
-// #define CW_SHIFT_FREQUENCY 750.0f  // CW alap offset
-#define CW_SHIFT_FREQUENCY 1000.0f  // CW alap offset
+//--- CW Decoder ---
+#define CW_DECODER_DEFAULT_FREQUENCY 750  // Alapértelmezett CW dekóder frekvencia (Hz)
+#define CW_DECODER_MIN_FREQUENCY 600      // Minimum CW dekóder frekvencia (Hz)
+#define CW_DECODER_MAX_FREQUENCY 1500     // Maximum CW dekóder frekvencia (Hz)
 
 //--- RTTY mód adatai
 #define RTTY_SPACE_FREQUENCY 2125.0f                                       // RTTY tér frekvencia (Hz)

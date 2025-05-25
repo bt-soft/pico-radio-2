@@ -38,9 +38,10 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref
     settingItems[3] = {"Inactive Digit Segments", ItemAction::INACTIVE_DIGIT_LIGHT};  // Inaktív szegmensek
     settingItems[4] = {"Beeper", ItemAction::BEEPER_ENABLED};                         // Beeper engedélyezése (4)
     settingItems[5] = {"FFT Config (AM)", ItemAction::FFT_CONFIG_AM};                 // ÚJ, összevont
-    settingItems[6] = {"FFT Config (FM)", ItemAction::FFT_CONFIG_FM};
-    settingItems[7] = {"Info", ItemAction::INFO};                    // Információ
-    settingItems[8] = {"Factory Reset", ItemAction::FACTORY_RESET};  // Gyári beállítások visszaállítása (5)
+    settingItems[6] = {"FFT Config (FM)", ItemAction::FFT_CONFIG_FM};                 // ÚJ, összevont
+    settingItems[7] = {"CW Offset", ItemAction::CW_RECEIVER_OFFSET};                  // CW vételi eltolás
+    settingItems[8] = {"Info", ItemAction::INFO};                                     // Információ
+    settingItems[9] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -162,6 +163,9 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
             else
                 valueStr = "Manual: " + String(val, 1) + "x";
         } break;
+        case SetupList::ItemAction::CW_RECEIVER_OFFSET:
+            valueStr = String(config.data.cwReceiverOffsetHz) + " Hz";
+            break;
         case SetupList::ItemAction::INFO:
         case SetupList::ItemAction::FACTORY_RESET:
         case SetupList::ItemAction::NONE:
@@ -294,7 +298,7 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
 
                         // Új dialógus a manuális értékhez
                         float currentManualGain = (*targetConfigField > 0.0f) ? *targetConfigField : 1.0f;  // Alapértelmezett, ha nem volt manuális
-                        this->pendingCloseDialog = DisplayBase::pDialog; // Elmentjük a MultiButtonDialog-ot törlésre
+                        this->pendingCloseDialog = DisplayBase::pDialog;                                    // Elmentjük a MultiButtonDialog-ot törlésre
                         DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Set Manual FFT Gain"), F("Factor (0.1-10.0):"),
                                                                      // A pDialog-ot felülírjuk, a MultiButtonDialog NEM záródik be azonnal a return miatt
                                                                      &currentManualGain,                                             // float*
@@ -316,6 +320,12 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
             );
         } break;
 
+        case SetupList::ItemAction::CW_RECEIVER_OFFSET:
+            DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("CW Receiver Offset"), F("Hz (600-1500):"), (int *)&config.data.cwReceiverOffsetHz,
+                                                         (int)CW_DECODER_MIN_FREQUENCY, (int)CW_DECODER_MAX_FREQUENCY, (int)10, [this](int newOffset) {
+                                                             // A ValueChangeDialog már beállította a config értékét.
+                                                         });
+            break;
         case SetupList::ItemAction::FACTORY_RESET:
             // Megerősítő dialógus megnyitása
             pDialog = new MessageDialog(this, tft, 250, 120, F("Confirm"), F("Reset to factory defaults?"), "Yes", "No");

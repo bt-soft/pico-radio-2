@@ -131,7 +131,7 @@ class ValueChangeDialog : public MessageDialog {
 
         } else {
             this->valuePtrType = ValuePtrType::Unknown;
-            Utils::beepTick();
+            Utils::beepError();
             DEBUG("ValueChangeDialog: Ismeretlen adattípus!\n");
         }
 

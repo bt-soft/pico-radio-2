@@ -57,4 +57,7 @@ const Config_t DEFAULT_CONFIG = {
     .miniAudioFftConfigFm = 0.0f,        // Auto Gain
     .miniAudioFftConfigAnalyzer = 0.0f,  // Analyzerhez alapértelmezetten Auto Gain
     .miniAudioFftConfigRtty = 0.0f,      // RTTY-hez alapértelmezetten Auto Gain
+
+    // CW vételi eltolás
+    .cwReceiverOffsetHz = CW_DECODER_DEFAULT_FREQUENCY,  // Default CW vételi eltolás Hz-ben
 };

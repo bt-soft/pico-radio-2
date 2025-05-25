@@ -1048,7 +1048,7 @@ bool DisplayBase::processMandatoryButtonTouchEvent(TftButton::ButtonTouchEvent &
                 config.data.currentBFOmanu = 0;  // Finomhangolás nullázása
 
                 // Újrahangolás a chipen a nullázott manuális BFO-val
-                const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
+                const int16_t cwBaseOffset = (currMod == CW) ? config.data.cwReceiverOffsetHz : 0;
                 int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;  // currentBFOmanu itt már 0
                 si4735.setSSBBfo(bfoToSet);
             }

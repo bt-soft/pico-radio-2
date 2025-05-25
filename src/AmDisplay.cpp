@@ -203,7 +203,7 @@ bool AmDisplay::handleRotary(RotaryEncoder::EncoderState encoderState) {
             config.data.currentBFO = rtv::freqDec;
             currentBand.varData.lastBFO = config.data.currentBFO;
         }
-        const int16_t cwBaseOffset = (currMod == CW) ? CW_SHIFT_FREQUENCY : 0;
+        const int16_t cwBaseOffset = (currMod == CW) ? config.data.cwReceiverOffsetHz : 0;
         int16_t bfoToSet = cwBaseOffset + config.data.currentBFO + config.data.currentBFOmanu;
         si4735.setSSBBfo(bfoToSet);
         checkAGC();
