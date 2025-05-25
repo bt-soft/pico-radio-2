@@ -25,7 +25,7 @@ class AmDisplay : public DisplayBase {
     static constexpr uint8_t DECODER_TEXT_AREA_Y_MARGIN_TOP = 5;        // S-Meter alatt
     static constexpr uint8_t DECODER_TEXT_AREA_Y_MARGIN_BOTTOM = 5;     // Horizontális gombok felett
     static constexpr uint8_t RTTY_MAX_TEXT_LINES = 6;                   // Megjeleníthető sorok száma (betűmérettől függ)
-    static constexpr uint8_t RTTY_LINE_BUFFER_SIZE = 50;                // Egy sor maximális karakterszáma
+    static constexpr uint8_t RTTY_LINE_BUFFER_SIZE = 55;                // Egy sor maximális karakterszáma
     static constexpr uint8_t DECODER_MODE_BTN_W = SCRN_BTN_W / 2 + 10;  // Kicsit szélesebb mini gombok
     static constexpr uint8_t DECODER_MODE_BTN_H = SCRN_BTN_H / 2;
     static constexpr uint8_t DECODER_MODE_BTN_GAP_X = 5;  // Rés a szövegterület és a gombok között
@@ -33,6 +33,7 @@ class AmDisplay : public DisplayBase {
     String decodedTextDisplayLines[RTTY_MAX_TEXT_LINES];
     uint8_t decodedTextCurrentLineIndex = 0;
     String decodedTextCurrentLineBuffer = "";
+    uint16_t decoderCharHeight_ = 0; // Karakter magasság a dekóder szöveghez
 
     // Dekódolási módválasztó rádiógomb csoport
     RadioButtonGroup decoderModeGroup;
@@ -46,6 +47,7 @@ class AmDisplay : public DisplayBase {
     uint16_t decodeModeButtonsX;  // A módváltó gombok oszlopának X pozíciója    // Segédfüggvények
     void drawDecodedTextAreaBackground();
     void appendDecodedCharacter(char c);
+    void redrawCurrentInputLine();            // Csak az aktuális sort rajzolja újra
     void updateDecodedTextDisplay();
     void clearDecodedTextBufferOnly();        // Csak a puffert törli
     void clearDecodedTextBufferAndDisplay();  // Törli a puffert és frissíti a kijelzőt

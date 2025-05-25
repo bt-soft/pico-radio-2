@@ -42,7 +42,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
     decodedTextAreaX = DECODER_TEXT_AREA_X_START;
     decodedTextAreaY = 150;
-    decodedTextAreaW = 330;
+    decodedTextAreaW = 340;
     decodedTextAreaH = 80;  // Kezdeti magasság
 
     // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
@@ -51,7 +51,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     if (firstVerticalButton) {
         mainVerticalButtonsStartX = firstVerticalButton->getX();
     }
-    decodeModeButtonsX = mainVerticalButtonsStartX - (DECODER_MODE_BTN_GAP_X * 2) - DECODER_MODE_BTN_W;
+    decodeModeButtonsX = mainVerticalButtonsStartX - (DECODER_MODE_BTN_GAP_X * 4) - DECODER_MODE_BTN_W;
 
     // Dekódolt szöveg pufferek inicializálása (CW és RTTY)
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
@@ -62,14 +62,19 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     // Dekódolási módváltó gombok létrehozása
     uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
     decoderModeStartId_ = nextButtonId;
+
+    // Karakter magasság inicializálása a dekóderhez
+    tft.setFreeFont();
+    tft.setTextSize(1);
+    decoderCharHeight_ = tft.fontHeight();
+    if (decoderCharHeight_ == 0) decoderCharHeight_ = 16;  // Alapértelmezett érték, ha a font magassága 0
+
     std::vector<String> decoderLabels = {"Off", "RTTY", "CW"};
     decoderModeGroup.createButtons(decoderLabels, nextButtonId);
     decoderModeGroup.selectButtonByIndex(0);
 
     // Horizontális képernyőgombok legyártása
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);
-
-    clearDecodedTextBufferAndDisplay();
 }
 
 /**
@@ -313,57 +318,134 @@ void AmDisplay::drawDecodedTextAreaBackground() {
 }
 
 /**
+ * @brief Csak az aktuális beviteli sort rajzolja újra a dekódolt szöveg területén.
+ * Minimalizálja a villogást karakterenkénti hozzáfűzéskor.
+ */
+void AmDisplay::redrawCurrentInputLine() {
+    // decoderCharHeight_ már tagváltozó és inicializálva van
+
+    // Aktuális sor Y pozíciójának kiszámítása
+    // Biztosítjuk, hogy a decodedTextCurrentLineIndex érvényes legyen a rajzoláshoz
+    if (decodedTextCurrentLineIndex >= RTTY_MAX_TEXT_LINES) {
+        // Ez az eset ideális esetben nem fordulhat elő a sortörési logika miatt.
+        // Visszaesésként teljes frissítést végzünk.
+        updateDecodedTextDisplay();
+        return;
+    }
+    uint16_t yPos = decodedTextAreaY + 2 + decodedTextCurrentLineIndex * decoderCharHeight_;
+
+    // Ellenőrizzük, hogy a rajzolás a területen belül marad-e
+    if (yPos + decoderCharHeight_ > decodedTextAreaY + decodedTextAreaH) {
+        updateDecodedTextDisplay();  // Visszaesés, ha kívül esne
+        return;
+    }
+
+    // Csak az aktuális sor hátterének törlése
+    tft.fillRect(decodedTextAreaX + 2, yPos, decodedTextAreaW - 4, decoderCharHeight_, TFT_BLACK);
+
+    // Aktuális beviteli puffer string kirajzolása
+    tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
+    tft.setTextDatum(TL_DATUM);
+    tft.setFreeFont();  // Biztosítjuk a helyes fontot
+    tft.setTextSize(1);
+    if (!decodedTextCurrentLineBuffer.isEmpty()) {
+        tft.drawString(decodedTextCurrentLineBuffer, decodedTextAreaX + 2, yPos);
+    }
+}
+
+/**
  * @brief Hozzáfűz egy karaktert a dekódolt szöveg kijelző pufferéhez és frissíti a kijelzőt.
  */
 void AmDisplay::appendDecodedCharacter(char c) {
+    bool needs_full_redraw = false;
+    bool char_appended = false;
 
-    // Először adjuk hozzá a karaktert a bufferhez, ha nyomtatható és nem '\n'
-    if (c >= 32 && c <= 126 && c != '\n') {
-        decodedTextCurrentLineBuffer += c;
+    if (c == '\n') {  // Explicit sortörés
+        needs_full_redraw = true;
+    } else if (c >= 32 && c <= 126) {  // Nyomtatható karakter
+        if (decodedTextCurrentLineBuffer.length() < RTTY_LINE_BUFFER_SIZE - 1) {
+            decodedTextCurrentLineBuffer += c;
+            char_appended = true;
+            // Ellenőrizzük, hogy a puffer most telt-e meg
+            if (decodedTextCurrentLineBuffer.length() >= RTTY_LINE_BUFFER_SIZE - 1) {
+                needs_full_redraw = true;  // Sortörésként kezeljük
+                char_appended = false;     // A teljes újrarajzolás kezeli
+            }
+        } else {  // A puffer már tele volt, ez a karakter nem fér bele, sortörésként kezeljük
+            needs_full_redraw = true;
+        }
+    } else {
+        // Nem nyomtatható karakter (és nem '\n'), nem csinálunk semmit
+        return;
     }
 
-    // Ezután ellenőrizzük, hogy sort kell-e váltani
-    if (c == '\n' || decodedTextCurrentLineBuffer.length() >= RTTY_LINE_BUFFER_SIZE - 1) {
-        if (decodedTextCurrentLineIndex >= RTTY_MAX_TEXT_LINES - 1) {
+    if (needs_full_redraw) {
+        // Sortörés vagy puffer megtelt: véglegesítjük az aktuális sort
+        if (decodedTextCurrentLineIndex >= RTTY_MAX_TEXT_LINES - 1) {  // Görgetés szükséges
             for (int i = 0; i < RTTY_MAX_TEXT_LINES - 1; ++i) {
                 decodedTextDisplayLines[i] = decodedTextDisplayLines[i + 1];
             }
             decodedTextDisplayLines[RTTY_MAX_TEXT_LINES - 1] = decodedTextCurrentLineBuffer;
-        } else {
+        } else {  // Nincs görgetés, csak a következő sorra lépünk
             decodedTextDisplayLines[decodedTextCurrentLineIndex] = decodedTextCurrentLineBuffer;
             decodedTextCurrentLineIndex++;
         }
         decodedTextCurrentLineBuffer = "";
+        updateDecodedTextDisplay();  // Teljes újrarajzolás
+    } else if (char_appended) {
+        // Karakter hozzáfűzve, nincs sortörés
+        redrawCurrentInputLine();  // Csak az aktuális sor újrarajzolása
     }
-    updateDecodedTextDisplay();
 }
 
 /**
  * @brief Frissíti a dekódolt szövegterület tartalmát a puffer alapján.
  */
 void AmDisplay::updateDecodedTextDisplay() {
-
-    drawDecodedTextAreaBackground();
+    drawDecodedTextAreaBackground();  // Teljes háttér törlése
 
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
     tft.setTextDatum(TL_DATUM);
     tft.setFreeFont();
     tft.setTextSize(1);
-    uint16_t charHeight = tft.fontHeight();
+    // decoderCharHeight_ tagváltozót használunk
 
-    if (charHeight == 0) charHeight = 16;
-
+    // Az összes "lezárt" sor kirajzolása a decodedTextDisplayLines tömbből
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
-        if (i == decodedTextCurrentLineIndex) {
-            if (!decodedTextCurrentLineBuffer.isEmpty()) {
-                tft.drawString(decodedTextCurrentLineBuffer, decodedTextAreaX + 2, decodedTextAreaY + 2 + i * charHeight);
-            }
-        } else {
-            if (!decodedTextDisplayLines[i].isEmpty()) {
-                tft.drawString(decodedTextDisplayLines[i], decodedTextAreaX + 2, decodedTextAreaY + 2 + i * charHeight);
+        // Ellenőrizzük, hogy a sor a megjelenítési területen belül van-e
+        if (decodedTextAreaY + 2 + i * decoderCharHeight_ + decoderCharHeight_ <= decodedTextAreaY + decodedTextAreaH) {
+            // Ha az 'i' index kisebb, mint az aktuális sor indexe, akkor az egy korábbi, lezárt sor.
+            // Vagy ha az 'i' index megegyezik az aktuális sor indexével, de a decodedTextDisplayLines[i] nem üres
+            // (ez akkor fordulhat elő, ha pl. egy karakter hozzáfűzése után azonnal teljes frissítés történik,
+            // bár ez a jelenlegi logikával nem valószínű).
+            // A legegyszerűbb, ha minden sort kirajzolunk a decodedTextDisplayLines-ból, ami nem üres,
+            // és nem az aktuális szerkesztés alatt álló sor.
+            if (i != decodedTextCurrentLineIndex && !decodedTextDisplayLines[i].isEmpty()) {
+                tft.drawString(decodedTextDisplayLines[i], decodedTextAreaX + 2, decodedTextAreaY + 2 + i * decoderCharHeight_);
             }
         }
     }
+
+    // Az aktuálisan szerkesztett sor (decodedTextCurrentLineBuffer) kirajzolása
+    // a decodedTextCurrentLineIndex által mutatott pozícióba.
+    uint16_t currentLineYPos = decodedTextAreaY + 2 + decodedTextCurrentLineIndex * decoderCharHeight_;
+    if (currentLineYPos + decoderCharHeight_ <= decodedTextAreaY + decodedTextAreaH) {  // Határellenőrzés
+        if (!decodedTextCurrentLineBuffer.isEmpty()) {
+            tft.drawString(decodedTextCurrentLineBuffer, decodedTextAreaX + 2, currentLineYPos);
+        }
+        // Ha a decodedTextCurrentLineBuffer üres (pl. sortörés után), akkor a hátteret a drawDecodedTextAreaBackground már törölte.
+    }
+}
+
+/**
+ * @brief Törli a dekódolt szöveg pufferét, de nem frissíti a kijelzőt.
+ */
+void AmDisplay::clearDecodedTextBufferOnly() {
+    for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
+        decodedTextDisplayLines[i] = "";
+    }
+    decodedTextCurrentLineBuffer = "";
+    decodedTextCurrentLineIndex = 0;
 }
 
 /**
@@ -400,9 +482,18 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     if (!rp2040.fifo.push_nb(static_cast<uint32_t>(core1_cmd_set_mode))) {
         Utils::beepError();
         DEBUG("Core0: Command NOT sent to Core1, FIFO full\n");
-        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot    }
+        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot    } // Ez a zárójel itt hibásnak tűnik
 
         // Ha kikapcsoljuk a módot, akkor nem töröljük a területet
+        if (core1_cmd_set_mode != CORE1_CMD_SET_MODE_OFF) {  // Ezt a blokkot a FIFO push elé kellene vinni, vagy a return után nem fut le.
+                                                             // De a logikája az, hogy csak akkor töröljön, ha sikeres volt a parancsküldés.
+                                                             // A jelenlegi formában ez a blokk sosem fut le, ha a FIFO push sikertelen.
+                                                             // Jobb lenne a clearDecodedTextBufferAndDisplay()-t a sikeres parancsküldés utánra tenni.
+            clearDecodedTextBufferAndDisplay();
+        }
+    }  // Itt kellene lennie a zárójelnek a FIFO push feltételhez.
+       // A javított verzió:
+    else {  // Ha a parancsküldés sikeres volt
         if (core1_cmd_set_mode != CORE1_CMD_SET_MODE_OFF) {
             clearDecodedTextBufferAndDisplay();
         }
