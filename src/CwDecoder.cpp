@@ -131,11 +131,11 @@ bool CwDecoder::goertzelProcess() {
     q1 = 0;
     q2 = 0;
     for (short index = 0; index < N_SAMPLES; index++) {
-        q0 = COEFF * q1 - q2 + (float)testData[index];
+        q0 = COEFF() * q1 - q2 + (float)testData[index];
         q2 = q1;
         q1 = q0;
     }
-    float magnitudeSquared = (q1 * q1) + (q2 * q2) - q1 * q2 * COEFF;
+    float magnitudeSquared = (q1 * q1) + (q2 * q2) - q1 * q2 * COEFF();
     float magnitude = sqrt(magnitudeSquared);
 
     if (magnitude > THRESHOLD) {
@@ -375,7 +375,7 @@ void CwDecoder::addToBuffer(char c) {
  *
  * FIFO (First In, First Out) elvű olvasás a körkörös pufferből.
  * Frissíti a read pozíciót és csökkenti a pufferben lévő elemek számát.
- * Debug üzenetet ír ki a műveletről.
+ * Debug üzenetet ír ki a műveletról.
  */
 char CwDecoder::getCharacterFromBuffer() {
     if (charBufferCount_ == 0) {
@@ -562,7 +562,7 @@ void CwDecoder::updateDecoder() {
         }
     }  // Szóköz beillesztés ellenőrzése - dinamikus WPM alapú küszöbökkel
     if (decodedChar == '\0' && !measuringTone_ && !currentToneState && lastDecodedChar_ != '\0') {
-        unsigned long spaceDuration = currentTimeMs - trailingEdgeTimeMs_;
+        unsigned long spaceDuration = currentTimeMs - trailingEdgeMs_;
 
         // Dinamikus szóköz küszöb WPM alapján
         unsigned long dynamicWordGapMs;
