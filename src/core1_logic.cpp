@@ -4,6 +4,7 @@
 #include <pico/multicore.h>  // FIFO kommunikációhoz
 
 #include "CwDecoder.h"           // CW dekóder osztály
+#include "RttyDecoder.h"         // RTTY dekóder osztály
 #include "core_communication.h"  // Parancsok definíciója
 #include "defines.h"             // DEBUG makróhoz
 #include "utils.h"
@@ -12,10 +13,9 @@
 enum class Core1ActiveMode { MODE_OFF, MODE_RTTY, MODE_CW };
 static Core1ActiveMode core1_current_mode = Core1ActiveMode::MODE_OFF;
 
-// A Core1-specifikus AudioProcessor és dekóder példányok
-// static AudioProcessor* core1_audio_processor = nullptr;  // Későbbi használatra
-// static RttyDecoder* core1_rtty_decoder = nullptr;        // Későbbi használatra
+// A Core1-specifikus dekóder példányok
 static CwDecoder* core1_cw_decoder = nullptr;
+static RttyDecoder* core1_rtty_decoder = nullptr;
 
 /**
  * @brief Törli a Core1 dekódereit és erőforrásait.
@@ -25,11 +25,10 @@ void deleteDecoders() {
         delete core1_cw_decoder;
         core1_cw_decoder = nullptr;
     }
-    // Később: Itt törölhetjük a RTTY dekódert is, ha szükséges
-    // if (core1_rtty_decoder) {
-    //     delete core1_rtty_decoder;
-    //     core1_rtty_decoder = nullptr;
-    // }
+    if (core1_rtty_decoder) {
+        delete core1_rtty_decoder;
+        core1_rtty_decoder = nullptr;
+    }
 }
 
 /**
@@ -50,12 +49,18 @@ void core1_main() {
                 deleteDecoders();
                 core1_current_mode = Core1ActiveMode::MODE_OFF;
                 break;
-
             case CORE1_CMD_SET_MODE_RTTY:
                 DEBUG("Core1: Mode set to RTTY by command\n");
                 deleteDecoders();
                 core1_current_mode = Core1ActiveMode::MODE_RTTY;
-                // Később: Core1 RTTY dekóder inicializálása/resetelése
+
+                // RTTY dekóder példányosítása a Core1-en
+                core1_rtty_decoder = new RttyDecoder(AUDIO_INPUT_PIN);
+                if (core1_rtty_decoder) {
+                    core1_rtty_decoder->resetDecoderState();
+                } else {
+                    DEBUG("Core1: FATAL - Failed to create RttyDecoder instance!\n");
+                }
                 break;
 
             case CORE1_CMD_SET_MODE_CW:
@@ -71,12 +76,15 @@ void core1_main() {
                     DEBUG("Core1: FATAL - Failed to create CwDecoder instance!\n");
                 }
                 break;
-
             case CORE1_CMD_GET_RTTY_CHAR:
-                if (core1_current_mode == Core1ActiveMode::MODE_RTTY) {
-                    // DEBUG("Core1: Processing RTTY audio (simulated)\n"); // Ezt kikommentálva hagyjuk, hogy ne árassza el a logot
-                    // KÉSŐBB: Itt hívnánk a Core1-en futó RTTY dekódert
-                    // char_to_send_back = core1_rtty_decoder->decodeNextCharacter();
+                if (core1_current_mode == Core1ActiveMode::MODE_RTTY && core1_rtty_decoder) {
+                    char char_to_send_back = core1_rtty_decoder->getCharacterFromBuffer();
+                    if (char_to_send_back != '\0') {
+                        if (!rp2040.fifo.push_nb(static_cast<uint32_t>(char_to_send_back))) {
+                            Utils::beepError();
+                            DEBUG("Core1: RTTY command NOT sent to Core0, FIFO full\n");
+                        }
+                    }
                 }
                 break;
 
@@ -97,11 +105,12 @@ void core1_main() {
                 DEBUG("Core1: Unknown command received: 0x%lX\n", raw_command);
                 break;
         }
-
     } else {
-        // Ha nincs parancs a Core0-tól, és CW módban vagyunk, futtatjuk a dekódert
-        if (core1_current_mode == Core1ActiveMode::MODE_CW and core1_cw_decoder) {
+        // Ha nincs parancs a Core0-tól, futtatjuk a megfelelő dekódert
+        if (core1_current_mode == Core1ActiveMode::MODE_CW && core1_cw_decoder) {
             core1_cw_decoder->updateDecoder();  // Folyamatosan feldolgozza az audiót és tölti a belső puffert
+        } else if (core1_current_mode == Core1ActiveMode::MODE_RTTY && core1_rtty_decoder) {
+            core1_rtty_decoder->updateDecoder();  // Folyamatosan feldolgozza az RTTY audiót és tölti a belső puffert
         }
 
         // Rövid várakozás, hogy ne pörgesse túl a CPU-t, ha nincs más teendő

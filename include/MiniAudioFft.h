@@ -75,18 +75,14 @@ class AudioProcessor;
 class MiniAudioFft {
    public:  // Publikus enum a könnyebb elérhetőségért, ha külsőleg is hivatkoznánk rá
     // Megjelenítési módok enum definíciója
-    enum class DisplayMode : uint8_t {
-        Off = 0,
-        SpectrumLowRes,
-        SpectrumHighRes,
-        Oscilloscope,
-        Waterfall,
-        Envelope,
-        TuningAid  // Új mód a hangolási segédhez
-    };
+    enum class DisplayMode : uint8_t { Off = 0, SpectrumLowRes, SpectrumHighRes, Oscilloscope, Waterfall, Envelope, TuningAid };
 
     // Enum a TuningAid típusának megkülönböztetésére
-    enum class TuningAidType : uint8_t { CW_TUNING, RTTY_TUNING };
+    enum class TuningAidType : uint8_t {
+        CW_TUNING,
+        RTTY_TUNING,
+        OFF_DECODER  // Added to indicate that the main decoder is OFF
+    };
 
    public:
     /**
@@ -152,7 +148,8 @@ class MiniAudioFft {
     float currentTuningAidMinFreqHz_;  // Dinamikusan számolt min frekvencia a TuningAid-hez
     float currentTuningAidMaxFreqHz_;  // Dinamikusan számolt max frekvencia a TuningAid-hez
 
-    TuningAidType currentTuningAidType_;  // Aktuális hangolási segéd típus (CW vagy RTTY)
+    TuningAidType currentTuningAidType_;  // Aktuális hangolási segéd típus (CW / RTTY / OFF_DECODER)
+
     // Belső segédfüggvények
     /**
      * @brief Vált a következő megjelenítési módra.

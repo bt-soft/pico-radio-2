@@ -247,16 +247,15 @@ void AmDisplay::displayLoop() {
         pSevenSegmentFreq->freqDispl(currentBand.varData.currFreq);
         DisplayBase::frequencyChanged = false;
     }
-    if (pMiniAudioFft != nullptr) {
-        // Ha a MiniAudioFft TuningAid módban van, állítsuk be a típusát a dekóder módja alapján
+    if (pMiniAudioFft != nullptr) {  // Ha a MiniAudioFft TuningAid módban van, állítsuk be a típusát a dekóder módja alapján
         if (pMiniAudioFft->getCurrentDisplayMode() == MiniAudioFft::DisplayMode::TuningAid) {
             if (currentDecodeMode == DecodeMode::MORSE) {
                 pMiniAudioFft->setTuningAidType(MiniAudioFft::TuningAidType::CW_TUNING);
             } else if (currentDecodeMode == DecodeMode::RTTY) {
                 pMiniAudioFft->setTuningAidType(MiniAudioFft::TuningAidType::RTTY_TUNING);
             } else {
-                // Alapértelmezett vagy egyéb esetek (pl. ha a dekóder Off)
-                pMiniAudioFft->setTuningAidType(MiniAudioFft::TuningAidType::CW_TUNING);  // Alapértelmezetten CW
+                // Dekóder OFF esetén ne jelenjenek meg a hangolási vonalak
+                pMiniAudioFft->setTuningAidType(MiniAudioFft::TuningAidType::OFF_DECODER);
             }
         }
         pMiniAudioFft->loop();

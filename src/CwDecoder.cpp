@@ -572,15 +572,11 @@ void CwDecoder::updateDecoder() {
         } else {
             // Fallback érték
             dynamicWordGapMs = max(200UL, (unsigned long)(estimatedDotLength * 4.0f));
-        }
-
-        // Debug kimenet korlátozása - csak 1 másodpercenként írjuk ki
+        }  // Debug kimenet korlátozása - csak 1 másodpercenként írjuk ki
         if (currentTimeMs - lastSpaceDebugMs_ >= SPACE_DEBUG_INTERVAL_MS) {
             // WPM becslés debug kiíráshoz
-            int currentWpm = (toneMinDurationMs_ != 9999L && toneMinDurationMs_ > 0) ? (1200 / toneMinDurationMs_) : 15;
-
-            CW_DEBUG("CW: Szóköz ellenőrzés - space: %lu ms, küszöb: %lu ms, WPM: %d, lastChar: '%c', processed: %s\n", spaceDuration, dynamicWordGapMs, currentWpm,
-                     lastDecodedChar_, wordSpaceProcessed_ ? "igen" : "nem");
+            CW_DEBUG("CW: Szóköz ellenőrzés - space: %lu ms, küszöb: %lu ms, WPM: %d, lastChar: '%c', processed: %s\n", spaceDuration, dynamicWordGapMs,
+                     (toneMinDurationMs_ != 9999L && toneMinDurationMs_ > 0) ? (1200 / toneMinDurationMs_) : 15, lastDecodedChar_, wordSpaceProcessed_ ? "igen" : "nem");
 
             lastSpaceDebugMs_ = currentTimeMs;
         }
