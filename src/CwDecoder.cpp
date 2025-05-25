@@ -52,6 +52,7 @@ void CwDecoder::initialize() {
     decoderStarted_ = false;
     measuringTone_ = false;
     toneDetectedState_ = false;
+    lastActivityMs_ = 0;  // Tagváltozó inicializálása
     lastDecodedChar_ = '\0';
     wordSpaceProcessed_ = false;
     inInactiveState = false;
@@ -61,6 +62,11 @@ void CwDecoder::initialize() {
     q2 = 0;
     memset(testData, 0, sizeof(testData));
     memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
+    // Puffer inicializálása
+    memset(decodedCharBuffer_, 0, sizeof(decodedCharBuffer_));
+    charBufferReadPos_ = 0;
+    charBufferWritePos_ = 0;
+    charBufferCount_ = 0;
 }
 
 void CwDecoder::resetDecoderState() {
@@ -236,8 +242,40 @@ char CwDecoder::processCollectedElements() {
     return '\0';
 }
 
-char CwDecoder::decodeNextCharacter() {
-    static unsigned long lastActivityMs = 0;
+void CwDecoder::addToBuffer(char c) {
+    if (c == '\0') {  // Üres karaktert nem teszünk a pufferbe
+        return;
+    }
+
+    decodedCharBuffer_[charBufferWritePos_] = c;
+    charBufferWritePos_ = (charBufferWritePos_ + 1) % DECODED_CHAR_BUFFER_SIZE;
+    if (charBufferCount_ < DECODED_CHAR_BUFFER_SIZE) {
+        charBufferCount_++;
+    } else {
+        // Ha a puffer tele volt, a legrégebbi elem (readPos) felülíródott,
+        // ezért a readPos-t is el kell léptetni.
+        charBufferReadPos_ = (charBufferReadPos_ + 1) % DECODED_CHAR_BUFFER_SIZE;
+    }
+    CW_DEBUG("CW: Char '%c' added to buffer. Count: %d, R:%d, W:%d\n", c, charBufferCount_, charBufferReadPos_, charBufferWritePos_);
+}
+
+char CwDecoder::getCharacterFromBuffer() {
+    if (charBufferCount_ == 0) {
+        return '\0';
+    }
+    char c = decodedCharBuffer_[charBufferReadPos_];
+    charBufferReadPos_ = (charBufferReadPos_ + 1) % DECODED_CHAR_BUFFER_SIZE;
+    charBufferCount_--;
+    CW_DEBUG("CW: Char '%c' read from buffer. Count: %d, R:%d, W:%d\n", c, charBufferCount_, charBufferReadPos_, charBufferWritePos_);
+    return c;
+}
+
+void CwDecoder::updateDecoder() {
+    // Ez a metódus hívja a belső logikát, ami a pufferbe teszi a karaktert.
+    internalProcessNextCharacter();
+}
+
+void CwDecoder::internalProcessNextCharacter() {
     static const unsigned long MAX_SILENCE_MS = 4000;
     static const unsigned long ELEMENT_GAP_MIN_MS = DOT_MIN_MS / 2;
 
@@ -254,20 +292,20 @@ char CwDecoder::decodeNextCharacter() {
     char decodedChar = '\0';
 
     if (currentToneState) {
-        lastActivityMs = currentTimeMs;
+        lastActivityMs_ = currentTimeMs;
         // Ha hangot észlelünk, és előtte nem mértünk hangot (azaz egy új hang kezdődött)
         if (!measuringTone_) {
             wordSpaceProcessed_ = false;  // Új hang megszakítja az előző csendperiódust, reseteljük a flag-et
         }
     }
 
-    if (currentTimeMs - lastActivityMs > MAX_SILENCE_MS) {
+    if (currentTimeMs - lastActivityMs_ > MAX_SILENCE_MS) {
         if (!inInactiveState) {   // Csak akkor írjuk ki, ha még nem tettük
             resetDecoderState();  // Teljes reset, ami az initialize()-t hívja
             CW_DEBUG("CW: Reset inactivity (%lu ms) miatt\n", MAX_SILENCE_MS);
             inInactiveState = true;  // Beállítjuk, hogy kiírtuk
         }
-        return '\0';
+        return;  // Nem adunk vissza karaktert, csak resetelünk
     }
 
     if (!decoderStarted_ && !measuringTone_ && currentToneState) {
@@ -326,7 +364,7 @@ char CwDecoder::decodeNextCharacter() {
             decodedChar = processCollectedElements();
             if (decodedChar != '\0') {
                 lastDecodedChar_ = decodedChar;
-                lastActivityMs = currentTimeMs;
+                lastActivityMs_ = currentTimeMs;
             }
             resetMorseTree();
             // trailingEdgeTimeMs_ nem frissül itt, mert a következő hang leadingEdgeTimeMs_-e lesz a mérvadó
@@ -371,7 +409,8 @@ char CwDecoder::decodeNextCharacter() {
     }
 
     if (decodedChar != '\0') {
-        DEBUG("CW: Dekódolt karakter: '%c'\n", decodedChar);
+        CW_DEBUG("CW: Dekódolt karakter: '%c'\n", decodedChar);
     }
-    return decodedChar;
+    addToBuffer(decodedChar);
+    return;
 }

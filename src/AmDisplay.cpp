@@ -277,28 +277,32 @@ void AmDisplay::displayLoop() {
             }
         }
     }
-    // CW dekódolás Core1-re delegálva
-    // A Core0 kezdeményezi a CW dekódolást és vár a Core1 válaszára
+    
+    // CW dekódolás Core1-re delegálva.  A Core0 vár a Core1 válaszára
     if (currentDecodeMode == DecodeMode::MORSE && !rtv::muteStat) {
-        // Parancs küldése a Core1-nek a CW audio feldolgozására
-        // Ellenőrizzük, hogy a Core1 FIFO-ja készen áll-e írásra
-        if (multicore_fifo_wready()) {
+        // A multicore_fifo_push_blocking() maga kezeli a várakozást, ha a FIFO tele van.
+        // A wready() ellenőrzés itt felesleges lehet.
 
-            multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_CW);
+        DEBUG("Core0: Sending CORE1_CMD_PROCESS_AUDIO_CW to Core1\n");
+        multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_CW);
 
-            // Várakozás a válaszra (dekódolt karakter) a Core1-től
-            unsigned long startTimeWait = millis();
-            while (millis() - startTimeWait < 10) {  // Max 10ms várakozás
-                if (multicore_fifo_rvalid()) {
-                    char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
-                    DEBUG("Core0: CW decodedChar received from Core1: '%c' (%d)\n", decodedChar, decodedChar);
-                    if (decodedChar != '\0') {
-                        appendRttyCharacter(decodedChar);
-                    }
-                    break;
+        // Várakozás a válaszra (dekódolt karakter) a Core1-től
+        unsigned long startTimeWait = millis();
+        bool received = false;
+        while (millis() - startTimeWait < 20) {  // Timeout növelve 20ms-ra teszteléshez
+            if (multicore_fifo_rvalid()) {
+                char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
+                DEBUG("Core0: CW decodedChar received from Core1: '%c' (%d)\n", decodedChar, decodedChar);
+                if (decodedChar != '\0') {
+                    appendRttyCharacter(decodedChar);
                 }
-                delayMicroseconds(100);  // Rövid várakozás a CPU tehermentesítésére
+                received = true;
+                break;
             }
+            delayMicroseconds(100);  // Rövid várakozás a CPU tehermentesítésére
+        }
+        if (!received) {
+            DEBUG("Core0: Timeout waiting for CW char from Core1.\n");
         }
     }
 }

@@ -39,14 +39,13 @@ void core1_main() {
     // (a komment áthelyezve a jobb olvashatóságért)
 
     while (true) {
+        char char_to_send_back = '\0';  // Itt deklaráljuk, hogy a switch-en kívül is elérhető legyen
+        bool send_char = false;         // Itt deklaráljuk
+
         // Várakozás parancsra Core0-tól
         if (multicore_fifo_rvalid()) {
             uint32_t raw_command = multicore_fifo_pop_blocking();
-            // DEBUG("Core1: Popped command: 0x%lX\n", raw_command);  // Log the popped command
-
             Core1Command command = static_cast<Core1Command>(raw_command);
-            char char_to_send_back = '\0';
-            bool send_char = false;
 
             switch (command) {
                 case CORE1_CMD_SET_MODE_OFF:
@@ -89,18 +88,13 @@ void core1_main() {
                     break;
 
                 case CORE1_CMD_PROCESS_AUDIO_CW:
-                    // Ezt a parancsot már nem használjuk a karakterenkénti dekódoláshoz,
-                    // de itt maradhat pl. egy explicit dekódolási kéréshez.
-                    if (core1_current_mode == Core1ActiveMode::MODE_CW) {
-                        if (core1_cw_decoder) {
-                            char_to_send_back = core1_cw_decoder->decodeNextCharacter();
-                        } else {
-                            DEBUG("Core1: CW Decoder not initialized for explicit processing!\n");
-                        }
-
-                        if (char_to_send_back != '\0') {
-                            send_char = true;
-                        }
+                    // Ez a parancs kéri le a karaktert a CwDecoder belső pufferéből
+                    if (core1_current_mode == Core1ActiveMode::MODE_CW and core1_cw_decoder) {
+                        char_to_send_back = core1_cw_decoder->getCharacterFromBuffer();
+                        // A robusztusság érdekében jó, ha a Core1 mindig küld választ a CORE1_CMD_PROCESS_AUDIO_CW parancsra,
+                        // még akkor is, ha a pufferből \0 karaktert olvasott ki.
+                        // Ez segít elkerülni, hogy a Core0 feleslegesen várakozzon, ha a puffer éppen üres.
+                        send_char = true;
                     }
                     break;
 
@@ -109,10 +103,10 @@ void core1_main() {
                     break;
             }
 
-            // Ha van dekódolt karakter, akkor azt küldjük vissza a Core0-nak
+            // Ha van dekódolt karakter, akkor azt visszaküldjük a Core0-nak
             if (send_char) {
                 if (multicore_fifo_wready()) {
-                    DEBUG("Core1: CW Decoder processed character: '%c'\n", char_to_send_back);
+                    DEBUG("Core1: Sending char '%c' to Core0 from CW buffer\n", char_to_send_back);
                     multicore_fifo_push_blocking(static_cast<uint32_t>(char_to_send_back));
                 } else {
                     DEBUG("Core1: FIFO full when sending char '%c'\n", char_to_send_back);
@@ -120,9 +114,18 @@ void core1_main() {
             }
 
         } else {
-            // A dekódolás csak a CORE1_CMD_PROCESS_AUDIO_CW parancsra történik.
-            // Ha más háttérfeladatok lennének itt, azok maradhatnak.
-            delayMicroseconds(10000);  // Pl. 10 ms
+            // Ha nincs parancs a Core0-tól, és CW módban vagyunk, futtatjuk a dekódert
+            if (core1_current_mode == Core1ActiveMode::MODE_CW and core1_cw_decoder) {
+                core1_cw_decoder->updateDecoder();  // Folyamatosan feldolgozza az audiót és tölti a belső puffert
+            }
+
+            // Rövid várakozás, hogy ne pörgesse túl a CPU-t, ha nincs más teendő
+            // Ezt az értéket finomhangolni kellhet a dekódolási sebesség és a rendszer válaszkészsége alapján.
+            // Ha túl nagy, lassú lehet a dekódolás. Ha túl kicsi, feleslegesen terheli a CPU-t.
+            // A CwDecoder belső időzítései (pl. sampleWithNoiseBlanking) határozzák meg a tényleges audio feldolgozási sebességet.
+            // Ez a delay csak akkor releváns, ha a dekóder gyorsabban végezne, mint ahogy új adat érkezik,
+            // vagy ha más feladatok is futnának a Core1-en.
+            delayMicroseconds(1000);  // 1 ms várakozás, ha nincs FIFO parancs
         }
     }
 }

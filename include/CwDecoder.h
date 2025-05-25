@@ -12,7 +12,8 @@ class CwDecoder {
     CwDecoder(int audioPin);
     ~CwDecoder();
 
-    char decodeNextCharacter();
+    void updateDecoder(); // Core1 hívja ciklikusan
+    char getCharacterFromBuffer(); // Core0 kéri le a karaktert
     void resetDecoderState();  // To be called when switching to CW mode
 
    private:
@@ -56,6 +57,7 @@ class CwDecoder {
     unsigned long toneMaxDurationMs_;
     unsigned long toneMinDurationMs_;
 
+    unsigned long lastActivityMs_; // Korábban static volt a decodeNextCharacter-ben
     unsigned long currentLetterStartTimeMs_;
     short symbolCountForWpm_;
 
@@ -68,6 +70,13 @@ class CwDecoder {
     // Szóköz dekódoláshoz
     char lastDecodedChar_;     // Utoljára dekódolt karakter
     bool wordSpaceProcessed_;  // Jelzi, ha egy adott csendperiódusért már adtunk szóközt
+
+    // Karakter puffer a folyamatos dekódoláshoz
+    static constexpr short DECODED_CHAR_BUFFER_SIZE = 3;
+    char decodedCharBuffer_[DECODED_CHAR_BUFFER_SIZE];
+    short charBufferReadPos_;
+    short charBufferWritePos_;
+    short charBufferCount_;
 
     // Morse tree
     static const char MORSE_TREE_SYMBOLS[];
@@ -90,8 +99,10 @@ class CwDecoder {
     char getCharFromTree();
     void resetMorseTree();
     void updateReferenceTimings(unsigned long duration);
-    void initialize();                // Common initialization logic
-    char processCollectedElements();  // Process collected Morse elements
+    void initialize();                 // Common initialization logic
+    char processCollectedElements();   // Process collected Morse elements
+    void internalProcessNextCharacter(); // Belső feldolgozó logika
+    void addToBuffer(char c);          // Karakter hozzáadása a pufferhez
 };
 
 #endif  // CWDECODER_H
