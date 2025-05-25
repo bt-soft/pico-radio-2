@@ -277,6 +277,56 @@ void RttyDecoder::resetRttyStateMachine() {
     currentByte_ = 0;
 }
 
+// --- AUTOMATIKUS MARK/SPACE FREKVENCIA FINE-TUNING ---
+// Meghívható pl. minden dekódolt karakter után vagy időnként
+void RttyDecoder::autoTuneFrequencies() {
+    // Keresési tartomány (Hz)
+    const float markStart = 2270.0f, markEnd = 2320.0f;
+    const float spaceStart = 2100.0f, spaceEnd = 2150.0f;
+    const float step = 5.0f;
+    float bestMark = detectedMarkFreq_;
+    float bestSpace = detectedSpaceFreq_;
+    float bestScore = 0.0f;
+    // Mintavétel a jelenlegi audio jellel
+    for (float markF = markStart; markF <= markEnd; markF += step) {
+        for (float spaceF = spaceStart; spaceF <= spaceEnd; spaceF += step) {
+            // Számold ki a Goertzel paramétereket
+            short kMark = round(N_SAMPLES * markF / SAMPLING_FREQ);
+            float coeffMark = 2.0f * cos(2.0f * M_PI * kMark / N_SAMPLES);
+            short kSpace = round(N_SAMPLES * spaceF / SAMPLING_FREQ);
+            float coeffSpace = 2.0f * cos(2.0f * M_PI * kSpace / N_SAMPLES);
+            // Mintavétel
+            float markMag = 0.0f, spaceMag = 0.0f;
+            // Goertzel Mark
+            float q1 = 0, q2 = 0, q0 = 0;
+            for (short i = 0; i < N_SAMPLES; i++) {
+                q0 = coeffMark * q1 - q2 + (float)testData[i];
+                q2 = q1;
+                q1 = q0;
+            }
+            markMag = sqrt(q1 * q1 + q2 * q2 - q1 * q2 * coeffMark);
+            // Goertzel Space
+            q1 = q2 = q0 = 0;
+            for (short i = 0; i < N_SAMPLES; i++) {
+                q0 = coeffSpace * q1 - q2 + (float)testData[i];
+                q2 = q1;
+                q1 = q0;
+            }
+            spaceMag = sqrt(q1 * q1 + q2 * q2 - q1 * q2 * coeffSpace);
+            float score = fabs(markMag - spaceMag);  // Minél nagyobb a különbség, annál jobb
+            if (score > bestScore) {
+                bestScore = score;
+                bestMark = markF;
+                bestSpace = spaceF;
+            }
+        }
+    }
+    detectedMarkFreq_ = bestMark;
+    detectedSpaceFreq_ = bestSpace;
+    // Frissítsd a Goertzel paramétereket is, ha szükséges
+    RTTY_DEBUG("RTTY: Auto-tuned Mark=%.1f Hz, Space=%.1f Hz (score=%.1f)\n", bestMark, bestSpace, bestScore);
+}
+
 /**
  * @brief Dekódol egy Baudot karaktert ASCII-ra
  * @param baudotCode 5-bites Baudot kód
@@ -456,6 +506,7 @@ void RttyDecoder::updateDecoder() {
                 if (decodedChar != '\0') {
                     addToBuffer(decodedChar);
                     RTTY_DEBUG("RTTY: Character decoded: '%c' (0x%02X) at %lu ms [7-sample stop bit]\n", decodedChar, currentByte_, millis());
+                    autoTuneFrequencies();  // <-- automatikus finomhangolás
                 }
             } else {
                 RTTY_DEBUG("RTTY: Invalid stop bit (Space, majority, 7-sample) at %lu ms, discarding character 0x%02X\n", millis(), currentByte_);

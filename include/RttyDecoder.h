@@ -102,6 +102,7 @@ class RttyDecoder {
     void addToBuffer(char c);
     void resetRttyStateMachine();
     unsigned long estimateBaudRate();
+    void autoTuneFrequencies();
 };
 
 #endif  // RTTYDECODER_H
