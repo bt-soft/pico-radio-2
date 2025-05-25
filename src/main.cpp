@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "PicoSensorUtils.h"
+#include "core1_logic.h"  // Core1 logika
 #include "defines.h"
 #include "pico/multicore.h"  // Core1 kezeléséhez
 #include "rtVars.h"
@@ -175,14 +176,6 @@ void setup() {
     // Beeper
     pinMode(PIN_BEEPER, OUTPUT);
     digitalWrite(PIN_BEEPER, LOW);
-
-    // --- Core1 indítása KORÁBBAN ---
-    // Indítsuk el a Core1-et még az EEPROM műveletek előtt, hogy a lockout működhessen.
-    multicore_launch_core1(core1_main);
-    DEBUG("Core0: Core1 launched. Draining FIFO and delaying...\n");
-    multicore_fifo_drain();  // Drain Core0's TX FIFO (Core1's RX) after launch
-    delay(100);              // Növelt várakozás, hogy a Core1 elindulhasson és készen álljon a lockout-ra
-    // --- Core1 indítás VÉGE ---
 
     // TFT LED háttérvilágítás kimenet
     pinMode(PIN_TFT_BACKGROUND_LED, OUTPUT);
@@ -362,4 +355,20 @@ void loop() {
             }
         }
     }
+}
+
+/**
+ * Core1 belépési pontja
+ */
+void setup1() {
+    // Core1 belépési pontja, itt indítjuk el a Core1 logikát
+    DEBUG("Core1: Setup started.\n");
+}
+
+/**
+ * @brief Core1 logika futtatása a loop-ban.
+ */
+void loop1() {
+    // Core1 logika indítása
+    core1_main();
 }

@@ -1,8 +1,8 @@
 #ifndef __AMDISPLAY_H
 #define __AMDISPLAY_H
 
+#include "CwDecoder.h"  // CW dekóder osztály
 #include "DisplayBase.h"
-#include "CwDecoder.h"    // CW dekóder osztály
 #include "MiniAudioFft.h"
 #include "RadioButton.h"  // Új RadioButton include
 #include "RttyDecoder.h"  // RTTY dekóder osztály
@@ -25,7 +25,7 @@ class AmDisplay : public DisplayBase {
     static constexpr uint16_t DECODER_TEXT_AREA_Y_MARGIN_TOP = 5;        // S-Meter alatt
     static constexpr uint16_t DECODER_TEXT_AREA_Y_MARGIN_BOTTOM = 5;     // Horizontális gombok felett
     static constexpr int RTTY_MAX_TEXT_LINES = 6;                        // Megjeleníthető sorok száma (betűmérettől függ)
-    static constexpr int RTTY_LINE_BUFFER_SIZE = 60;                     // Egy sor maximális karakterszáma
+    static constexpr int RTTY_LINE_BUFFER_SIZE = 50;                     // Egy sor maximális karakterszáma
     static constexpr uint16_t DECODER_MODE_BTN_W = SCRN_BTN_W / 2 + 10;  // Kicsit szélesebb mini gombok
     static constexpr uint16_t DECODER_MODE_BTN_H = SCRN_BTN_H / 2;
     static constexpr uint16_t DECODER_MODE_BTN_GAP_X = 5;  // Rés a szövegterület és a gombok között
@@ -40,12 +40,10 @@ class AmDisplay : public DisplayBase {
     RadioButtonGroup decoderModeGroup;
     enum class DecodeMode { OFF, RTTY, MORSE };
     DecodeMode currentDecodeMode = DecodeMode::OFF;  // Kezdetben kikapcsolva
-    uint8_t decoderModeStartId_ = 0; // Dekóder gombok kezdő ID-ja
+    uint8_t decoderModeStartId_ = 0;                 // Dekóder gombok kezdő ID-ja
     void setDecodeModeBasedOnButtonId(uint8_t buttonId);
 
-    AudioProcessor *pAudioProcessor;      // Audio processor példány
-    RttyDecoder *pRttyDecoder = nullptr;  // RTTY dekóder
-    CwDecoder *pCwDecoder = nullptr;      // CW dekóder
+    AudioProcessor *pAudioProcessor;  // Audio processor példány
 
     // A szövegterület tényleges koordinátái és méretei (konstruktorban számolva)
     uint16_t rttyTextAreaX, rttyTextAreaY, rttyTextAreaW, rttyTextAreaH;
@@ -55,8 +53,8 @@ class AmDisplay : public DisplayBase {
     void drawRttyTextAreaBackground();
     void appendRttyCharacter(char c);
     void updateRttyTextDisplay();
-    void clearRttyTextBufferOnly(); // Csak a puffert törli
-    void clearRttyTextBufferAndDisplay(); // Törli a puffert és frissíti a kijelzőt
+    void clearRttyTextBufferOnly();        // Csak a puffert törli
+    void clearRttyTextBufferAndDisplay();  // Törli a puffert és frissíti a kijelzőt
     void drawDecodeModeButtons();
     void setDecodeMode(DecodeMode newMode);
 

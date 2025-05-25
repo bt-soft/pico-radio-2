@@ -37,13 +37,8 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     };
     uint8_t horizontalButtonCount = ARRAY_ITEM_COUNT(horizontalButtonsData);
 
-    // MiniAudioFft és RTTY dekóder inicializálása
     // A targetSamplingFrequency 12000 Hz (2 * 6000 Hz) az AM FFT-hez és RTTY-hez.
-    // Az RTTY dekóderhez a config.data.miniAudioFftConfigRtty erősítési beállítást használjuk.
-    // Ezek a példányok Core0-n maradnak, de a feldolgozást Core1-re delegáljuk.
     pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigRtty, AUDIO_INPUT_PIN, MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
-    pRttyDecoder = new RttyDecoder(*pAudioProcessor);  // RTTY dekóder inicializálása az AudioProcessorral
-    pCwDecoder = new CwDecoder(AUDIO_INPUT_PIN);       // CW dekóder inicializálása
 
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
     rttyTextAreaX = DECODER_TEXT_AREA_X_START;
@@ -89,8 +84,6 @@ AmDisplay::~AmDisplay() {
     if (pSevenSegmentFreq) delete pSevenSegmentFreq;
     if (pMiniAudioFft) delete pMiniAudioFft;
     if (pAudioProcessor) delete pAudioProcessor;  // AudioProcessor törlése
-    if (pRttyDecoder) delete pRttyDecoder;
-    if (pCwDecoder) delete pCwDecoder;
 }
 
 /**
@@ -267,7 +260,7 @@ void AmDisplay::displayLoop() {
     if (currentDecodeMode == DecodeMode::RTTY && !rtv::muteStat) {
         if (multicore_fifo_wready()) {
             DEBUG("Core0: Sending CORE1_CMD_PROCESS_AUDIO_RTTY\n");
-            multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_RTTY);
+            multicore_fifo_push_blocking(CORE1_CMD_GET_RTTY_CHAR);
         }
         if (multicore_fifo_rvalid()) {
             char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
@@ -277,33 +270,35 @@ void AmDisplay::displayLoop() {
             }
         }
     }
-    
+
     // CW dekódolás Core1-re delegálva.  A Core0 vár a Core1 válaszára
     if (currentDecodeMode == DecodeMode::MORSE && !rtv::muteStat) {
-        // A multicore_fifo_push_blocking() maga kezeli a várakozást, ha a FIFO tele van.
-        // A wready() ellenőrzés itt felesleges lehet.
 
-        DEBUG("Core0: Sending CORE1_CMD_PROCESS_AUDIO_CW to Core1\n");
-        multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_CW);
+        // Parancs küldése a Core1-nek, hogy adjon egy dekódolt CW karaktert
+        if (!rp2040.fifo.push_nb(CORE1_CMD_GET_CW_CHAR)) {
+            Utils::beepError();
+            DEBUG("Core0: CW command NOT sent to Core1, FIFO full\n");
+            return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot
+        }
 
         // Várakozás a válaszra (dekódolt karakter) a Core1-től
+        char decodedChar = '\0';  // Dekódolt karakter inicializálása
         unsigned long startTimeWait = millis();
-        bool received = false;
-        while (millis() - startTimeWait < 20) {  // Timeout növelve 20ms-ra teszteléshez
-            if (multicore_fifo_rvalid()) {
-                char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
-                DEBUG("Core0: CW decodedChar received from Core1: '%c' (%d)\n", decodedChar, decodedChar);
-                if (decodedChar != '\0') {
-                    appendRttyCharacter(decodedChar);
+        while (millis() - startTimeWait < 5) {  // Timeout 5 ms
+            if (rp2040.fifo.available() > 0) {
+
+                uint32_t raw_command;
+                if (rp2040.fifo.pop_nb(&raw_command)) {
+                    decodedChar = static_cast<char>(raw_command);
+                    // DEBUG("Core0: CW decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
+                    if (decodedChar != '\0') {
+                        appendRttyCharacter(decodedChar);
+                    }
                 }
-                received = true;
-                break;
             }
-            delayMicroseconds(100);  // Rövid várakozás a CPU tehermentesítésére
+            break;
         }
-        if (!received) {
-            DEBUG("Core0: Timeout waiting for CW char from Core1.\n");
-        }
+        delayMicroseconds(100);  // Rövid várakozás a CPU tehermentesítésére
     }
 }
 
@@ -327,15 +322,14 @@ void AmDisplay::drawRttyTextAreaBackground() {
  * @brief Hozzáfűz egy karaktert az RTTY kijelző pufferéhez és frissíti a kijelzőt.
  */
 void AmDisplay::appendRttyCharacter(char c) {
-    DEBUG("AmDisplay::appendRttyCharacter: kapott karakter: '%c' (%d), buffer: '%s'\n", c, c, rttyCurrentLineBuffer.c_str());
+
     // Először adjuk hozzá a karaktert a bufferhez, ha nyomtatható és nem '\n'
     if (c >= 32 && c <= 126 && c != '\n') {
         rttyCurrentLineBuffer += c;
-        DEBUG("AmDisplay::appendRttyCharacter: buffer after append: '%s'\n", rttyCurrentLineBuffer.c_str());
     }
+
     // Ezután ellenőrizzük, hogy sort kell-e váltani
     if (c == '\n' || rttyCurrentLineBuffer.length() >= RTTY_LINE_BUFFER_SIZE - 1) {
-        DEBUG("AmDisplay::appendRttyCharacter: line break, index=%d, buffer='%s'\n", rttyCurrentLineIndex, rttyCurrentLineBuffer.c_str());
         if (rttyCurrentLineIndex >= RTTY_MAX_TEXT_LINES - 1) {
             for (int i = 0; i < RTTY_MAX_TEXT_LINES - 1; ++i) {
                 rttyDisplayLines[i] = rttyDisplayLines[i + 1];
@@ -354,14 +348,17 @@ void AmDisplay::appendRttyCharacter(char c) {
  * @brief Frissíti az RTTY szövegterület tartalmát a puffer alapján.
  */
 void AmDisplay::updateRttyTextDisplay() {
-    DEBUG("AmDisplay::updateRttyTextDisplay: index=%d, buffer='%s'\n", rttyCurrentLineIndex, rttyCurrentLineBuffer.c_str());
+
     drawRttyTextAreaBackground();
+
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
     tft.setTextDatum(TL_DATUM);
     tft.setFreeFont();
     tft.setTextSize(1);
     uint16_t charHeight = tft.fontHeight();
+
     if (charHeight == 0) charHeight = 16;
+
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
         if (i == rttyCurrentLineIndex) {
             if (!rttyCurrentLineBuffer.isEmpty()) {
@@ -379,8 +376,7 @@ void AmDisplay::updateRttyTextDisplay() {
  * @brief Beállítja a dekódolási módot és frissíti a gombok állapotát.
  */
 void AmDisplay::setDecodeMode(DecodeMode newMode) {
-    if (currentDecodeMode == newMode && newMode != DecodeMode::RTTY) {  // RTTY-nél mindig fusson le az auto-detect miatt
-                                                                        // Ha RTTY-re váltunk, akkor is le kell futnia, hogy az auto-detect elinduljon
+    if (currentDecodeMode == newMode && newMode != DecodeMode::RTTY) {
         if (newMode != DecodeMode::RTTY) return;
     }
 
@@ -392,46 +388,31 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
             decoderModeGroup.selectButtonByIndex(0);
             core1_cmd_set_mode = CORE1_CMD_SET_MODE_OFF;
             break;
+
         case DecodeMode::RTTY:
             decoderModeGroup.selectButtonByIndex(1);
             core1_cmd_set_mode = CORE1_CMD_SET_MODE_RTTY;
-            if (pRttyDecoder) {                   // Csak akkor, ha létezik
-                pRttyDecoder->startAutoDetect();  // Automatikus frekvencia detektálás indítása
-            }
             break;
+
         case DecodeMode::MORSE:
             decoderModeGroup.selectButtonByIndex(2);
             core1_cmd_set_mode = CORE1_CMD_SET_MODE_CW;
-            if (pCwDecoder) {
-                pCwDecoder->resetDecoderState();
-            }
             break;
         default:
             break;
     }
 
     // Parancs küldése Core1-nek a módváltásról
-    DEBUG("Core0: Sending mode change command to Core1: 0x%lX\n", static_cast<uint32_t>(core1_cmd_set_mode));
-    multicore_fifo_push_blocking(static_cast<uint32_t>(core1_cmd_set_mode));
+    if (!rp2040.fifo.push_nb(static_cast<uint32_t>(core1_cmd_set_mode))) {
+        Utils::beepError();
+        DEBUG("Core0: Command NOT sent to Core1, FIFO full\n");
+        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot
+    }
 
-    clearRttyTextBufferAndDisplay();
-
-    // const char *modeMsg = nullptr;
-    // if (currentDecodeMode == DecodeMode::RTTY)
-    //     modeMsg = "--- RTTY Mode ---\n";
-    // else if (currentDecodeMode == DecodeMode::MORSE)
-    //     modeMsg = "--- CW Mode ---\n";
-    // // else if (currentDecodeMode == DecodeMode::OFF) modeMsg = "--- Decoder Off ---\n"; // Opcionális
-
-    // if (modeMsg) {
-    //     for (int i = 0; modeMsg[i] != '\0'; ++i) {
-    //         // Itt az appendRttyCharacter már nem frissít minden karakter után,
-    //         // ezért a ciklus után kell egy updateRttyTextDisplay()
-    //         // De mivel az appendRttyCharacter most már frissít, ez így jó.
-    //         appendRttyCharacter(modeMsg[i]);
-    //     }
-    //     // updateRttyTextDisplay(); // Ha az appendRttyCharacter nem frissítene
-    // }
+    // Ha kikapcsoljuk a módot, akkor nem töröljük a területet
+    if (core1_cmd_set_mode != CORE1_CMD_SET_MODE_OFF) {
+        clearRttyTextBufferAndDisplay();
+    }
 }
 
 /**

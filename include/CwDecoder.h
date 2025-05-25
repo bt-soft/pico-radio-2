@@ -12,13 +12,13 @@ class CwDecoder {
     CwDecoder(int audioPin);
     ~CwDecoder();
 
-    void updateDecoder(); // Core1 hívja ciklikusan
-    char getCharacterFromBuffer(); // Core0 kéri le a karaktert
-    void resetDecoderState();  // To be called when switching to CW mode
+    void updateDecoder();           // Core1 hívja ciklikusan
+    char getCharacterFromBuffer();  // Core0 kéri le a karaktert
+    void resetDecoderState();       // To be called when switching to CW mode
 
    private:
     // Goertzel filter parameters for 750Hz
-    static constexpr float TARGET_FREQ = 750.0f;
+    static constexpr float TARGET_FREQ = CW_SHIFT_FREQUENCY;
     static constexpr float SAMPLING_FREQ = 8400.0f;
     static constexpr short N_SAMPLES = 45;  // Adjusted for better 750Hz tuning with 8400Hz Fs
     // K_CONSTANT = round(45 * 750 / 8400) = round(4.0178) = 4
@@ -57,7 +57,7 @@ class CwDecoder {
     unsigned long toneMaxDurationMs_;
     unsigned long toneMinDurationMs_;
 
-    unsigned long lastActivityMs_; // Korábban static volt a decodeNextCharacter-ben
+    unsigned long lastActivityMs_;  // Korábban static volt a decodeNextCharacter-ben
     unsigned long currentLetterStartTimeMs_;
     short symbolCountForWpm_;
 
@@ -99,10 +99,9 @@ class CwDecoder {
     char getCharFromTree();
     void resetMorseTree();
     void updateReferenceTimings(unsigned long duration);
-    void initialize();                 // Common initialization logic
-    char processCollectedElements();   // Process collected Morse elements
-    void internalProcessNextCharacter(); // Belső feldolgozó logika
-    void addToBuffer(char c);          // Karakter hozzáadása a pufferhez
+    void initialize();                // Common initialization logic
+    char processCollectedElements();  // Process collected Morse elements
+    void addToBuffer(char c);         // Karakter hozzáadása a pufferhez
 };
 
 #endif  // CWDECODER_H

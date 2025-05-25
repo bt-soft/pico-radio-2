@@ -1,6 +1,6 @@
 #include "CwDecoder.h"
 
-#include <cmath>  // round, sin, cos, sqrt, abs, min, max (already in .h for constexpr, but good practice)
+#include <cmath>
 
 #include "defines.h"  // DEBUG
 
@@ -271,11 +271,6 @@ char CwDecoder::getCharacterFromBuffer() {
 }
 
 void CwDecoder::updateDecoder() {
-    // Ez a metódus hívja a belső logikát, ami a pufferbe teszi a karaktert.
-    internalProcessNextCharacter();
-}
-
-void CwDecoder::internalProcessNextCharacter() {
     static const unsigned long MAX_SILENCE_MS = 4000;
     static const unsigned long ELEMENT_GAP_MIN_MS = DOT_MIN_MS / 2;
 

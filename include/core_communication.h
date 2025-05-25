@@ -11,8 +11,8 @@ enum Core1Command : uint32_t {
     CORE1_CMD_SET_MODE_OFF = 0x10,
     CORE1_CMD_SET_MODE_RTTY = 0x11,
     CORE1_CMD_SET_MODE_CW = 0x12,
-    CORE1_CMD_PROCESS_AUDIO_RTTY = 0x21,  // Később ezt használjuk RTTY feldolgozásra
-    CORE1_CMD_PROCESS_AUDIO_CW = 0x22     // Később ezt használjuk CW feldolgozásra
+    CORE1_CMD_GET_RTTY_CHAR = 0x21,
+    CORE1_CMD_GET_CW_CHAR = 0x22
     // Később bővíthető pl. MUTE paranccsal, stb.
 };
 
