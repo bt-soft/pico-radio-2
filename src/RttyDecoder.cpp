@@ -27,13 +27,13 @@ const unsigned long RttyDecoder::SAMPLING_PERIOD_US = static_cast<unsigned long>
 // K_MARK = round(84 * 2295 / 8400) = round(22.95) = 23
 // Tényleges Mark frekvencia: (23 / 84) * 8400 = 2300 Hz
 const short RttyDecoder::K_MARK = 23;
-const float RttyDecoder::COEFF_MARK = -0.4067f;  // 2.0f * cos((2*PI*23)/84)
+const float RttyDecoder::COEFF_MARK = -0.4067f;  // 2.0f * cos((2*PI*23)/84) = 2.0f * cos(1.719) = -0.4067
 
 // Goertzel konstansok Space frekvenciához (2125Hz)
 // K_SPACE = round(84 * 2125 / 8400) = round(21.25) = 21
 // Tényleges Space frekvencia: (21 / 84) * 8400 = 2100 Hz
 const short RttyDecoder::K_SPACE = 21;
-const float RttyDecoder::COEFF_SPACE = 0.0000f;  // 2.0f * cos((2*PI*21)/84)
+const float RttyDecoder::COEFF_SPACE = 0.0000f;  // 2.0f * cos((2*PI*21)/84) = 2.0f * cos(π/2) = 0.0f
 
 // Baudot LTRS (Letters) tábla - ITA2 standard
 const char RttyDecoder::BAUDOT_LTRS_TABLE[32] = {
@@ -269,66 +269,6 @@ bool RttyDecoder::detectShiftFrequency() {
 }
 
 /**
- * @brief Feldolgoz egy RTTY bitet
- * @param isMark true ha Mark bit, false ha Space bit
- */
-void RttyDecoder::processBit(bool isMark) {
-    switch (currentState_) {
-        case IDLE:
-            if (!isMark) {  // Start bit (Space)
-                currentState_ = WAITING_FOR_START_BIT;
-                startBitTimeMs_ = millis();
-                RTTY_DEBUG("RTTY: Potential start bit detected\n");
-            }
-            break;
-
-        case WAITING_FOR_START_BIT:
-            if (!isMark) {  // Still Space, start bit confirmed
-                currentState_ = RECEIVING_DATA_BITS;
-                bitsReceived_ = 0;
-                currentByte_ = 0;
-                lastBitTimeMs_ = millis();
-                RTTY_DEBUG("RTTY: Start bit confirmed, receiving data bits\n");
-            } else {
-                // False start, back to IDLE
-                currentState_ = IDLE;
-                RTTY_DEBUG("RTTY: False start bit, back to IDLE\n");
-            }
-            break;
-
-        case RECEIVING_DATA_BITS:
-            // Data bit tárolása (LSB first)
-            if (isMark) {
-                currentByte_ |= (1 << bitsReceived_);
-            }
-            bitsReceived_++;
-
-            RTTY_DEBUG("RTTY: Data bit %d: %s (byte: 0x%02X)\n", bitsReceived_, isMark ? "Mark" : "Space", currentByte_);
-
-            if (bitsReceived_ >= 5) {  // 5 data bits received
-                currentState_ = RECEIVING_STOP_BIT;
-                RTTY_DEBUG("RTTY: 5 data bits received, waiting for stop bit\n");
-            }
-            break;
-
-        case RECEIVING_STOP_BIT:
-            if (isMark) {  // Stop bit (Mark)
-                char decodedChar = decodeBaudotCharacter(currentByte_);
-                if (decodedChar != '\0') {
-                    addToBuffer(decodedChar);
-                    RTTY_DEBUG("RTTY: Character decoded: '%c' (0x%02X)\n", decodedChar, currentByte_);
-                }
-            } else {
-                RTTY_DEBUG("RTTY: Invalid stop bit (Space), discarding character\n");
-            }
-
-            // Reset for next character
-            resetRttyStateMachine();
-            break;
-    }
-}
-
-/**
  * @brief Visszaállítja az RTTY állapotgépet
  */
 void RttyDecoder::resetRttyStateMachine() {
@@ -447,10 +387,79 @@ void RttyDecoder::updateDecoder() {
         }
     }
 
-    // Bit időzítés ellenőrzése
-    static unsigned long lastBitProcessTime = 0;
-    if (currentTime - lastBitProcessTime >= bitDurationMs_) {
-        processBit(currentToneState_);
-        lastBitProcessTime = currentTime;
+    // RTTY állapotgép időzítési logikája
+    switch (currentState_) {
+        case IDLE:
+            // Start bit (Space) keresése
+            if (!currentToneState_) {  // Space jel
+                currentState_ = WAITING_FOR_START_BIT;
+                startBitTimeMs_ = currentTime;
+                RTTY_DEBUG("RTTY: Potential start bit detected at %lu ms\n", currentTime);
+            }
+            break;
+
+        case WAITING_FOR_START_BIT:
+            // Start bit megerősítése (fél bit idő után)
+            if (currentTime - startBitTimeMs_ >= (bitDurationMs_ / 2)) {
+                if (!currentToneState_) {  // Még mindig Space
+                    currentState_ = RECEIVING_DATA_BITS;
+                    bitsReceived_ = 0;
+                    currentByte_ = 0;
+                    lastBitTimeMs_ = startBitTimeMs_ + bitDurationMs_;  // Első data bit időpontja
+                    RTTY_DEBUG("RTTY: Start bit confirmed, first data bit at %lu ms\n", lastBitTimeMs_);
+                } else {
+                    // Téves start bit
+                    currentState_ = IDLE;
+                    RTTY_DEBUG("RTTY: False start bit, back to IDLE\n");
+                }
+            }
+            break;
+
+        case RECEIVING_DATA_BITS:
+            // Data bit mintavételezése a bit közepén
+            if (currentTime >= lastBitTimeMs_) {
+                // Bit mintavételezése
+                if (currentToneState_) {  // Mark = 1
+                    currentByte_ |= (1 << bitsReceived_);
+                }
+                bitsReceived_++;
+
+                RTTY_DEBUG("RTTY: Data bit %d: %s (byte: 0x%02X) at %lu ms\n", bitsReceived_, currentToneState_ ? "Mark" : "Space", currentByte_, currentTime);
+
+                if (bitsReceived_ >= 5) {  // 5 data bits received
+                    currentState_ = RECEIVING_STOP_BIT;
+                    lastBitTimeMs_ += bitDurationMs_;  // Stop bit időpontja
+                    RTTY_DEBUG("RTTY: 5 data bits received, stop bit expected at %lu ms\n", lastBitTimeMs_);
+                } else {
+                    lastBitTimeMs_ += bitDurationMs_;  // Következő data bit időpontja
+                }
+            }
+            break;
+
+        case RECEIVING_STOP_BIT: {
+            // 5 minta a stop bit periódusán belül, többségi szavazás
+            int markCount = 0;
+            const int sampleCount = 5;
+            // Fél bit periódus várakozás, hogy középre kerüljön az első minta
+            delay(bitDurationMs_ / (sampleCount + 1));
+            for (int i = 0; i < sampleCount; ++i) {
+                if (detectToneState() && currentToneState_) markCount++;
+                if (i < sampleCount - 1) {
+                    delay(bitDurationMs_ / (sampleCount + 1));  // Egyenletesen elosztva
+                }
+            }
+            if (markCount >= 3) {  // Legalább 3 Mark: érvényes stop bit
+                char decodedChar = decodeBaudotCharacter(currentByte_);
+                if (decodedChar != '\0') {
+                    addToBuffer(decodedChar);
+                    RTTY_DEBUG("RTTY: Character decoded: '%c' (0x%02X) at %lu ms [5-sample stop bit]\n", decodedChar, currentByte_, millis());
+                }
+            } else {
+                RTTY_DEBUG("RTTY: Invalid stop bit (Space, majority, 5-sample) at %lu ms, discarding character 0x%02X\n", millis(), currentByte_);
+            }
+            // Reset for next character
+            resetRttyStateMachine();
+            break;
+        }
     }
 }

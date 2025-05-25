@@ -44,6 +44,10 @@ class RttyDecoder {
     static constexpr unsigned long MAX_BIT_DURATION_MS = 1000 / MIN_BAUD_RATE;  // 22ms
     static constexpr unsigned long DEFAULT_BIT_DURATION_MS = 22;                // 45.45 baud alapértelmezett
 
+    // Timing toleranciák
+    static constexpr unsigned long BIT_TIMING_TOLERANCE_MS = 3;        // ±3ms tolerancia bit időzítéshez
+    static constexpr unsigned long START_BIT_CONFIRM_DELAY_RATIO = 3;  // Start bit megerősítés: bit_duration / 3
+
     // Shift frekvencia detektálás
     static constexpr float TARGET_SHIFT_850HZ = 850.0f;  // 850Hz shift
     static constexpr float TARGET_SHIFT_170HZ = 170.0f;  // 170Hz shift (defines.h-ban megadott)
@@ -85,9 +89,7 @@ class RttyDecoder {
     // Baudot kód tábla
     static const char BAUDOT_LTRS_TABLE[32];
     static const char BAUDOT_FIGS_TABLE[32];
-    bool figsShift_;  // true = FIGS mód, false = LTRS mód
-
-    // Audio bemenet
+    bool figsShift_;  // true = FIGS mód, false = LTRS mód    // Audio bemenet
     int audioInputPin_;
 
     // Privát metódusok
@@ -96,7 +98,6 @@ class RttyDecoder {
     bool detectToneState();
     void updateBaudRateDetection();
     bool detectShiftFrequency();
-    void processBit(bool isMark);
     char decodeBaudotCharacter(uint8_t baudotCode);
     void addToBuffer(char c);
     void resetRttyStateMachine();
