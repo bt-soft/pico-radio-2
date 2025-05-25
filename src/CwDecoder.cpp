@@ -67,7 +67,7 @@ CwDecoder::~CwDecoder() {}
  */
 void CwDecoder::initialize() {
     noiseBlankerLoops_ = 1;
-    startReferenceMs_ = 150;  // Kezdő referencia 15WPM-hez (pont ~80ms, küszöb ~150-160ms)
+    startReferenceMs_ = 120;  // Kezdő referencia 10 WPM-hez (pont ~120ms) - jó kiindulási pont 7-25 WPM tartományhoz
     currentReferenceMs_ = startReferenceMs_;
     leadingEdgeTimeMs_ = 0;
     trailingEdgeTimeMs_ = 0;
@@ -257,27 +257,31 @@ void CwDecoder::processDash() {
  * a pont/vonás közötti döntési küszöböt. Biztonsági korlátokat alkalmaz
  * a DOT_MIN_MS és DOT_MAX_MS értékek között.
  */
-void CwDecoder::updateReferenceTimings(unsigned long duration) {
-    // Adaptív referencia
-    const unsigned long ADAPTIVE_WEIGHT_OLD = 3;  // Régi érték súlya (csökkentve 7-ről)
-    const unsigned long ADAPTIVE_WEIGHT_NEW = 1;  // Új érték súlya
+void CwDecoder::updateReferenceTimings(unsigned long duration) {  // Adaptív referencia - gyorsabb tanulás a széles WPM tartományhoz (7-25 WPM)
+    const unsigned long ADAPTIVE_WEIGHT_OLD = 2;                  // Régi érték súlya (gyorsabb adaptálás)
+    const unsigned long ADAPTIVE_WEIGHT_NEW = 1;                  // Új érték súlya
     const unsigned long ADAPTIVE_DIVISOR = ADAPTIVE_WEIGHT_OLD + ADAPTIVE_WEIGHT_NEW;
 
     if (toneMinDurationMs_ == 9999L) {
-        // Első elem
-        if (duration < (startReferenceMs_ * 1.2)) {
+        // Első elem - intelligensebb inicializálás
+        if (duration < (startReferenceMs_ * 1.5)) {
+            // Ez valószínűleg pont
             toneMinDurationMs_ = duration;
-            currentReferenceMs_ = duration * 2.0;
+            currentReferenceMs_ = duration * 2.2;  // Pont/vonás küszöb optimalizálása
         } else {
-            toneMinDurationMs_ = duration / 3;
+            // Ez valószínűleg vonás
+            toneMinDurationMs_ = duration / 3.2;  // Reálisabb pont/vonás arány (1:3.2)
             toneMaxDurationMs_ = duration;
             currentReferenceMs_ = (toneMinDurationMs_ + toneMaxDurationMs_) / 2;
         }
+        CW_DEBUG("CW: Első elem init - duration: %lu, min: %lu, max: %lu, ref: %lu\n", duration, toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_);
     } else {
         unsigned long currentThreshold = currentReferenceMs_;
         if (duration < currentThreshold) {
+            // Pont detektálva
             toneMinDurationMs_ = (toneMinDurationMs_ * ADAPTIVE_WEIGHT_OLD + duration * ADAPTIVE_WEIGHT_NEW) / ADAPTIVE_DIVISOR;
         } else {
+            // Vonás detektálva
             if (toneMaxDurationMs_ == 0L) {
                 toneMaxDurationMs_ = duration;
             } else {
@@ -285,17 +289,24 @@ void CwDecoder::updateReferenceTimings(unsigned long duration) {
             }
         }
 
+        // Intelligens referencia számítás
         if (toneMaxDurationMs_ > 0L && toneMinDurationMs_ < 9999L) {
-            unsigned long calculatedRef = toneMinDurationMs_ * 2.0;
+            // Optimális küszöb: pont + (vonás-pont)/3
+            unsigned long calculatedRef = toneMinDurationMs_ + ((toneMaxDurationMs_ - toneMinDurationMs_) / 3);
             currentReferenceMs_ = (currentReferenceMs_ * ADAPTIVE_WEIGHT_OLD + calculatedRef * ADAPTIVE_WEIGHT_NEW) / ADAPTIVE_DIVISOR;
         }
-    }
+    }  // Széles biztonságos tartomány 7-30 WPM-hez
+    toneMinDurationMs_ = constrain(toneMinDurationMs_, DOT_MIN_MS, DOT_MAX_MS);
+    toneMaxDurationMs_ = constrain(toneMaxDurationMs_, DOT_MIN_MS, DASH_MAX_MS);
 
-    // Biztonságos tartomány
-    unsigned long lowerBound = DOT_MIN_MS * 1.25f;  // Pl. 40 * 1.25 = 50ms
-    unsigned long upperBound = DOT_MAX_MS * 1.5f;   // Pl. 200 * 1.5 = 300ms.
+    // Adaptív referencia biztonsági korlátok
+    unsigned long lowerBound = max(DOT_MIN_MS + 5, toneMinDurationMs_ * 2);  // Dinamikus alsó határ
+    unsigned long upperBound = DOT_MAX_MS + 50;                              // ~300ms (6- WPM)
     currentReferenceMs_ = constrain(currentReferenceMs_, lowerBound, upperBound);
-    CW_DEBUG("CW: Ref frissítve - min: %lu, max: %lu, ref: %lu, új elem: %lu\n", toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_, duration);
+
+    // WPM becslés és debug kimenet
+    int estimatedWpm = estimateWpm();
+    CW_DEBUG("CW: Ref frissítve - min: %lu, max: %lu, ref: %lu, új elem: %lu, WPM: %d\n", toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_, duration, estimatedWpm);
 }
 
 /**
@@ -397,7 +408,12 @@ char CwDecoder::getCharacterFromBuffer() {
  */
 void CwDecoder::updateDecoder() {
     static const unsigned long MAX_SILENCE_MS = 4000;
-    static const unsigned long ELEMENT_GAP_MIN_MS = DOT_MIN_MS / 2;
+
+    // Dinamikus element gap minimum - adaptív zajszűrés alapján
+    unsigned long elementGapMinMs = DOT_MIN_MS / 2;
+    if (toneMinDurationMs_ != 9999L && toneMinDurationMs_ > 0) {
+        elementGapMinMs = max(DOT_MIN_MS / 2, toneMinDurationMs_ / 4);  // Pont hossz / 4
+    }
 
     unsigned long estimatedDotLength = (toneMinDurationMs_ == 9999L || toneMinDurationMs_ == 0) ? (currentReferenceMs_ / 2) : toneMinDurationMs_;
     if (estimatedDotLength < DOT_MIN_MS || currentReferenceMs_ == 0) estimatedDotLength = DOT_MIN_MS;  // Biztosítjuk, hogy legyen értelmes alap
@@ -452,13 +468,32 @@ void CwDecoder::updateDecoder() {
             resetMorseTree();
             toneIndex_ = 0;
         }
+        if (duration >= DOT_MIN_MS && duration <= DASH_MAX_MS && toneIndex_ < 6) {  // Dinamikus zaj ellenőrzés
+            unsigned long dynamicMinDuration = DOT_MIN_MS;
+            if (toneMinDurationMs_ != 9999L && toneMinDurationMs_ > 0) {
+                // Adaptív minimum: aktuális min pont / 5, de minimum MIN_ADAPTIVE_DOT_MS (15ms)
+                // Ez lehetővé teszi a rövid elemek elfogadását 25 WPM-nél
+                dynamicMinDuration = max(DOT_MIN_MS, max(MIN_ADAPTIVE_DOT_MS, toneMinDurationMs_ / NOISE_THRESHOLD_FACTOR));
 
-        if (duration >= DOT_MIN_MS && duration <= DASH_MAX_MS && toneIndex_ < 6) {
-            rawToneDurations_[toneIndex_] = duration;
-            toneIndex_++;
-            updateReferenceTimings(duration);
+                // Speciális eset: ha már van tanulási adat és a jel 25% hosszabb mint a min zaj küszöb,
+                // akkor elfogadjuk, még ha rövid is (pl. rossz vételi körülmények)
+                if (duration >= DOT_MIN_MS && duration >= (dynamicMinDuration * 0.6)) {
+                    // Ez 25 WPM-nél (~48ms dot) esetén 18-20ms körüli jeleket is elfogad
+                    dynamicMinDuration = min(dynamicMinDuration, duration);
+                }
+            } else {
+                // Ha még nincs tanulási adat, kevésbé konzervatív küszöb
+                dynamicMinDuration = max(DOT_MIN_MS, MIN_ADAPTIVE_DOT_MS);
+            }
 
-            CW_DEBUG("CW: Elem hozzáadva [%d]: %lu ms, ref: %lu ms\n", toneIndex_ - 1, duration, currentReferenceMs_);
+            if (duration >= dynamicMinDuration) {
+                rawToneDurations_[toneIndex_] = duration;
+                toneIndex_++;
+                updateReferenceTimings(duration);
+                CW_DEBUG("CW: Elem hozzáadva [%d]: %lu ms, ref: %lu ms, dyn_min: %lu ms\n", toneIndex_ - 1, duration, currentReferenceMs_, dynamicMinDuration);
+            } else {
+                CW_DEBUG("CW: Dinamikus zajszűrés: %lu ms < %lu ms (adaptív minimum)\n", duration, dynamicMinDuration);
+            }
         } else {
 
             if (duration > DASH_MAX_MS) {
@@ -493,7 +528,7 @@ void CwDecoder::updateDecoder() {
             leadingEdgeTimeMs_ = currentTimeMs;
             measuringTone_ = true;
             CW_DEBUG("CW: Karakterhatár, gap: %lu ms\n", gapDuration);
-        } else if (gapDuration >= ELEMENT_GAP_MIN_MS || toneIndex_ == 0) {
+        } else if (gapDuration >= elementGapMinMs || toneIndex_ == 0) {
             leadingEdgeTimeMs_ = currentTimeMs;
             measuringTone_ = true;
         } else {
@@ -526,19 +561,30 @@ void CwDecoder::updateDecoder() {
             decoderStarted_ = false;
             CW_DEBUG("CW: Hosszú csend, space: %lu ms\n", spaceDuration);
         }
-    }  // Szóköz beillesztés ellenőrzése - enyhített feltételekkel
+    }  // Szóköz beillesztés ellenőrzése - dinamikus WPM alapú küszöbökkel
     if (decodedChar == '\0' && !measuringTone_ && !currentToneState && lastDecodedChar_ != '\0') {
         unsigned long spaceDuration = currentTimeMs - trailingEdgeTimeMs_;
-        // Csökkentett szóköz küszöb - 4-5 pont hossza helyett 3-4 pont hossza
-        unsigned long reducedWordGapMs = max(150UL, (unsigned long)(estimatedDotLength * 3.5f));
 
-        CW_DEBUG("CW: Szóköz ellenőrzés - space: %lu ms, küszöb: %lu ms, lastChar: '%c', processed: %s\n", spaceDuration, reducedWordGapMs, lastDecodedChar_,
+        // Dinamikus szóköz küszöb WPM alapján
+        unsigned long dynamicWordGapMs;
+        if (toneMinDurationMs_ != 9999L && toneMinDurationMs_ > 0) {
+            // Szóköz = 7 * pont hossz (standard Morse timing)
+            dynamicWordGapMs = toneMinDurationMs_ * 7;
+        } else {
+            // Fallback érték
+            dynamicWordGapMs = max(200UL, (unsigned long)(estimatedDotLength * 4.0f));
+        }
+
+        // WPM becslés debug kiíráshoz
+        int currentWpm = (toneMinDurationMs_ != 9999L && toneMinDurationMs_ > 0) ? (1200 / toneMinDurationMs_) : 15;
+
+        CW_DEBUG("CW: Szóköz ellenőrzés - space: %lu ms, küszöb: %lu ms, WPM: %d, lastChar: '%c', processed: %s\n", spaceDuration, dynamicWordGapMs, currentWpm, lastDecodedChar_,
                  wordSpaceProcessed_ ? "igen" : "nem");
 
-        if (spaceDuration > reducedWordGapMs && !wordSpaceProcessed_ && lastDecodedChar_ != ' ') {
+        if (spaceDuration > dynamicWordGapMs && !wordSpaceProcessed_ && lastDecodedChar_ != ' ') {
             decodedChar = ' ';           // Szóköz karakter beszúrása
             wordSpaceProcessed_ = true;  // Jelöljük, hogy ehhez a szünethez már adtunk szóközt
-            CW_DEBUG("CW: Szóköz beszúrva, gap: %lu ms (küszöb: %lu ms)\n", spaceDuration, reducedWordGapMs);
+            CW_DEBUG("CW: Szóköz beszúrva, gap: %lu ms (küszöb: %lu ms, WPM: %d)\n", spaceDuration, dynamicWordGapMs, currentWpm);
         }
     }
 

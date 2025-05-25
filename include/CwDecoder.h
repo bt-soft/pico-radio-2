@@ -39,9 +39,13 @@ class CwDecoder {
     static constexpr float WORD_GAP_DOT_MULTIPLIER = 6.5f;  // Kb. 7 dit, de a char gap-nél biztosan nagyobb
     static constexpr unsigned long MIN_CHAR_GAP_MS_FALLBACK = 180;
     static constexpr unsigned long MIN_WORD_GAP_MS_FALLBACK = 400;
-    static constexpr unsigned long DOT_MIN_MS = 25;               // Minimum pont hossz (ms) - csökkentve a rövid jelek fogadásához
-    static constexpr unsigned long DOT_MAX_MS = 200;              // Maximum pont hossz (ms)
-    static constexpr unsigned long DASH_MAX_MS = DOT_MAX_MS * 7;  // Maximum vonás hossz (ms)
+    static constexpr unsigned long DOT_MIN_MS = 5;                // Minimum pont hossz (ms) - 50+ WPM támogatásához
+    static constexpr unsigned long DOT_MAX_MS = 250;              // Maximum pont hossz (ms) - 7 WPM támogatásához
+    static constexpr unsigned long DASH_MAX_MS = DOT_MAX_MS * 4;  // Maximum vonás hossz (ms) - reálisabb arány
+
+    // Dinamikus zaj szűrés - aggresívebb beállítások 25 WPM-hez
+    static constexpr unsigned long NOISE_THRESHOLD_FACTOR = 5;  // Zaj küszöb szorzó: min_duration / 5 (toleránsabb)
+    static constexpr unsigned long MIN_ADAPTIVE_DOT_MS = 15;    // Adaptív minimum - 15ms (~40 WPM alsó határ)
 
     short noiseBlankerLoops_;  // Megerősítések száma hang/nincs hang állapothoz
 
@@ -97,6 +101,16 @@ class CwDecoder {
     void initialize();                // Közös inicializálási logika
     char processCollectedElements();  // Összegyűjtött Morse elemek feldolgozása
     void addToBuffer(char c);         // Karakter hozzáadása a pufferhez
+
+    // WPM sebesség becslés az aktuális pont hossz alapján
+    int estimateWpm() const {
+        if (toneMinDurationMs_ == 9999L || toneMinDurationMs_ == 0) {
+            return 15;  // Alapértelmezett érték
+        }
+        // WPM = 1200 / (pont hossz ms-ban)
+        int wpm = 1200 / toneMinDurationMs_;
+        return constrain(wpm, 5, 30);  // Biztonságos tartomány
+    }
 };
 
 #endif  // CWDECODER_H
