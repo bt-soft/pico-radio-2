@@ -35,16 +35,15 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
         {"SSTV", TftButton::ButtonType::Pushable},                                // SSTV GOMB
         {"AntC", TftButton::ButtonType::Pushable},                                //
     };
-    uint8_t horizontalButtonCount = ARRAY_ITEM_COUNT(horizontalButtonsData);
-
-    // A targetSamplingFrequency 12000 Hz (2 * 6000 Hz) az AM FFT-hez és RTTY-hez.
-    pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigRtty, AUDIO_INPUT_PIN, MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
+    uint8_t horizontalButtonCount = ARRAY_ITEM_COUNT(horizontalButtonsData);  // A targetSamplingFrequency 12000 Hz (2 * 6000 Hz) az AM FFT-hez, CW és RTTY dekódoláshoz.
+    pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigRtty, AUDIO_INPUT_PIN,
+                                         MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
 
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
-    rttyTextAreaX = DECODER_TEXT_AREA_X_START;
-    rttyTextAreaY = 150;
-    rttyTextAreaW = 330;
-    rttyTextAreaH = 80;  // Kezdeti magasság
+    decodedTextAreaX = DECODER_TEXT_AREA_X_START;
+    decodedTextAreaY = 150;
+    decodedTextAreaW = 330;
+    decodedTextAreaH = 80;  // Kezdeti magasság
 
     // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
     TftButton *firstVerticalButton = DisplayBase::findButtonByLabel("Mute");
@@ -52,18 +51,17 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     if (firstVerticalButton) {
         mainVerticalButtonsStartX = firstVerticalButton->getX();
     }
-    decodeModeButtonsX = mainVerticalButtonsStartX - DECODER_MODE_BTN_GAP_X - DECODER_MODE_BTN_W;
+    decodeModeButtonsX = mainVerticalButtonsStartX - (DECODER_MODE_BTN_GAP_X * 2) - DECODER_MODE_BTN_W;
 
-    // Dekódolt szöveg pufferek inicializálása
+    // Dekódolt szöveg pufferek inicializálása (CW és RTTY)
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
-        rttyDisplayLines[i] = "";
+        decodedTextDisplayLines[i] = "";
     }
-    rttyCurrentLineBuffer = "";
+    decodedTextCurrentLineBuffer = "";
 
     // Dekódolási módváltó gombok létrehozása
     uint8_t nextButtonId = SCRN_HBTNS_ID_START + horizontalButtonCount;
     decoderModeStartId_ = nextButtonId;
-
     std::vector<String> decoderLabels = {"Off", "RTTY", "CW"};
     decoderModeGroup.createButtons(decoderLabels, nextButtonId);
     decoderModeGroup.selectButtonByIndex(0);
@@ -71,7 +69,7 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     // Horizontális képernyőgombok legyártása
     DisplayBase::buildHorizontalScreenButtons(horizontalButtonsData, ARRAY_ITEM_COUNT(horizontalButtonsData), true);
 
-    clearRttyTextBufferAndDisplay();
+    clearDecodedTextBufferAndDisplay();
 }
 
 /**
@@ -100,8 +98,8 @@ void AmDisplay::drawScreen() {
     pSMeter->showRSSI(rssi, snr, band.getCurrentBand().varData.currMod == FM);
     float currFreq = band.getCurrentBand().varData.currFreq;
     pSevenSegmentFreq->freqDispl(currFreq);
-    drawRttyTextAreaBackground();
-    updateRttyTextDisplay();
+    drawDecodedTextAreaBackground();
+    updateDecodedTextDisplay();
     drawDecodeModeButtons();
     DisplayBase::drawScreenButtons();
 
@@ -286,7 +284,7 @@ void AmDisplay::decodeCwAndRttyText() {
                 decodedChar = static_cast<char>(raw_command);
                 // DEBUG("Core0: CW decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
                 if (decodedChar != '\0') {
-                    appendRttyCharacter(decodedChar);
+                    appendDecodedCharacter(decodedChar);
                 }
                 char_popped = true;
                 break;  // Kilépés a ciklusból, ha sikeresen olvastunk
@@ -302,50 +300,50 @@ void AmDisplay::decodeCwAndRttyText() {
  * @brief Kirajzolja a dekódolási módválasztó gombokat.
  */
 void AmDisplay::drawDecodeModeButtons() {
-    decoderModeGroup.setPositionsAndSize(decodeModeButtonsX, rttyTextAreaY, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, DECODER_MODE_BTN_GAP_Y);
+    decoderModeGroup.setPositionsAndSize(decodeModeButtonsX, decodedTextAreaY, DECODER_MODE_BTN_W, DECODER_MODE_BTN_H, DECODER_MODE_BTN_GAP_Y);
     decoderModeGroup.draw();
 }
 
 /**
- * @brief Kirajzolja az RTTY szövegterület hátterét és keretét.
+ * @brief Kirajzolja a dekódolt szövegterület hátterét és keretét.
  */
-void AmDisplay::drawRttyTextAreaBackground() {
-    tft.fillRect(rttyTextAreaX, rttyTextAreaY, rttyTextAreaW, rttyTextAreaH, TFT_BLACK);
-    tft.drawRect(rttyTextAreaX - 1, rttyTextAreaY - 1, rttyTextAreaW + 2, rttyTextAreaH + 2, TFT_DARKGREY);
+void AmDisplay::drawDecodedTextAreaBackground() {
+    tft.fillRect(decodedTextAreaX, decodedTextAreaY, decodedTextAreaW, decodedTextAreaH, TFT_BLACK);
+    tft.drawRect(decodedTextAreaX - 1, decodedTextAreaY - 1, decodedTextAreaW + 2, decodedTextAreaH + 2, TFT_DARKGREY);
 }
 
 /**
- * @brief Hozzáfűz egy karaktert az RTTY kijelző pufferéhez és frissíti a kijelzőt.
+ * @brief Hozzáfűz egy karaktert a dekódolt szöveg kijelző pufferéhez és frissíti a kijelzőt.
  */
-void AmDisplay::appendRttyCharacter(char c) {
+void AmDisplay::appendDecodedCharacter(char c) {
 
     // Először adjuk hozzá a karaktert a bufferhez, ha nyomtatható és nem '\n'
     if (c >= 32 && c <= 126 && c != '\n') {
-        rttyCurrentLineBuffer += c;
+        decodedTextCurrentLineBuffer += c;
     }
 
     // Ezután ellenőrizzük, hogy sort kell-e váltani
-    if (c == '\n' || rttyCurrentLineBuffer.length() >= RTTY_LINE_BUFFER_SIZE - 1) {
-        if (rttyCurrentLineIndex >= RTTY_MAX_TEXT_LINES - 1) {
+    if (c == '\n' || decodedTextCurrentLineBuffer.length() >= RTTY_LINE_BUFFER_SIZE - 1) {
+        if (decodedTextCurrentLineIndex >= RTTY_MAX_TEXT_LINES - 1) {
             for (int i = 0; i < RTTY_MAX_TEXT_LINES - 1; ++i) {
-                rttyDisplayLines[i] = rttyDisplayLines[i + 1];
+                decodedTextDisplayLines[i] = decodedTextDisplayLines[i + 1];
             }
-            rttyDisplayLines[RTTY_MAX_TEXT_LINES - 1] = rttyCurrentLineBuffer;
+            decodedTextDisplayLines[RTTY_MAX_TEXT_LINES - 1] = decodedTextCurrentLineBuffer;
         } else {
-            rttyDisplayLines[rttyCurrentLineIndex] = rttyCurrentLineBuffer;
-            rttyCurrentLineIndex++;
+            decodedTextDisplayLines[decodedTextCurrentLineIndex] = decodedTextCurrentLineBuffer;
+            decodedTextCurrentLineIndex++;
         }
-        rttyCurrentLineBuffer = "";
+        decodedTextCurrentLineBuffer = "";
     }
-    updateRttyTextDisplay();
+    updateDecodedTextDisplay();
 }
 
 /**
- * @brief Frissíti az RTTY szövegterület tartalmát a puffer alapján.
+ * @brief Frissíti a dekódolt szövegterület tartalmát a puffer alapján.
  */
-void AmDisplay::updateRttyTextDisplay() {
+void AmDisplay::updateDecodedTextDisplay() {
 
-    drawRttyTextAreaBackground();
+    drawDecodedTextAreaBackground();
 
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
     tft.setTextDatum(TL_DATUM);
@@ -356,13 +354,13 @@ void AmDisplay::updateRttyTextDisplay() {
     if (charHeight == 0) charHeight = 16;
 
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
-        if (i == rttyCurrentLineIndex) {
-            if (!rttyCurrentLineBuffer.isEmpty()) {
-                tft.drawString(rttyCurrentLineBuffer, rttyTextAreaX + 2, rttyTextAreaY + 2 + i * charHeight);
+        if (i == decodedTextCurrentLineIndex) {
+            if (!decodedTextCurrentLineBuffer.isEmpty()) {
+                tft.drawString(decodedTextCurrentLineBuffer, decodedTextAreaX + 2, decodedTextAreaY + 2 + i * charHeight);
             }
         } else {
-            if (!rttyDisplayLines[i].isEmpty()) {
-                tft.drawString(rttyDisplayLines[i], rttyTextAreaX + 2, rttyTextAreaY + 2 + i * charHeight);
+            if (!decodedTextDisplayLines[i].isEmpty()) {
+                tft.drawString(decodedTextDisplayLines[i], decodedTextAreaX + 2, decodedTextAreaY + 2 + i * charHeight);
             }
         }
     }
@@ -402,25 +400,25 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     if (!rp2040.fifo.push_nb(static_cast<uint32_t>(core1_cmd_set_mode))) {
         Utils::beepError();
         DEBUG("Core0: Command NOT sent to Core1, FIFO full\n");
-        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot
-    }
+        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot    }
 
-    // Ha kikapcsoljuk a módot, akkor nem töröljük a területet
-    if (core1_cmd_set_mode != CORE1_CMD_SET_MODE_OFF) {
-        clearRttyTextBufferAndDisplay();
+        // Ha kikapcsoljuk a módot, akkor nem töröljük a területet
+        if (core1_cmd_set_mode != CORE1_CMD_SET_MODE_OFF) {
+            clearDecodedTextBufferAndDisplay();
+        }
     }
 }
 
 /**
- * @brief Törli az RTTY szöveg puffereit és frissíti a kijelzőt.
+ * @brief Törli a dekódolt szöveg puffereit és frissíti a kijelzőt.
  */
-void AmDisplay::clearRttyTextBufferAndDisplay() {
+void AmDisplay::clearDecodedTextBufferAndDisplay() {
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {
-        rttyDisplayLines[i] = "";
+        decodedTextDisplayLines[i] = "";
     }
-    rttyCurrentLineBuffer = "";
-    rttyCurrentLineIndex = 0;
-    updateRttyTextDisplay();
+    decodedTextCurrentLineBuffer = "";
+    decodedTextCurrentLineIndex = 0;
+    updateDecodedTextDisplay();
 }
 
 /**

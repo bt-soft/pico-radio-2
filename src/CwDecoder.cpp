@@ -13,7 +13,7 @@
 #include "defines.h"  // DEBUG
 
 // CW működés debug engedélyezése de csak DEBUG módban
-#ifdef nem__DEBUG
+#ifdef __DEBUG
 #define CW_DEBUG(fmt, ...) DEBUG(fmt __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define CW_DEBUG(fmt, ...)  // Üres makró, ha __DEBUG nincs definiálva
@@ -81,6 +81,7 @@ void CwDecoder::initialize() {
     lastActivityMs_ = 0;  // Tagváltozó inicializálása
     lastDecodedChar_ = '\0';
     wordSpaceProcessed_ = false;
+    lastSpaceDebugMs_ = 0;  // Debug kimenet korlátozott gyakoriságához
     inInactiveState = false;
     resetMorseTree();
     q0 = 0;
@@ -572,13 +573,15 @@ void CwDecoder::updateDecoder() {
         } else {
             // Fallback érték
             dynamicWordGapMs = max(200UL, (unsigned long)(estimatedDotLength * 4.0f));
-        }
-
-        // WPM becslés debug kiíráshoz
+        }  // WPM becslés debug kiíráshoz
         int currentWpm = (toneMinDurationMs_ != 9999L && toneMinDurationMs_ > 0) ? (1200 / toneMinDurationMs_) : 15;
 
-        CW_DEBUG("CW: Szóköz ellenőrzés - space: %lu ms, küszöb: %lu ms, WPM: %d, lastChar: '%c', processed: %s\n", spaceDuration, dynamicWordGapMs, currentWpm, lastDecodedChar_,
-                 wordSpaceProcessed_ ? "igen" : "nem");
+        // Debug kimenet korlátozása - csak 1 másodpercenként írjuk ki
+        if (currentTimeMs - lastSpaceDebugMs_ >= SPACE_DEBUG_INTERVAL_MS) {
+            CW_DEBUG("CW: Szóköz ellenőrzés - space: %lu ms, küszöb: %lu ms, WPM: %d, lastChar: '%c', processed: %s\n", spaceDuration, dynamicWordGapMs, currentWpm,
+                     lastDecodedChar_, wordSpaceProcessed_ ? "igen" : "nem");
+            lastSpaceDebugMs_ = currentTimeMs;
+        }
 
         if (spaceDuration > dynamicWordGapMs && !wordSpaceProcessed_ && lastDecodedChar_ != ' ') {
             decodedChar = ' ';           // Szóköz karakter beszúrása

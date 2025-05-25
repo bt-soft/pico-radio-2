@@ -66,11 +66,13 @@ class CwDecoder {
     bool measuringTone_;      // Igaz, ha éppen hangot mér (felfutó és lefutó él között)
     bool toneDetectedState_;  // Igaz, ha a Goertzel szűrő kimenete a küszöb felett van
 
-    bool inInactiveState;  // Ha inaktív állapotban vagyunk
-
-    // Szóköz dekódoláshoz
+    bool inInactiveState;      // Ha inaktív állapotban vagyunk    // Szóköz dekódoláshoz
     char lastDecodedChar_;     // Utoljára dekódolt karakter
     bool wordSpaceProcessed_;  // Jelzi, ha egy adott csendperiódusért már adtunk szóközt
+
+    // Debug kimenet optimalizálásához
+    unsigned long lastSpaceDebugMs_;                                // Utolsó "Szóköz ellenőrzés" debug üzenet időpontja
+    static constexpr unsigned long SPACE_DEBUG_INTERVAL_MS = 1000;  // Debug üzenetek közötti minimum idő (ms)
 
     // Karakter puffer a folyamatos dekódoláshoz
     static constexpr short DECODED_CHAR_BUFFER_SIZE = 3;
