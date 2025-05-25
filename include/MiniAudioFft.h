@@ -42,7 +42,7 @@ constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;  // Oszcilloszkóp mintavételi
 constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;                          // Célvonal színe
 constexpr float TUNING_AID_TARGET_FREQ_HZ = CW_SHIFT_FREQUENCY;                       // Célfrekvencia CW-hez (Hz)
 constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 300.0f;                              // Megjelenített tartomány minimuma (Hz)
-constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 2500.0f;                             // Megjelenített tartomány maximuma (Hz) - RTTY jelekhez is
+constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 3500.0f;                             // Megjelenített tartomány maximuma (Hz) - RTTY jelekhez is
 constexpr float TUNING_AID_INPUT_SCALE = 0.1f;                                        // Erősítési faktor a hangolási segéd bemenetéhez (csökkentve a "vonal" vékonyításához)
 constexpr int TUNING_AID_INTERNAL_WIDTH = MiniAudioFftConstants::MAX_INTERNAL_WIDTH;  // Belső szélesség a hangolási segédhez (a komponens szélessége)
 

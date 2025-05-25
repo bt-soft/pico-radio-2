@@ -48,6 +48,10 @@
 //--- CW mód adatai
 #define CW_DEMOD_MODE LSB          // CW demodulációs mód
 #define CW_SHIFT_FREQUENCY 750.0f  // CW alap offset
+//--- RTTY mód adatai
+#define RTTY_MARKER_FREQUENCY 22950.0f  // RTTY jelölő frekvencia (Hz)
+#define RTTY_SPACE_FREQUENCY 21250.0f   // RTTY tér frekvencia (Hz)
+#define RTTY_SHIFT_FREQUENCY 175.0f     // RTTY eltolás frekvencia (Hz)
 
 //--- Debug ---
 #define __DEBUG  // Debug mód bekapcsolása

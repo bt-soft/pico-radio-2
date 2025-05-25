@@ -1035,46 +1035,29 @@ void MiniAudioFft::drawTuningAid() {
     const int max_fft_bin_for_tuning_local =
         std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(TUNING_AID_DISPLAY_MAX_FREQ_HZ / currentBinWidthHz)));
     const int num_bins_in_tuning_range = NUM_BINS(max_fft_bin_for_tuning_local, min_fft_bin_for_tuning_local);
+    if (!pAudioProcessor) return;  // Biztonsági ellenőrzés
 
-    // Iterálás a belső frekvencia-oszlopokon
-    for (int internal_x = 0; internal_x < TUNING_AID_INTERNAL_WIDTH; ++internal_x) {
-        // Leképezés a belső oszlop indexről az FFT bin indexre
-        float ratio_in_display_width = (TUNING_AID_INTERNAL_WIDTH == 1) ? 0.0f : (static_cast<float>(internal_x) / (TUNING_AID_INTERNAL_WIDTH - 1));
+    // Iterálás a komponens teljes szélességén (minden pixel oszlop)
+    for (int c = 0; c < width; ++c) {
+        // Képernyő pixel X koordinátájának (c) leképezése FFT bin indexre
+        // a TUNING_AID_DISPLAY_MIN_FREQ_HZ és TUNING_AID_DISPLAY_MAX_FREQ_HZ tartományon belül.
+        float ratio_in_display_width = (width == 1) ? 0.0f : (static_cast<float>(c) / (width - 1));
         int fft_bin_index = min_fft_bin_for_tuning_local + static_cast<int>(std::round(ratio_in_display_width * (num_bins_in_tuning_range - 1)));
         fft_bin_index = constrain(fft_bin_index, min_fft_bin_for_tuning_local, max_fft_bin_for_tuning_local);
         fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1));
 
-        // Az adat tárolása a wabuf első sorában, a belső indexen
-        if (!pAudioProcessor) continue;
-        if (internal_x < width) {  // Biztosítjuk, hogy ne írjunk a wabuf szélességén kívülre
-            wabuf[0][internal_x] =
-                static_cast<uint8_t>(constrain((pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0) * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
-        }
+        // Az adat tárolása a wabuf első sorában, az aktuális oszlop (c) indexen
+        wabuf[0][c] = static_cast<uint8_t>(constrain((pAudioProcessor->getMagnitudeData()[fft_bin_index]) * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
     }
 
     // 3. Sprite görgetése és új sor kirajzolása
     sprGraph.scroll(0, 1);  // Tartalom görgetése 1 pixellel lefelé
 
-    // Az új (legfelső) sor kirajzolása a sprite-ra, középre igazítva
-    int startX_on_sprite = (width - TUNING_AID_INTERNAL_WIDTH) / 2;
-    int endX_of_data_on_sprite = startX_on_sprite + TUNING_AID_INTERNAL_WIDTH;
-
-    // Bal oldali üres sáv a sprite tetején (y=0)
-    if (startX_on_sprite > 0) {
-        sprGraph.fillRect(0, 0, startX_on_sprite, 1, TFT_BLACK);
-    }
-
-    // A tényleges TUNING_AID_INTERNAL_WIDTH (50) pixelnyi adat kirajzolása a sprite tetejére (y=0)
-    for (int internal_col_idx = 0; internal_col_idx < TUNING_AID_INTERNAL_WIDTH; ++internal_col_idx) {
-        int current_sprite_x = startX_on_sprite + internal_col_idx;
-        // internal_col_idx (0-49) az index a wabuf[0]-hoz
-        uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[0][internal_col_idx]);
-        sprGraph.drawPixel(current_sprite_x, 0, color);
-    }
-
-    // Jobb oldali üres sáv a sprite tetején (y=0)
-    if (endX_of_data_on_sprite < width) {
-        sprGraph.fillRect(endX_of_data_on_sprite, 0, width - endX_of_data_on_sprite, 1, TFT_BLACK);
+    // Az új (legfelső) sor kirajzolása a sprite-ra (teljes szélességben)
+    for (int c = 0; c < width; ++c) {
+        // 'c' (0-tól width-1-ig) az index a wabuf[0]-hoz és a sprite X koordinátája
+        uint16_t color = valueToWaterfallColor(WF_GRADIENT * wabuf[0][c]);
+        sprGraph.drawPixel(c, 0, color);  // Rajzolás a sprite x=c, y=0 pozíciójára
     }
 
     // 4. Célfrekvencia vonalának kirajzolása a sprite-ra
@@ -1084,15 +1067,8 @@ void MiniAudioFft::drawTuningAid() {
 
     if (displayed_span_hz > 0 && TUNING_AID_TARGET_FREQ_HZ >= min_freq_displayed_actual && TUNING_AID_TARGET_FREQ_HZ <= max_freq_displayed_actual) {
         float ratio = (TUNING_AID_TARGET_FREQ_HZ - min_freq_displayed_actual) / displayed_span_hz;
-        // A célfrekvencia pozícióját a BELSŐ TUNING_AID_INTERNAL_WIDTH (50) oszlophoz képest számoljuk ki
-        int internal_line_x = static_cast<int>(std::round(ratio * (TUNING_AID_INTERNAL_WIDTH - 1)));
-        internal_line_x = constrain(internal_line_x, 0, TUNING_AID_INTERNAL_WIDTH - 1);  // Biztosítjuk, hogy a belső szélességen belül maradjon
-
-        // Ezt a belső pozíciót ültetjük át a sprite-ra, figyelembe véve a középre igazítást
-        // A startX_on_sprite már ki lett számolva feljebb
-        int line_x_on_sprite = startX_on_sprite + internal_line_x;
-
-        // Biztosítjuk, hogy a vonal a sprite-on belül legyen (bár a startX_on_sprite + internal_line_x elvileg már jó kell legyen)
+        // A célfrekvencia X pozíciójának kiszámítása a sprite teljes szélességéhez képest
+        int line_x_on_sprite = static_cast<int>(std::round(ratio * (width - 1)));
         line_x_on_sprite = constrain(line_x_on_sprite, 0, width - 1);
 
         sprGraph.drawFastVLine(line_x_on_sprite, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
