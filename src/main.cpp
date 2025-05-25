@@ -69,6 +69,117 @@ DisplayBase::DisplayType currentDisplay = DisplayBase::DisplayType::none;
 // A képernyővédő elindulása előtti screen pointere, majd erre állunk vissza
 DisplayBase *pDisplayBeforeScreenSaver = nullptr;
 
+//---- Power Management ----
+bool isSystemShuttingDown = false;
+
+// Forward declarations
+void wakeupSystem();
+
+/**
+ * @brief GPIO interrupt callback a felébredéshez
+ * Ez a függvény hívódik meg, amikor a rotary gomb megnyomását érzékeli alvás alatt
+ */
+void gpio_callback() {
+    // Csak jelezzük, hogy ébredés történt
+    // A tényleges felébredést az attachInterrupt mechanizmus kezeli
+}
+
+/**
+ * @brief Rendszer kikapcsolása (dormant mode)
+ * Szinte teljes kikapcsolás, csak a rotary gomb tud felébreszteni
+ */
+void shutdownSystem() {
+    DEBUG("System shutdown initiated...\n");  // Mentés minden fontos adatnak
+    config.checkSave();
+    fmStationStore.checkSave();
+    amStationStore.checkSave();
+
+    // Képernyő és háttérvilágítás kikapcsolása
+    tft.writecommand(0x10);                  // Sleep mode
+    analogWrite(PIN_TFT_BACKGROUND_LED, 0);  // Háttérvilágítás ki
+
+    // Audio mute
+    si4735.setAudioMute(true);
+
+    // Hangjelzés kikapcsolásról
+    Utils::beepTick();
+    delay(100);
+    Utils::beepTick();
+    delay(500);
+
+    // Core1 leállítása
+    multicore_reset_core1();
+
+    // FIFO tisztítása a Core1 leállítása után
+    while (rp2040.fifo.available() > 0) {
+        uint32_t dummy;
+        rp2040.fifo.pop_nb(&dummy);
+    }
+
+    DEBUG("Core1 stopped and FIFO cleared.\n");
+
+    DEBUG("Going to sleep...\n");
+    delay(100);  // Kis várakozás a debug üzenet kiiratásához
+    // Setup wake-up interrupt a rotary buttonra
+    pinMode(PIN_ENCODER_SW, INPUT_PULLUP);
+    attachInterrupt(PIN_ENCODER_SW, gpio_callback, FALLING);
+
+    // Egyszerű deep sleep - CPU leállítása, csak interrupt ébresztheti fel
+    // Megjegyzés: Ez nem igazi dormant mode, de energiatakarékos
+    while (digitalRead(PIN_ENCODER_SW) == HIGH) {
+        delay(10);  // Egyszerű várakozás interrupt-ra
+    }
+
+    // Ha ide eljutunk, akkor felébredtünk
+    wakeupSystem();
+}
+
+/**
+ * @brief Rendszer felébredése
+ * Dormant mode után újrainicializálás
+ */
+void wakeupSystem() {
+    DEBUG("System waking up...\n");  // GPIO interrupt kikapcsolása
+    detachInterrupt(PIN_ENCODER_SW);
+
+    // TFT újrainicializálása
+    tft.init();
+    tft.setRotation(1);
+    tft.setTouch(config.data.tftCalibrateData);
+
+    // Háttérvilágítás visszakapcsolása
+    analogWrite(PIN_TFT_BACKGROUND_LED, config.data.tftBackgroundBrightness);
+
+    // SI4735 újrainicializálása
+    Wire.begin();
+    si4735.reset();  // Reset a chipet
+    delay(100);      // Core1 újraindítása
+    multicore_launch_core1(setup1);
+
+    // FIFO tisztítása a Core1 újraindítása után
+    // Ez biztosítja, hogy a kommunikáció tiszta állapotból indul
+    while (rp2040.fifo.available() > 0) {
+        uint32_t dummy;
+        rp2040.fifo.pop_nb(&dummy);
+    }
+
+    DEBUG("Core1 restarted and FIFO cleared.\n");
+
+    // Audio unmute
+    si4735.setAudioMute(false);
+
+    // Képernyő újrarajzolása
+    if (pDisplay != nullptr) {
+        pDisplay->drawScreen();
+    }
+
+    // Hangjelzés bekapcsolásról
+    Utils::beepTick();
+
+    isSystemShuttingDown = false;
+    DEBUG("System wake up complete.\n");
+}
+
 /**
  * Aktuális kijelző váltása
  * A loop()-ból hívjuk, ha van képernyő váltási igény
@@ -359,17 +470,24 @@ void loop() {
         debugMemoryInfo();
         lasDebugMemoryInfo = millis();
     }
-#endif
-
-    // Rotary Encoder olvasása
+#endif  // Rotary Encoder olvasása
     RotaryEncoder::EncoderState encoderState = rotaryEncoder.read();
+
     // Ha folyamatosan nyomva tartják a rotary gombját akkor kikapcsolunk
-    if (encoderState.buttonState == RotaryEncoder::ButtonState::Held) {
-        // TODO: Kikapcsolás figyelését még implementálni
-        DEBUG("Ki kellene kapcsolni...\n");
-        Utils::beepError();
-        delay(1000);
-        return;
+    if (encoderState.buttonState == RotaryEncoder::ButtonState::Held && !isSystemShuttingDown) {
+        isSystemShuttingDown = true;
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextColor(TFT_RED, TFT_BLACK);
+        tft.setTextSize(2);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString("SHUTTING DOWN...", tft.width() / 2, tft.height() / 2 - 20);
+        tft.setTextSize(1);
+        tft.drawString("Press rotary button to wake up", tft.width() / 2, tft.height() / 2 + 20);
+
+        delay(2000);  // 2 másodperc várakozás
+
+        shutdownSystem();
+        // Ez a pont sosem érhető el, mert a shutdownSystem() dormant(majdnem) módba teszi a processzort
     }
 
     // Aktuális Display loopja
@@ -414,6 +532,12 @@ void loop() {
 void setup1() {
     // Core1 belépési pontja, itt indítjuk el a Core1 logikát
     DEBUG("Core1: Setup started.\n");
+
+    // // Végtelen loop a Core1-en
+    // FONTOS!!!: Ezt azért kell itt, mert felébredés után a Core1 nem indul újra automatikusan, csak ha itt van egy loop
+    while (true) {
+        loop1();
+    }
 }
 
 /**

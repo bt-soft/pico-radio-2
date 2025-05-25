@@ -185,7 +185,7 @@ void SplashScreen::updateProgress(uint8_t step, uint8_t totalSteps, const char* 
 
     if (message != nullptr) {
         // Előző üzenet törlése
-        tft.fillRect(0, tft.height() - 45, tft.width() - 10, 15, BACKGROUND_COLOR);
+        tft.fillRect(10, tft.height() - 45, tft.width() - 10, 15, BACKGROUND_COLOR);
 
         // Új üzenet kiírása
         tft.setFreeFont();
