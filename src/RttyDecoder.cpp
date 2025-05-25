@@ -14,7 +14,7 @@
 #include "defines.h"
 
 // RTTY működés debug engedélyezése csak DEBUG módban
-#ifdef __DEBUG
+#ifdef nem__DEBUG
 #define RTTY_DEBUG(fmt, ...) DEBUG(fmt __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define RTTY_DEBUG(fmt, ...)  // Üres makró, ha __DEBUG nincs definiálva
