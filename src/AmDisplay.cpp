@@ -478,18 +478,10 @@ void AmDisplay::setDecodeMode(DecodeMode newMode) {
     if (!rp2040.fifo.push_nb(static_cast<uint32_t>(core1_cmd_set_mode))) {
         Utils::beepError();
         DEBUG("Core0: Command NOT sent to Core1, FIFO full\n");
-        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot    } // Ez a zárójel itt hibásnak tűnik
-
+        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot
+    } else {
+        // A parancsküldés sikeres volt
         // Ha kikapcsoljuk a módot, akkor nem töröljük a területet
-        if (core1_cmd_set_mode != CORE1_CMD_SET_MODE_OFF) {  // Ezt a blokkot a FIFO push elé kellene vinni, vagy a return után nem fut le.
-                                                             // De a logikája az, hogy csak akkor töröljön, ha sikeres volt a parancsküldés.
-                                                             // A jelenlegi formában ez a blokk sosem fut le, ha a FIFO push sikertelen.
-                                                             // Jobb lenne a clearDecodedTextBufferAndDisplay()-t a sikeres parancsküldés utánra tenni.
-            clearDecodedTextBufferAndDisplay();
-        }
-    }  // Itt kellene lennie a zárójelnek a FIFO push feltételhez.
-       // A javított verzió:
-    else {  // Ha a parancsküldés sikeres volt
         if (core1_cmd_set_mode != CORE1_CMD_SET_MODE_OFF) {
             clearDecodedTextBufferAndDisplay();
         }
