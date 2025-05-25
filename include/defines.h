@@ -3,6 +3,12 @@
 
 #include <Arduino.h>
 
+//---- Program Information ------------------------------------------
+#define PROGRAM_NAME "Pico Radio v2"
+#define PROGRAM_VERSION "1.0.0"
+#define PROGRAM_AUTHOR "bt-soft"
+//---- Program Information ------------------------------------------
+
 //---- Pinouts ------------------------------------------
 // TFT (A TFT_eSPI_User_Setup.h-ban a pinout)
 
@@ -59,7 +65,7 @@
 #define __DEBUG  // Debug mód bekapcsolása
 
 #ifdef __DEBUG
-//#define SHOW_MEMORY_INFO
+// #define SHOW_MEMORY_INFO
 #define MEMORY_INFO_INTERVAL 20 * 1000  // 20mp
 
 // Soros portra várakozás a debug üzenetek előtt
