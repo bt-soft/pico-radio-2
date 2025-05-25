@@ -45,13 +45,8 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
     decodedTextAreaW = 330;  // Széleség
     decodedTextAreaH = 80;   // Magasság
 
-    // A jobb oldali fő függőleges gombsor X pozíciójának meghatározása
-    TftButton *firstVerticalButton = DisplayBase::findButtonByLabel("Mute");
-    uint16_t mainVerticalButtonsStartX = tft.width() - SCRN_BTN_W - SCREEN_VBTNS_X_MARGIN;
-    if (firstVerticalButton) {
-        mainVerticalButtonsStartX = firstVerticalButton->getX();
-    }
-    decodeModeButtonsX = mainVerticalButtonsStartX - (DECODER_MODE_BTN_GAP_X * 2) - DECODER_MODE_BTN_W;  // Visszaállítva az eredeti diff alapján.
+    // A dekódolási módváltó gombok oszlopának X pozíciója
+    decodeModeButtonsX = decodedTextAreaX + decodedTextAreaW + 10;
 
     // Dekódolt szöveg pufferek inicializálása (CW és RTTY)
     for (int i = 0; i < RTTY_MAX_TEXT_LINES; ++i) {

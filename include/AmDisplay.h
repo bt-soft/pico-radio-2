@@ -24,7 +24,7 @@ class AmDisplay : public DisplayBase {
     static constexpr uint8_t DECODER_TEXT_AREA_X_START = 5;
     static constexpr uint8_t DECODER_TEXT_AREA_Y_MARGIN_TOP = 5;        // S-Meter alatt
     static constexpr uint8_t DECODER_TEXT_AREA_Y_MARGIN_BOTTOM = 5;     // Horizontális gombok felett
-    static constexpr uint8_t RTTY_MAX_TEXT_LINES = 6;                   // Megjeleníthető sorok száma (betűmérettől függ)
+    static constexpr uint8_t RTTY_MAX_TEXT_LINES = 8;                   // Megjeleníthető sorok száma (betűmérettől függ)
     static constexpr uint8_t RTTY_LINE_BUFFER_SIZE = 55;                // Egy sor maximális karakterszáma
     static constexpr uint8_t DECODER_LINE_GAP = 2;                      // Sorköz a dekódolt szöveg sorai között (pixel)
     static constexpr uint8_t DECODER_MODE_BTN_W = SCRN_BTN_W / 2 + 10;  // Kicsit szélesebb mini gombok
