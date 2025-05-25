@@ -384,7 +384,6 @@ void MiniAudioFft::loop() {
     // Grafikonok kirajzolása a nekik szánt (csökkentett) területre
     // Ezek a függvények a `posY`-tól `posY + getGraphHeight() - 1`-ig rajzolnak.
     // A `getGraphHeight()` mindig a grafikon magasságát adja vissza, a módkijelző sávja nélkül.
-    unsigned long draw_start_time = micros();
     switch (currentMode) {
         // Csak akkor rajzolunk, ha a currentMode nem Off.
         // Az FFT letiltását (-1.0f) a loop elején már kezeltük.
