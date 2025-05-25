@@ -41,8 +41,7 @@ constexpr int OSCI_SAMPLE_DECIMATION_FACTOR = 2;  // Oszcilloszkóp mintavételi
 // Konstansok a hangolási segéd módhoz
 constexpr uint16_t TUNING_AID_TARGET_LINE_COLOR = TFT_GREEN;                          // Célvonal színe
 constexpr float TUNING_AID_TARGET_FREQ_HZ = CW_SHIFT_FREQUENCY;                       // Célfrekvencia CW-hez (Hz)
-constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 300.0f;                              // Megjelenített tartomány minimuma (Hz)
-constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 3500.0f;                             // Megjelenített tartomány maximuma (Hz) - RTTY jelekhez is
+constexpr float CW_TUNING_AID_SPAN_HZ = 600.0f;                                       // Megjelenített sávszélesség CW hangoláshoz
 constexpr float TUNING_AID_INPUT_SCALE = 0.1f;                                        // Erősítési faktor a hangolási segéd bemenetéhez (csökkentve a "vonal" vékonyításához)
 constexpr uint16_t TUNING_AID_RTTY_SPACE_LINE_COLOR = TFT_CYAN;                       // RTTY Space vonal színe (ÚJ)
 constexpr uint16_t TUNING_AID_RTTY_MARK_LINE_COLOR = TFT_MAGENTA;                     // RTTY Mark vonal színe (ÚJ)
@@ -152,6 +151,9 @@ class MiniAudioFft {
     int highResOffset;                     // Magas felbontású spektrum eltolásához (FFT.ino 'offset')
     float envelope_prev_smoothed_max_val;  // Előző simított maximális amplitúdó az Envelope módhoz
     int indicatorFontHeight_;              // A módkijelzőhöz használt font magassága
+
+    float currentTuningAidMinFreqHz_;    // Dinamikusan számolt min frekvencia a TuningAid-hez
+    float currentTuningAidMaxFreqHz_;    // Dinamikusan számolt max frekvencia a TuningAid-hez
 
     TuningAidType currentTuningAidType_; // Aktuális hangolási segéd típus (CW vagy RTTY)
     // Belső segédfüggvények

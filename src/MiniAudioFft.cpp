@@ -41,6 +41,8 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
       activeFftGainConfigRef(fftGainConfigRef),                               // Referencia elmentése az erősítés konfigurációhoz
       highResOffset(0),
       envelope_prev_smoothed_max_val(0.0f),
+      currentTuningAidMinFreqHz_(0.0f), // Inicializálás
+      currentTuningAidMaxFreqHz_(0.0f), // Inicializálás
       indicatorFontHeight_(0),   // Inicializálás
       currentTuningAidType_(TuningAidType::CW_TUNING), // Alapértelmezetten CW
       pAudioProcessor(nullptr),  // Inicializáljuk nullptr-rel
@@ -90,12 +92,10 @@ void MiniAudioFft::setInitialMode(DisplayMode mode) {
     isIndicatorCurrentlyVisible = true;  // Induláskor mindig látható
     modeIndicatorShowUntil = millis() + MODE_INDICATOR_TIMEOUT_MS;
 
-    // Ha a kezdeti mód TuningAid, beállítjuk az alapértelmezett típust (CW)
-    // A tényleges típust az AmDisplay::displayLoop fogja beállítani a dekóder módja alapján.
-    // Ez csak egy kezdeti biztonsági beállítás.
     if (currentMode == DisplayMode::TuningAid) {
-        // Itt nem tudjuk, hogy CW vagy RTTY kell, az AmDisplay majd beállítja.
-        // Maradjon az alapértelmezett currentTuningAidType_ (CW_TUNING).
+        // Az alapértelmezett currentTuningAidType_ CW_TUNING.
+        // Hívjuk meg a setTuningAidType-ot, hogy a frekvenciahatárok beállítódjanak.
+        setTuningAidType(currentTuningAidType_);
     }
 
 
@@ -289,7 +289,7 @@ void MiniAudioFft::drawModeIndicator() {
             modeText = "Envelope";
             break;
         case DisplayMode::TuningAid:
-            modeText = "Tune CW";  // Vagy általánosabb "Tune Aid"
+            modeText = (currentTuningAidType_ == TuningAidType::CW_TUNING) ? "Tune CW" : "Tune RTTY";
             break;
         default:
             modeText = "Unknown";
@@ -772,11 +772,45 @@ void MiniAudioFft::drawSpectrumHighRes() {
  * @param type A beállítandó TuningAidType.
  */
 void MiniAudioFft::setTuningAidType(TuningAidType type) {
-    if (currentTuningAidType_ != type) {
-        currentTuningAidType_ = type;
-        // Ha a típus változik, és a mód TuningAid, akkor érdemes lehet újrarajzolni.
-        // A loop() gondoskodik a rajzolásról, itt elég a típust beállítani.
-        // Ha azonnali frissítés kellene: if (currentMode == DisplayMode::TuningAid) forceRedraw();
+    using namespace MiniAudioFftConstants;
+    bool typeChanged = (currentTuningAidType_ != type); // Check if type actually changed
+    currentTuningAidType_ = type;
+    if (currentMode == DisplayMode::TuningAid) {
+        float oldMinFreq = currentTuningAidMinFreqHz_; // Store old values to check if span changed
+        float oldMaxFreq = currentTuningAidMaxFreqHz_;
+
+        if (currentTuningAidType_ == TuningAidType::CW_TUNING) {
+            currentTuningAidMinFreqHz_ = TUNING_AID_TARGET_FREQ_HZ - (CW_TUNING_AID_SPAN_HZ / 2.0f);
+            currentTuningAidMaxFreqHz_ = TUNING_AID_TARGET_FREQ_HZ + (CW_TUNING_AID_SPAN_HZ / 2.0f);
+        } else { // RTTY_TUNING
+            float f_space = RTTY_SPACE_FREQUENCY;
+            float f_mark = RTTY_MARKER_FREQUENCY;
+            float f_low = std::min(f_space, f_mark);
+            float f_high = std::max(f_space, f_mark);
+            float delta_f = std::abs(f_high - f_low); // Ensure positive delta
+            if (delta_f < 1.0f) delta_f = 170.0f; // Prevent too small or zero delta, default to common RTTY shift
+
+            float total_span = 3.0f * delta_f; 
+            // Ensure total_span is reasonable
+            total_span = std::max(total_span, CW_TUNING_AID_SPAN_HZ); // At least as wide as CW
+            total_span = std::min(total_span, 3200.0f); // Cap at e.g. 3.2kHz (max RTTY freq for typical amateur use + margin)
+
+            float center_freq = (f_high + f_low) / 2.0f;
+            currentTuningAidMinFreqHz_ = center_freq - (total_span / 2.0f);
+            currentTuningAidMaxFreqHz_ = center_freq + (total_span / 2.0f);
+        }
+        if (currentTuningAidMinFreqHz_ < 0) currentTuningAidMinFreqHz_ = 0;
+        // Ensure min < max and there's a minimal span
+        if (currentTuningAidMaxFreqHz_ <= currentTuningAidMinFreqHz_) {
+             currentTuningAidMaxFreqHz_ = currentTuningAidMinFreqHz_ + std::max(CW_TUNING_AID_SPAN_HZ, 100.0f); 
+        }
+
+        bool freqSpanChanged = (std::abs(currentTuningAidMinFreqHz_ - oldMinFreq) > 1.0f ||
+                                std::abs(currentTuningAidMaxFreqHz_ - oldMaxFreq) > 1.0f);
+
+        if (typeChanged || freqSpanChanged) {
+            forceRedraw(); // Redraw if type or calculated frequency span changed
+        }
     }
 }
 
@@ -1055,9 +1089,9 @@ void MiniAudioFft::drawTuningAid() {
     float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
     if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::FFT_SAMPLES);
 
-    const int min_fft_bin_for_tuning_local = std::max(2, static_cast<int>(std::round(TUNING_AID_DISPLAY_MIN_FREQ_HZ / currentBinWidthHz)));
+    const int min_fft_bin_for_tuning_local = std::max(1, static_cast<int>(std::round(currentTuningAidMinFreqHz_ / currentBinWidthHz)));
     const int max_fft_bin_for_tuning_local =
-        std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(TUNING_AID_DISPLAY_MAX_FREQ_HZ / currentBinWidthHz)));
+        std::min(static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1), static_cast<int>(std::round(currentTuningAidMaxFreqHz_ / currentBinWidthHz)));
     const int num_bins_in_tuning_range = NUM_BINS(max_fft_bin_for_tuning_local, min_fft_bin_for_tuning_local);
     if (!pAudioProcessor) return;  // Biztonsági ellenőrzés
 
@@ -1065,7 +1099,7 @@ void MiniAudioFft::drawTuningAid() {
     for (int c = 0; c < width; ++c) {
         // Képernyő pixel X koordinátájának (c) leképezése FFT bin indexre
         // a TUNING_AID_DISPLAY_MIN_FREQ_HZ és TUNING_AID_DISPLAY_MAX_FREQ_HZ tartományon belül.
-        float ratio_in_display_width = (width == 1) ? 0.0f : (static_cast<float>(c) / (width - 1));
+        float ratio_in_display_width = (width <= 1) ? 0.0f : (static_cast<float>(c) / (width - 1)); // <= 1 a biztonság kedvéért
         int fft_bin_index = min_fft_bin_for_tuning_local + static_cast<int>(std::round(ratio_in_display_width * (num_bins_in_tuning_range - 1)));
         fft_bin_index = constrain(fft_bin_index, min_fft_bin_for_tuning_local, max_fft_bin_for_tuning_local);
         fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(AudioProcessorConstants::FFT_SAMPLES / 2 - 1));
@@ -1085,35 +1119,42 @@ void MiniAudioFft::drawTuningAid() {
     }
 
     // 4. Célfrekvencia vonalának kirajzolása a sprite-ra
-    float min_freq_displayed_actual = static_cast<float>(min_fft_bin_for_tuning_local) * currentBinWidthHz;
-    float max_freq_displayed_actual = static_cast<float>(max_fft_bin_for_tuning_local) * currentBinWidthHz;
+    // A pontosabb pozícionáláshoz a beállított min/max frekvenciákat használjuk
+    float min_freq_displayed_actual = currentTuningAidMinFreqHz_;
+    float max_freq_displayed_actual = currentTuningAidMaxFreqHz_;
     float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;
+
 
     if (displayed_span_hz > 0) {
         if (currentTuningAidType_ == TuningAidType::CW_TUNING) {
-            if (TUNING_AID_TARGET_FREQ_HZ >= min_freq_displayed_actual && TUNING_AID_TARGET_FREQ_HZ <= max_freq_displayed_actual) {
-                float ratio = (TUNING_AID_TARGET_FREQ_HZ - min_freq_displayed_actual) / displayed_span_hz;
-                int line_x_on_sprite = static_cast<int>(std::round(ratio * (width - 1)));
-                line_x_on_sprite = constrain(line_x_on_sprite, 0, width - 1);
-                sprGraph.drawFastVLine(line_x_on_sprite, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
-            }
+            // CW célfrekvencia (TUNING_AID_TARGET_FREQ_HZ) középre kerül
+            int line_x_on_sprite = width / 2; 
+            sprGraph.drawFastVLine(line_x_on_sprite, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
+            // sprGraph.setTextColor(TUNING_AID_TARGET_LINE_COLOR, TFT_BLACK); 
+            // sprGraph.drawString(String(static_cast<int>(TUNING_AID_TARGET_FREQ_HZ)) + "Hz", line_x_on_sprite, 2);
+
         } else if (currentTuningAidType_ == TuningAidType::RTTY_TUNING) {
-            // RTTY Space vonal (lila)
-            if (RTTY_SPACE_FREQUENCY >= min_freq_displayed_actual && RTTY_SPACE_FREQUENCY <= max_freq_displayed_actual) {
-                float ratio_space = (RTTY_SPACE_FREQUENCY - min_freq_displayed_actual) / displayed_span_hz;
-                int line_x_space = static_cast<int>(std::round(ratio_space * (width - 1)));
-                line_x_space = constrain(line_x_space, 0, width - 1);
+            float f_space = RTTY_SPACE_FREQUENCY;
+            float f_mark = RTTY_MARKER_FREQUENCY;
+
+            // Space vonal
+            if (f_space >= min_freq_displayed_actual && f_space <= max_freq_displayed_actual) {
+                float ratio_space = (f_space - min_freq_displayed_actual) / displayed_span_hz;
+                int line_x_space = static_cast<int>(std::round(ratio_space * (width - 1))); // width-1, ha 0-tól width-1-ig terjed
+                line_x_space = constrain(line_x_space, 0, width - 1); // Biztosítjuk, hogy a sprite-on belül legyen
                 sprGraph.drawFastVLine(line_x_space, 0, graphH, TUNING_AID_RTTY_SPACE_LINE_COLOR);
+                // sprGraph.setTextColor(TUNING_AID_RTTY_SPACE_LINE_COLOR, TFT_BLACK);
+                // sprGraph.drawString(String(static_cast<int>(f_space)) + "Hz", line_x_space, 2);
             }
-            // RTTY Mark vonal (piros)
-            // Figyelem: Az RTTY_MARKER_FREQUENCY a defines.h-ban 22950.0f, ami valószínűleg túl magas.
-            // Ha a defines.h-ban lévő értékeket használjuk, ezek a vonalak nem fognak megjelenni,
-            // mert kívül esnek a TUNING_AID_DISPLAY_MAX_FREQ_HZ (3500.0f) tartományon.
-            if (RTTY_MARKER_FREQUENCY >= min_freq_displayed_actual && RTTY_MARKER_FREQUENCY <= max_freq_displayed_actual) {
-                float ratio_mark = (RTTY_MARKER_FREQUENCY - min_freq_displayed_actual) / displayed_span_hz;
+
+            // Mark vonal
+            if (f_mark >= min_freq_displayed_actual && f_mark <= max_freq_displayed_actual) {
+                float ratio_mark = (f_mark - min_freq_displayed_actual) / displayed_span_hz;
                 int line_x_mark = static_cast<int>(std::round(ratio_mark * (width - 1)));
                 line_x_mark = constrain(line_x_mark, 0, width - 1);
                 sprGraph.drawFastVLine(line_x_mark, 0, graphH, TUNING_AID_RTTY_MARK_LINE_COLOR);
+                // sprGraph.setTextColor(TUNING_AID_RTTY_MARK_LINE_COLOR, TFT_BLACK);
+                // sprGraph.drawString(String(static_cast<int>(f_mark)) + "Hz", line_x_mark, 2);
             }
         }
     }
