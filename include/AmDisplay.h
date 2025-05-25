@@ -57,6 +57,7 @@ class AmDisplay : public DisplayBase {
     void clearRttyTextBufferAndDisplay();  // Törli a puffert és frissíti a kijelzőt
     void drawDecodeModeButtons();
     void setDecodeMode(DecodeMode newMode);
+    void decodeCwAndRttyText();
 
    protected:
     /**

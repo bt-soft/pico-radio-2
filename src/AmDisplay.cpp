@@ -256,49 +256,45 @@ void AmDisplay::displayLoop() {
         pMiniAudioFft->loop();
     }
 
-    // RTTY dekódolás Core1-re delegálva
-    if (currentDecodeMode == DecodeMode::RTTY && !rtv::muteStat) {
-        if (multicore_fifo_wready()) {
-            DEBUG("Core0: Sending CORE1_CMD_PROCESS_AUDIO_RTTY\n");
-            multicore_fifo_push_blocking(CORE1_CMD_GET_RTTY_CHAR);
-        }
-        if (multicore_fifo_rvalid()) {
-            char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
-            DEBUG("Core0: RTTY decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
-            if (decodedChar != '\0') {
-                appendRttyCharacter(decodedChar);
-            }
-        }
+    // Csak ha nincs némítva akkor dekódolunk CW-t és RTTY-t
+    if (!rtv::muteStat) {
+        decodeCwAndRttyText();
+    }
+}
+
+/**
+ * @brief Kommunikál a Core1-gyel, hogy dekódolja a CW vagy RTTY szöveget.
+ */
+void AmDisplay::decodeCwAndRttyText() {
+
+    // Parancs küldése a Core1-nek, hogy adjon egy dekódolt karaktert
+    uint32_t getCommand = currentDecodeMode == DecodeMode::MORSE ? CORE1_CMD_GET_CW_CHAR : CORE1_CMD_GET_RTTY_CHAR;
+    if (!rp2040.fifo.push_nb(getCommand)) {
+        Utils::beepError();
+        DEBUG("Core0: getCommand NOT sent to Core1, FIFO full\n");
+        return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot
     }
 
-    // CW dekódolás Core1-re delegálva.  A Core0 vár a Core1 válaszára
-    if (currentDecodeMode == DecodeMode::MORSE && !rtv::muteStat) {
-
-        // Parancs küldése a Core1-nek, hogy adjon egy dekódolt CW karaktert
-        if (!rp2040.fifo.push_nb(CORE1_CMD_GET_CW_CHAR)) {
-            Utils::beepError();
-            DEBUG("Core0: CW command NOT sent to Core1, FIFO full\n");
-            return;  // Ha a FIFO tele van, akkor nem küldjük el a parancsot
-        }
-
-        // Várakozás a válaszra (dekódolt karakter) a Core1-től
-        char decodedChar = '\0';  // Dekódolt karakter inicializálása
-        unsigned long startTimeWait = millis();
-        while (millis() - startTimeWait < 5) {  // Timeout 5 ms
-            if (rp2040.fifo.available() > 0) {
-
-                uint32_t raw_command;
-                if (rp2040.fifo.pop_nb(&raw_command)) {
-                    decodedChar = static_cast<char>(raw_command);
-                    // DEBUG("Core0: CW decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
-                    if (decodedChar != '\0') {
-                        appendRttyCharacter(decodedChar);
-                    }
+    // Várakozás a válaszra (dekódolt karakter) a Core1-től
+    char decodedChar = '\0';  // Dekódolt karakter inicializálása
+    bool char_popped = false;
+    unsigned long startTimeWait = millis();
+    while (millis() - startTimeWait < 5) {  // Timeout 5 ms. Érdemes lehet konstanssá tenni.
+        if (rp2040.fifo.available() > 0) {
+            uint32_t raw_command;
+            if (rp2040.fifo.pop_nb(&raw_command)) {
+                decodedChar = static_cast<char>(raw_command);
+                // DEBUG("Core0: CW decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
+                if (decodedChar != '\0') {
+                    appendRttyCharacter(decodedChar);
                 }
+                char_popped = true;
+                break;  // Kilépés a ciklusból, ha sikeresen olvastunk
             }
-            break;
         }
-        delayMicroseconds(100);  // Rövid várakozás a CPU tehermentesítésére
+        // Ha nem volt elérhető karakter, a ciklus folytatódik a timeoutig.
+        // Egy rövid várakozás itt csökkentheti a CPU terhelést.
+        delayMicroseconds(50);  // Opcionális: rövid várakozás
     }
 }
 
