@@ -367,7 +367,7 @@ void CwDecoder::addToBuffer(char c) {
         // ezért a readPos-t is el kell léptetni.
         charBufferReadPos_ = (charBufferReadPos_ + 1) % DECODED_CHAR_BUFFER_SIZE;
     }
-    CW_DEBUG("CW: Char '%c' added to buffer. Count: %d, R:%d, W:%d\n", c, charBufferCount_, charBufferReadPos_, charBufferWritePos_);
+    CW_DEBUG("CW: Bufferhez adva: '%c'. Count: %d, R:%d, W:%d\n", c, charBufferCount_, charBufferReadPos_, charBufferWritePos_);
 }
 
 /**
@@ -385,7 +385,7 @@ char CwDecoder::getCharacterFromBuffer() {
     char c = decodedCharBuffer_[charBufferReadPos_];
     charBufferReadPos_ = (charBufferReadPos_ + 1) % DECODED_CHAR_BUFFER_SIZE;
     charBufferCount_--;
-    CW_DEBUG("CW: Char '%c' read from buffer. Count: %d, R:%d, W:%d\n", c, charBufferCount_, charBufferReadPos_, charBufferWritePos_);
+    CW_DEBUG("CW: Bufferből olvasva: '%c' Count: %d, R:%d, W:%d\n", c, charBufferCount_, charBufferReadPos_, charBufferWritePos_);
     return c;
 }
 
@@ -438,7 +438,7 @@ void CwDecoder::updateDecoder() {
     if (currentTimeMs - lastActivityMs_ > MAX_SILENCE_MS) {
         if (!inInactiveState) {   // Csak akkor írjuk ki, ha még nem tettük
             resetDecoderState();  // Teljes reset, ami az initialize()-t hívja
-            CW_DEBUG("CW: Reset inactivity (%lu ms) miatt\n", MAX_SILENCE_MS);
+            CW_DEBUG("CW: Reset tétlenség (%lu ms) miatt\n", MAX_SILENCE_MS);
             inInactiveState = true;  // Beállítjuk, hogy kiírtuk
         }
         return;  // Nem adunk vissza karaktert, csak resetelünk
