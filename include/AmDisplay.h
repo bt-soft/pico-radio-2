@@ -5,7 +5,6 @@
 #include "DisplayBase.h"
 #include "MiniAudioFft.h"
 #include "RadioButton.h"  // Új RadioButton include
-#include "RttyDecoder.h"  // RTTY dekóder osztály
 #include "SMeter.h"
 #include "SevenSegmentFreq.h"
 #include "defines.h"  // A kijelző konstansok
