@@ -1,7 +1,7 @@
 #ifndef CWDECODER_H
 #define CWDECODER_H
 
-#include <Arduino.h>  // millis(), analogRead(), etc.
+#include <Arduino.h>  // millis(), analogRead(), stb.
 
 #include <cmath>  // round, sin, cos, sqrt, abs, min, max - szükséges a constexpr számításokhoz
 
@@ -12,41 +12,38 @@ class CwDecoder {
     CwDecoder(int audioPin);
     ~CwDecoder();
 
-    void updateDecoder();           // Core1 hívja ciklikusan
-    char getCharacterFromBuffer();  // Core0 kéri le a karaktert
-    void resetDecoderState();       // To be called when switching to CW mode
-
-   private:
-    // Goertzel filter parameters for 750Hz
+    void updateDecoder();           // Core1 hívja ciklikusan a CW dekódoláshoz
+    char getCharacterFromBuffer();  // Core0 kéri le a dekódolt karaktert a pufferből
+    void resetDecoderState();       // Hívandó a CW módra váltáskor az állapot visszaállításáhozprivate:
+    // Goertzel szűrő paraméterek 750Hz-hez
     static constexpr float TARGET_FREQ = CW_SHIFT_FREQUENCY;
     static constexpr float SAMPLING_FREQ = 8400.0f;
-    static constexpr short N_SAMPLES = 45;  // Adjusted for better 750Hz tuning with 8400Hz Fs
+    static constexpr short N_SAMPLES = 45;  // Beállítva a jobb 750Hz hangoláshoz 8400Hz mintavételezéssel
     // K_CONSTANT = round(45 * 750 / 8400) = round(4.0178) = 4
-    // Actual filter center frequency: (4 / 45) * 8400 = 746.67 Hz
-    static constexpr short K_CONSTANT = 4;  // Pre-calculated: round(45 * 750 / 8400)
-    static constexpr float OMEGA = (2.0f * M_PI * static_cast<float>(K_CONSTANT)) / static_cast<float>(N_SAMPLES);
-    // COEFF should be derived from K_CONSTANT and N_SAMPLES via OMEGA
-    static constexpr float COEFF = 2.0f * std::cos(OMEGA);  // Dynamically calculate COEFF
-    static const unsigned long SAMPLING_PERIOD_US;          // Defined in .cpp
+    // Tényleges szűrő középfrekvencia: (4 / 45) * 8400 = 746.67 Hz
+    static constexpr short K_CONSTANT = 4;  // Előre kiszámított: round(45 * 750 / 8400)
+    static constexpr float OMEGA =
+        (2.0f * M_PI * static_cast<float>(K_CONSTANT)) / static_cast<float>(N_SAMPLES);  // COEFF értéket előre kiszámoljuk az OMEGA alapján: 2.0 * cos(0.5585) = 1.7015
+    static constexpr float COEFF = 1.7015f;                                              // Előre kiszámított érték: 2.0f * cos(OMEGA)
+    static const unsigned long SAMPLING_PERIOD_US;                                       // Definiálva a .cpp fájlban
 
     float q0, q1, q2;
-    short testData[N_SAMPLES];  // Adjusted size
+    short testData[N_SAMPLES];  // Beállított méret
 
-    // Morse timing and state
-    static constexpr float THRESHOLD = 250.0f;  // Adjusted threshold, experiment with this value (e.g., 200-400)
+    // Morse időzítés és állapot
+    static constexpr float THRESHOLD = 250.0f;  // Beállított küszöb, kísérletezzen ezzel az értékkel (pl. 200-400)
     static constexpr unsigned long MIN_MORSE_ELEMENT_DURATION_MS =
-        25;  // Minimum duration for a valid Morse element (ms) - Ezt lehet, hogy a DOT_MIN_MS-re kellene cserélni vagy összehangolni
+        25;  // Minimum időtartam egy érvényes Morse elemhez (ms) - Ezt lehet, hogy a DOT_MIN_MS-re kellene cserélni vagy összehangolni
     // Szünetek időzítéséhez konstansok
     static constexpr float CHAR_GAP_DOT_MULTIPLIER = 3.0f;
     static constexpr float WORD_GAP_DOT_MULTIPLIER = 6.5f;  // Kb. 7 dit, de a char gap-nél biztosan nagyobb
     static constexpr unsigned long MIN_CHAR_GAP_MS_FALLBACK = 180;
     static constexpr unsigned long MIN_WORD_GAP_MS_FALLBACK = 400;
-
     static constexpr unsigned long DOT_MIN_MS = 40;               // Minimum pont hossz (ms)
     static constexpr unsigned long DOT_MAX_MS = 200;              // Maximum pont hossz (ms)
     static constexpr unsigned long DASH_MAX_MS = DOT_MAX_MS * 7;  // Maximum vonás hossz (ms)
 
-    short noiseBlankerLoops_;  // Number of confirmations for tone/no-tone
+    short noiseBlankerLoops_;  // Megerősítések száma hang/nincs hang állapothoz
 
     unsigned long startReferenceMs_;
     unsigned long currentReferenceMs_;
@@ -61,9 +58,9 @@ class CwDecoder {
     unsigned long currentLetterStartTimeMs_;
     short symbolCountForWpm_;
 
-    bool decoderStarted_;     // True if the first leading edge of a character has been detected
-    bool measuringTone_;      // True if currently measuring a tone (between leading and trailing edge)
-    bool toneDetectedState_;  // True if Goertzel filter output is above threshold
+    bool decoderStarted_;     // Igaz, ha egy karakter első felfutó éle észlelésre került
+    bool measuringTone_;      // Igaz, ha éppen hangot mér (felfutó és lefutó él között)
+    bool toneDetectedState_;  // Igaz, ha a Goertzel szűrő kimenete a küszöb felett van
 
     bool inInactiveState;  // Ha inaktív állapotban vagyunk
 
@@ -76,9 +73,7 @@ class CwDecoder {
     char decodedCharBuffer_[DECODED_CHAR_BUFFER_SIZE];
     short charBufferReadPos_;
     short charBufferWritePos_;
-    short charBufferCount_;
-
-    // Morse tree
+    short charBufferCount_;  // Morse fa
     static const char MORSE_TREE_SYMBOLS[];
     static const short MORSE_TREE_ROOT_INDEX = 63;
     static const short MORSE_TREE_INITIAL_OFFSET = 32;
@@ -88,10 +83,10 @@ class CwDecoder {
     short treeOffset_;
     short treeCount_;
 
-    // Audio input
+    // Audio bemenet
     int audioInputPin_;
 
-    // Private methods
+    // Privát metódusok
     bool goertzelProcess();
     bool sampleWithNoiseBlanking();
     void processDot();
@@ -99,8 +94,8 @@ class CwDecoder {
     char getCharFromTree();
     void resetMorseTree();
     void updateReferenceTimings(unsigned long duration);
-    void initialize();                // Common initialization logic
-    char processCollectedElements();  // Process collected Morse elements
+    void initialize();                // Közös inicializálási logika
+    char processCollectedElements();  // Összegyűjtött Morse elemek feldolgozása
     void addToBuffer(char c);         // Karakter hozzáadása a pufferhez
 };
 

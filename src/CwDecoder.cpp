@@ -1,3 +1,11 @@
+/**
+ * @file CwDecoder.cpp
+ * @brief Az osztály a Morse kód dekódolására szolgál a Goertzel algoritmus segítségével.
+ *
+ * Az osztály a https://www.instructables.com/Binary-Tree-Morse-Decoder/MorseCodeDecoder6.ino
+ * alapján készült, amely a Goertzel algoritmust használja a CW jelek feldolgozására.
+ */
+
 #include "CwDecoder.h"
 
 #include <cmath>
@@ -34,10 +42,29 @@ const char CwDecoder::MORSE_TREE_SYMBOLS[] = {
     ' ', '9', ' ', ' ', ' ',  '0', ' ', ' '   // 120
 };
 
+/**
+ * @brief CwDecoder konstruktor
+ * @param audioPin Az analóg bemenet pin száma, ahol az audio jel érkezik
+ *
+ * Inicializálja a CW dekódert a megadott audio bemenettel és meghívja az initialize() függvényt
+ * az összes tagváltozó kezdőértékeinek beállításához.
+ */
 CwDecoder::CwDecoder(int audioPin) : audioInputPin_(audioPin) { initialize(); }
 
+/**
+ * @brief CwDecoder destruktor
+ *
+ * Felszabadítja a CwDecoder által használt erőforrásokat (jelenleg nincs dinamikus memória).
+ */
 CwDecoder::~CwDecoder() {}
 
+/**
+ * @brief Inicializálja a CW dekóder összes tagváltozóját alapértelmezett értékekre
+ *
+ * Beállítja a kezdeti értékeket a Goertzel szűrő változóinak, a Morse dekódolás
+ * állapotváltozóinak, az időzítési paramétereknek és a karakterpuffernek.
+ * Ezt a függvényt hívja meg a konstruktor és a resetDecoderState().
+ */
 void CwDecoder::initialize() {
     noiseBlankerLoops_ = 1;
     startReferenceMs_ = 150;  // Kezdő referencia 15WPM-hez (pont ~80ms, küszöb ~150-160ms)
@@ -69,17 +96,32 @@ void CwDecoder::initialize() {
     charBufferCount_ = 0;
 }
 
+/**
+ * @brief Visszaállítja a CW dekóder állapotát a kezdeti értékekre
+ *
+ * Meghívja az initialize() függvényt, majd debug üzenetet ír ki a reset eseményről.
+ * Ezt a metódust hívják meg a CW módra váltáskor vagy hosszas inaktivitás után.
+ */
 void CwDecoder::resetDecoderState() {
     initialize();
     CW_DEBUG("CW Decoder state reset.\n");
 }
 
+/**
+ * @brief Goertzel algoritmus végrehajtása a beérkező audio jel feldolgozására
+ * @return true ha a célfrekvencián (750Hz) hang található, false egyébként
+ *
+ * Végrehajtja a Goertzel algoritmus két fázisát:
+ * 1. N_SAMPLES számú minta begyűjtése az ADC-ről meghatározott időközönként
+ * 2. A Goertzel szűrő alkalmazása a célfrekvencia (750Hz) detektálására
+ * A kimeneti amplitúdót összehasonlítja a THRESHOLD értékkel.
+ */
 bool CwDecoder::goertzelProcess() {
     unsigned long loopStartTimeMicros;
     for (short index = 0; index < N_SAMPLES; index++) {
         loopStartTimeMicros = micros();
         int raw_adc = analogRead(audioInputPin_);
-        testData[index] = raw_adc - 2048;  // DC offset removal (assuming 12-bit ADC, 0-4095 range)
+        testData[index] = raw_adc - 2048;  // DC eltolás eltávolítása (12-bit ADC feltételezése, 0-4095 tartomány)
         unsigned long processingTimeMicros = micros() - loopStartTimeMicros;
         if (processingTimeMicros < SAMPLING_PERIOD_US) {
             if (SAMPLING_PERIOD_US > processingTimeMicros) delayMicroseconds(SAMPLING_PERIOD_US - processingTimeMicros);
@@ -105,6 +147,14 @@ bool CwDecoder::goertzelProcess() {
     }
 }
 
+/**
+ * @brief Zaj-elnyomó algoritmus a Goertzel szűrő kimenetén
+ * @return true ha hang van jelen, false ha nincs
+ *
+ * Többszöri Goertzel mérést végez (noiseBlankerLoops_ alkalommal) és
+ * megszámolja, hogy hányszor észlel hangot vs. csendet.
+ * Csak akkor jelzi hang jelenlétét, ha a hang detektálások száma meghaladja a csend detektálásokat.
+ */
 bool CwDecoder::sampleWithNoiseBlanking() {
     int no_tone_count = 0;
     int tone_count = 0;
@@ -119,12 +169,26 @@ bool CwDecoder::sampleWithNoiseBlanking() {
     return (tone_count > no_tone_count);
 }
 
+/**
+ * @brief Visszaállítja a Morse fa dekódolási állapotát a gyökér pozícióra
+ *
+ * Beállítja a fa index változókat a kezdeti értékekre, hogy új karakter
+ * dekódolását lehessen elkezdeni. A Morse fa egy bináris fa, ahol balra
+ * lépés a pont (.), jobbra lépés a vonás (-) karaktert jelenti.
+ */
 void CwDecoder::resetMorseTree() {
     treeIndex_ = MORSE_TREE_ROOT_INDEX;
     treeOffset_ = MORSE_TREE_INITIAL_OFFSET;
     treeCount_ = MORSE_TREE_MAX_DEPTH;
 }
 
+/**
+ * @brief Kiolvassa a Morse fa aktuális pozíciójának megfelelő karaktert
+ * @return A Morse fában található karakter vagy '\0' ha érvénytelen pozíció
+ *
+ * A treeIndex_ alapján megkeresi a megfelelő karaktert a MORSE_TREE_SYMBOLS
+ * tömbben. Ha az index érvénytelen tartományban van, '\0'-t ad vissza.
+ */
 char CwDecoder::getCharFromTree() {
     if (treeIndex_ >= 0 && treeIndex_ < sizeof(MORSE_TREE_SYMBOLS)) {
         return MORSE_TREE_SYMBOLS[treeIndex_];
@@ -132,6 +196,13 @@ char CwDecoder::getCharFromTree() {
     return '\0';
 }
 
+/**
+ * @brief Egy pont (.) elem feldolgozása a Morse fában
+ *
+ * Balra lép a Morse fában (treeIndex_ csökkentése), frissíti az offset és mélység értékeket.
+ * Hozzáadja a pont súlyértékét (2) a WPM számításhoz. Ha a fa túl mély lesz,
+ * hibakezelést végez és reseteli a dekóder állapotát.
+ */
 void CwDecoder::processDot() {
     treeIndex_ -= treeOffset_;
     treeOffset_ /= 2;
@@ -150,6 +221,13 @@ void CwDecoder::processDot() {
     }
 }
 
+/**
+ * @brief Egy vonás (-) elem feldolgozása a Morse fában
+ *
+ * Jobbra lép a Morse fában (treeIndex_ növelése), frissíti az offset és mélység értékeket.
+ * Hozzáadja a vonás súlyértékét (4) a WPM számításhoz. Ha a fa túl mély lesz,
+ * hibakezelést végez és reseteli a dekóder állapotát.
+ */
 void CwDecoder::processDash() {
     treeIndex_ += treeOffset_;
     treeOffset_ /= 2;
@@ -170,6 +248,15 @@ void CwDecoder::processDash() {
     }
 }
 
+/**
+ * @brief Frissíti a Morse időzítési referencia értékeket adaptív módon
+ * @param duration Az aktuálisan mért hanghossz milliszekundumban
+ *
+ * Adaptív algoritmus, amely tanul a beérkező Morse jelek időzítéséből.
+ * Külön kezeli a pont és vonás időtartamokat, és ezek alapján számítja ki
+ * a pont/vonás közötti döntési küszöböt. Biztonsági korlátokat alkalmaz
+ * a DOT_MIN_MS és DOT_MAX_MS értékek között.
+ */
 void CwDecoder::updateReferenceTimings(unsigned long duration) {
     // Adaptív referencia
     const unsigned long ADAPTIVE_WEIGHT_OLD = 3;  // Régi érték súlya (csökkentve 7-ről)
@@ -208,10 +295,17 @@ void CwDecoder::updateReferenceTimings(unsigned long duration) {
     unsigned long lowerBound = DOT_MIN_MS * 1.25f;  // Pl. 40 * 1.25 = 50ms
     unsigned long upperBound = DOT_MAX_MS * 1.5f;   // Pl. 200 * 1.5 = 300ms.
     currentReferenceMs_ = constrain(currentReferenceMs_, lowerBound, upperBound);
-
     CW_DEBUG("CW: Ref frissítve - min: %lu, max: %lu, ref: %lu, új elem: %lu\n", toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_, duration);
 }
 
+/**
+ * @brief Feldolgozza az összegyűjtött Morse elemeket és dekódolja őket karakterré
+ * @return A dekódolt karakter vagy '\0' ha nincs érvényes karakter
+ *
+ * Végigmegy a rawToneDurations_ tömbön és minden elemet pont vagy vonásként
+ * osztályoz a currentReferenceMs_ küszöb alapján. A Morse fában navigál
+ * és a végén megpróbálja visszaadni a megfelelő karaktert.
+ */
 char CwDecoder::processCollectedElements() {
     if (toneIndex_ == 0) return '\0';
     CW_DEBUG("CW: Feldolgozás - %d elem, ref: %lu ms\n", toneIndex_, currentReferenceMs_);
@@ -242,6 +336,14 @@ char CwDecoder::processCollectedElements() {
     return '\0';
 }
 
+/**
+ * @brief Hozzáad egy karaktert a dekódolt karakterek pufferéhez
+ * @param c A hozzáadandó karakter
+ *
+ * Körkörös puffer implementáció, amely automatikusan felülírja a legrégebbi
+ * elemeket, ha a puffer megtelt. Üres karaktereket ('\0') nem ad hozzá a pufferhez.
+ * Debug üzenetet ír ki a puffer állapotáról.
+ */
 void CwDecoder::addToBuffer(char c) {
     if (c == '\0') {  // Üres karaktert nem teszünk a pufferbe
         return;
@@ -259,6 +361,14 @@ void CwDecoder::addToBuffer(char c) {
     CW_DEBUG("CW: Char '%c' added to buffer. Count: %d, R:%d, W:%d\n", c, charBufferCount_, charBufferReadPos_, charBufferWritePos_);
 }
 
+/**
+ * @brief Kivesz egy karaktert a dekódolt karakterek pufferéből
+ * @return A legrégebbi dekódolt karakter vagy '\0' ha a puffer üres
+ *
+ * FIFO (First In, First Out) elvű olvasás a körkörös pufferből.
+ * Frissíti a read pozíciót és csökkenti a pufferben lévő elemek számát.
+ * Debug üzenetet ír ki a műveletről.
+ */
 char CwDecoder::getCharacterFromBuffer() {
     if (charBufferCount_ == 0) {
         return '\0';
@@ -270,6 +380,23 @@ char CwDecoder::getCharacterFromBuffer() {
     return c;
 }
 
+/**
+ * @brief A CW dekóder fő ciklikus feldolgozó függvénye
+ *
+ * Ez a Core1-en futó main loop, amely folyamatosan:
+ * - Mintavételezi az audio jelet és detektálja a CW hangokat
+ * - Méri a hangok és szünetek időtartamát
+ * - Adaptívan tanul az időzítésből (WPM sebesség)
+ * - Dekódolja a Morse karaktereket
+ * - Kezeli a karakter és szó közötti szüneteket
+ * - Puffereli a dekódolt karaktereket a Core0 számára
+ *
+ * Állapotgép alapú működés:
+ * - Hang detektálás → időzítés kezdete
+ * - Hang vége → elem hozzáadása, időzítés frissítése
+ * - Karakterközi szünet → dekódolás
+ * - Hosszú csend → állapot reset
+ */
 void CwDecoder::updateDecoder() {
     static const unsigned long MAX_SILENCE_MS = 4000;
     static const unsigned long ELEMENT_GAP_MIN_MS = DOT_MIN_MS / 2;
