@@ -251,6 +251,17 @@ void AmDisplay::displayLoop() {
         DisplayBase::frequencyChanged = false;
     }
     if (pMiniAudioFft != nullptr) {
+        // Ha a MiniAudioFft TuningAid módban van, állítsuk be a típusát a dekóder módja alapján
+        if (pMiniAudioFft->getCurrentDisplayMode() == MiniAudioFft::DisplayMode::TuningAid) {
+            if (currentDecodeMode == DecodeMode::MORSE) {
+                pMiniAudioFft->setTuningAidType(MiniAudioFft::TuningAidType::CW_TUNING);
+            } else if (currentDecodeMode == DecodeMode::RTTY) {
+                pMiniAudioFft->setTuningAidType(MiniAudioFft::TuningAidType::RTTY_TUNING);
+            } else {
+                // Alapértelmezett vagy egyéb esetek (pl. ha a dekóder Off)
+                pMiniAudioFft->setTuningAidType(MiniAudioFft::TuningAidType::CW_TUNING);  // Alapértelmezetten CW
+            }
+        }
         pMiniAudioFft->loop();
     }
 

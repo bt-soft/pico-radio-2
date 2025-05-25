@@ -44,6 +44,8 @@ constexpr float TUNING_AID_TARGET_FREQ_HZ = CW_SHIFT_FREQUENCY;                 
 constexpr float TUNING_AID_DISPLAY_MIN_FREQ_HZ = 300.0f;                              // Megjelenített tartomány minimuma (Hz)
 constexpr float TUNING_AID_DISPLAY_MAX_FREQ_HZ = 3500.0f;                             // Megjelenített tartomány maximuma (Hz) - RTTY jelekhez is
 constexpr float TUNING_AID_INPUT_SCALE = 0.1f;                                        // Erősítési faktor a hangolási segéd bemenetéhez (csökkentve a "vonal" vékonyításához)
+constexpr uint16_t TUNING_AID_RTTY_SPACE_LINE_COLOR = TFT_CYAN;                       // RTTY Space vonal színe (ÚJ)
+constexpr uint16_t TUNING_AID_RTTY_MARK_LINE_COLOR = TFT_MAGENTA;                     // RTTY Mark vonal színe (ÚJ)
 constexpr int TUNING_AID_INTERNAL_WIDTH = MiniAudioFftConstants::MAX_INTERNAL_WIDTH;  // Belső szélesség a hangolási segédhez (a komponens szélessége)
 
 // Vízesés
@@ -84,6 +86,12 @@ class MiniAudioFft {
         TuningAid  // Új mód a hangolási segédhez
     };
 
+    // Enum a TuningAid típusának megkülönböztetésére
+    enum class TuningAidType : uint8_t {
+        CW_TUNING,
+        RTTY_TUNING
+    };
+
    public:
     /**
      * @brief Konstruktor.
@@ -116,6 +124,8 @@ class MiniAudioFft {
      * @brief Kényszeríti a komponens teljes újrarajzolását az aktuális módban.
      */
     void forceRedraw();
+    void setTuningAidType(TuningAidType type);
+    DisplayMode getCurrentDisplayMode() const { return currentMode; }
 
    private:
     TFT_eSPI& tft;                  // Referencia a TFT objektumra
@@ -143,6 +153,7 @@ class MiniAudioFft {
     float envelope_prev_smoothed_max_val;  // Előző simított maximális amplitúdó az Envelope módhoz
     int indicatorFontHeight_;              // A módkijelzőhöz használt font magassága
 
+    TuningAidType currentTuningAidType_; // Aktuális hangolási segéd típus (CW vagy RTTY)
     // Belső segédfüggvények
     /**
      * @brief Vált a következő megjelenítési módra.
