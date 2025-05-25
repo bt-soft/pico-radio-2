@@ -278,16 +278,26 @@ void AmDisplay::displayLoop() {
         }
     }
     // CW dekódolás Core1-re delegálva
-    // A Core1 most már önállóan futtatja a CW dekódert, ha a mód be van állítva.
-    // A Core0 csak fogadja a dekódolt karaktereket.
-    // A !rtv::muteStat ellenőrzés itt is maradhat, hogy ne próbáljunk karaktert fűzni, ha némítva van.
+    // A Core0 kezdeményezi a CW dekódolást és vár a Core1 válaszára
     if (currentDecodeMode == DecodeMode::MORSE && !rtv::muteStat) {
-        // Nincs szükség parancs küldésére, a Core1 önállóan dolgozik.
-        if (multicore_fifo_rvalid()) {
-            char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
-            DEBUG("Core0: CW decodedChar received: '%c' (%d)\n", decodedChar, decodedChar);
-            if (decodedChar != '\0') {
-                appendRttyCharacter(decodedChar);
+        // Parancs küldése a Core1-nek a CW audio feldolgozására
+        // Ellenőrizzük, hogy a Core1 FIFO-ja készen áll-e írásra
+        if (multicore_fifo_wready()) {
+
+            multicore_fifo_push_blocking(CORE1_CMD_PROCESS_AUDIO_CW);
+
+            // Várakozás a válaszra (dekódolt karakter) a Core1-től
+            unsigned long startTimeWait = millis();
+            while (millis() - startTimeWait < 10) {  // Max 10ms várakozás
+                if (multicore_fifo_rvalid()) {
+                    char decodedChar = static_cast<char>(multicore_fifo_pop_blocking());
+                    DEBUG("Core0: CW decodedChar received from Core1: '%c' (%d)\n", decodedChar, decodedChar);
+                    if (decodedChar != '\0') {
+                        appendRttyCharacter(decodedChar);
+                    }
+                    break;
+                }
+                delayMicroseconds(100);  // Rövid várakozás a CPU tehermentesítésére
             }
         }
     }

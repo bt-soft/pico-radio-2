@@ -76,7 +76,7 @@ void core1_main() {
                     } else {
                         DEBUG("Core1: FATAL - Failed to create CwDecoder instance!\n");
                     }
-                    break; 
+                    break;
 
                 case CORE1_CMD_PROCESS_AUDIO_RTTY:
                     if (core1_current_mode == Core1ActiveMode::MODE_RTTY) {
@@ -94,12 +94,13 @@ void core1_main() {
                     if (core1_current_mode == Core1ActiveMode::MODE_CW) {
                         if (core1_cw_decoder) {
                             char_to_send_back = core1_cw_decoder->decodeNextCharacter();
-                            DEBUG("Core1: CW Decoder processed character: '%c'\n", char_to_send_back);
                         } else {
                             DEBUG("Core1: CW Decoder not initialized for explicit processing!\n");
-                            char_to_send_back = '?';  // Hiba karakter
                         }
-                        send_char = true;
+
+                        if (char_to_send_back != '\0') {
+                            send_char = true;
+                        }
                     }
                     break;
 
@@ -108,8 +109,10 @@ void core1_main() {
                     break;
             }
 
+            // Ha van dekódolt karakter, akkor azt küldjük vissza a Core0-nak
             if (send_char) {
                 if (multicore_fifo_wready()) {
+                    DEBUG("Core1: CW Decoder processed character: '%c'\n", char_to_send_back);
                     multicore_fifo_push_blocking(static_cast<uint32_t>(char_to_send_back));
                 } else {
                     DEBUG("Core1: FIFO full when sending char '%c'\n", char_to_send_back);
@@ -117,24 +120,9 @@ void core1_main() {
             }
 
         } else {
-            // Ha nincs parancs Core0-tól, de CW módban vagyunk, futtassuk a dekódert
-            if (core1_current_mode == Core1ActiveMode::MODE_CW && core1_cw_decoder) {
-                char decoded_char_loop = core1_cw_decoder->decodeNextCharacter();
-                if (decoded_char_loop != '\0') {
-                    if (multicore_fifo_wready()) {
-                        multicore_fifo_push_blocking(static_cast<uint32_t>(decoded_char_loop));
-                    } else {
-                        DEBUG("Core1: CW FIFO full in loop, char '%c' dropped.\n", decoded_char_loop);
-                    }
-                }
-                // Rövid várakozás, hogy ne terhelje túl a CPU-t, de elég gyakori legyen a dekódolás
-                // Ezt az értéket kísérletezéssel kell finomhangolni.
-                // Cél, hogy a `decodeNextCharacter` legalább 10-15ms-onként lefusson.
-                delayMicroseconds(5000);  // Pl. 5 ms
-            } else {
-                // Ha nem CW módban vagyunk, vagy nincs parancs, többet aludhat
-                delayMicroseconds(10000);  // Pl. 10 ms
-            }
+            // A dekódolás csak a CORE1_CMD_PROCESS_AUDIO_CW parancsra történik.
+            // Ha más háttérfeladatok lennének itt, azok maradhatnak.
+            delayMicroseconds(10000);  // Pl. 10 ms
         }
     }
 }
