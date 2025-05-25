@@ -437,25 +437,28 @@ void RttyDecoder::updateDecoder() {
             break;
 
         case RECEIVING_STOP_BIT: {
-            // 5 minta a stop bit periódusán belül, többségi szavazás
+            // 7 minta a stop bit periódusán belül, többségi szavazás + részletes log
             int markCount = 0;
-            const int sampleCount = 5;
-            // Fél bit periódus várakozás, hogy középre kerüljön az első minta
+            const int sampleCount = 7;
+            char sampleLog[16] = {0};
             delay(bitDurationMs_ / (sampleCount + 1));
             for (int i = 0; i < sampleCount; ++i) {
-                if (detectToneState() && currentToneState_) markCount++;
+                bool valid = detectToneState() && currentToneState_;
+                if (valid) markCount++;
+                sampleLog[i] = valid ? 'M' : 'S';
                 if (i < sampleCount - 1) {
-                    delay(bitDurationMs_ / (sampleCount + 1));  // Egyenletesen elosztva
+                    delay(bitDurationMs_ / (sampleCount + 1));
                 }
             }
-            if (markCount >= 3) {  // Legalább 3 Mark: érvényes stop bit
+            RTTY_DEBUG("RTTY: Stop bit samples: %s (%d Mark, %d Space)\n", sampleLog, markCount, sampleCount - markCount);
+            if (markCount >= 4) {  // Legalább 4 Mark: érvényes stop bit
                 char decodedChar = decodeBaudotCharacter(currentByte_);
                 if (decodedChar != '\0') {
                     addToBuffer(decodedChar);
-                    RTTY_DEBUG("RTTY: Character decoded: '%c' (0x%02X) at %lu ms [5-sample stop bit]\n", decodedChar, currentByte_, millis());
+                    RTTY_DEBUG("RTTY: Character decoded: '%c' (0x%02X) at %lu ms [7-sample stop bit]\n", decodedChar, currentByte_, millis());
                 }
             } else {
-                RTTY_DEBUG("RTTY: Invalid stop bit (Space, majority, 5-sample) at %lu ms, discarding character 0x%02X\n", millis(), currentByte_);
+                RTTY_DEBUG("RTTY: Invalid stop bit (Space, majority, 7-sample) at %lu ms, discarding character 0x%02X\n", millis(), currentByte_);
             }
             // Reset for next character
             resetRttyStateMachine();
