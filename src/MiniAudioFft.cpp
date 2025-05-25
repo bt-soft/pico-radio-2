@@ -1120,12 +1120,10 @@ void MiniAudioFft::drawTuningAid() {
     // A pontosabb pozícionáláshoz a beállított min/max frekvenciákat használjuk
     float min_freq_displayed_actual = currentTuningAidMinFreqHz_;
     float max_freq_displayed_actual = currentTuningAidMaxFreqHz_;
-    float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;
-
-    // Szöveg beállítások a frekvencia kiíráshoz (a sprite-ra rajzolunk)
-    sprGraph.setFreeFont();           // Alapértelmezett vagy válassz egy kisebb, jól olvasható fontot a sprite-hoz
-    sprGraph.setTextSize(1);          // Megfelelő méret a sprite-on
-    sprGraph.setTextDatum(TC_DATUM);  // Top-Center igazítás a vonal feletti kiíráshoz
+    float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;  // Szöveg beállítások a frekvencia kiíráshoz (a sprite-ra rajzolunk)
+    sprGraph.setFreeFont();                                                           // Alapértelmezett vagy válassz egy kisebb, jól olvasható fontot a sprite-hoz
+    sprGraph.setTextSize(1);                                                          // Megfelelő méret a sprite-on
+    sprGraph.setTextDatum(BC_DATUM);                                                  // Bottom-Center igazítás a vonal alatti kiíráshoz
 
     if (displayed_span_hz > 0) {
         if (currentTuningAidType_ == TuningAidType::CW_TUNING) {
@@ -1133,20 +1131,18 @@ void MiniAudioFft::drawTuningAid() {
             int line_x_on_sprite = width / 2;
             sprGraph.drawFastVLine(line_x_on_sprite, 0, graphH, TUNING_AID_TARGET_LINE_COLOR);
             sprGraph.setTextColor(TUNING_AID_TARGET_LINE_COLOR, TFT_BLACK);
-            sprGraph.drawString(String(static_cast<int>(TUNING_AID_TARGET_FREQ_HZ)) + "Hz", line_x_on_sprite, 2);
+            sprGraph.drawString(String(static_cast<int>(TUNING_AID_TARGET_FREQ_HZ)) + "Hz", line_x_on_sprite, graphH - 2);
 
         } else if (currentTuningAidType_ == TuningAidType::RTTY_TUNING) {
             float f_space = RTTY_SPACE_FREQUENCY;
-            float f_mark = RTTY_MARKER_FREQUENCY;
-
-            // Space vonal
+            float f_mark = RTTY_MARKER_FREQUENCY;  // Space vonal
             if (f_space >= min_freq_displayed_actual && f_space <= max_freq_displayed_actual) {
                 float ratio_space = (f_space - min_freq_displayed_actual) / displayed_span_hz;
                 int line_x_space = static_cast<int>(std::round(ratio_space * (width - 1)));  // width-1, ha 0-tól width-1-ig terjed
                 line_x_space = constrain(line_x_space, 0, width - 1);                        // Biztosítjuk, hogy a sprite-on belül legyen
                 sprGraph.drawFastVLine(line_x_space, 0, graphH, TUNING_AID_RTTY_SPACE_LINE_COLOR);
                 sprGraph.setTextColor(TUNING_AID_RTTY_SPACE_LINE_COLOR, TFT_BLACK);
-                sprGraph.drawString(String(static_cast<int>(f_space)) + "Hz", line_x_space, 2);
+                sprGraph.drawString(String(static_cast<int>(f_space)) + "Hz", line_x_space, graphH - 2);
             }
 
             // Mark vonal
@@ -1156,7 +1152,7 @@ void MiniAudioFft::drawTuningAid() {
                 line_x_mark = constrain(line_x_mark, 0, width - 1);
                 sprGraph.drawFastVLine(line_x_mark, 0, graphH, TUNING_AID_RTTY_MARK_LINE_COLOR);
                 sprGraph.setTextColor(TUNING_AID_RTTY_MARK_LINE_COLOR, TFT_BLACK);
-                sprGraph.drawString(String(static_cast<int>(f_mark)) + "Hz", line_x_mark, 2);
+                sprGraph.drawString(String(static_cast<int>(f_mark)) + "Hz", line_x_mark, graphH - 2);
             }
         }
     }
