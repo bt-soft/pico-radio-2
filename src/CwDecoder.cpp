@@ -14,7 +14,7 @@
 
 // CW működés debug engedélyezése de csak DEBUG módban
 
-#ifdef nem__DEBUG
+#ifdef __DEBUG
 #define CW_DEBUG(fmt, ...) DEBUG(fmt __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define CW_DEBUG(fmt, ...)  // Üres makró, ha __DEBUG nincs definiálva
@@ -320,18 +320,16 @@ char CwDecoder::processCollectedElements() {
             processDash();
             CW_DEBUG("CW: [%d] Vonás: %lu ms\n", i, duration);
         }
-    }
-
-    // Érvényes karakter?
+    }  // Érvényes karakter?
     char result = getCharFromTree();
-    if (result != '\0') {       // Csak azt ellenőrizzük, hogy nem null karakter-e
-        if (isprint(result)) {  // Nyomtatható karakter
+    if (result != '\0' && result != ' ') {  // Szóköz karaktert nem tekintünk érvényes dekódolt karakternek
+        if (isprint(result)) {              // Nyomtatható karakter
             CW_DEBUG("CW: Érvényes karakter dekódolva: '%c'\n", result);
             return result;
         }
     } else {
-        // Ha result '\0', az azt jelenti, hogy a getCharFromTree() ' '-t adott vissza, de a fa gyökerénél vagy érvénytelen indexen volt
-        CW_DEBUG("CW: Ismeretlen minta - treeIndex: %d\n", treeIndex_);
+        // Ha result '\0' vagy ' ', az azt jelenti, hogy nincs érvényes karakter ezen a pozíción
+        CW_DEBUG("CW: Ismeretlen minta - treeIndex: %d, result: '%c'\n", treeIndex_, result);
     }
     return '\0';
 }
@@ -528,10 +526,27 @@ void CwDecoder::updateDecoder() {
             decoderStarted_ = false;
             CW_DEBUG("CW: Hosszú csend, space: %lu ms\n", spaceDuration);
         }
+    }  // Szóköz beillesztés ellenőrzése - enyhített feltételekkel
+    if (decodedChar == '\0' && !measuringTone_ && !currentToneState && lastDecodedChar_ != '\0') {
+        unsigned long spaceDuration = currentTimeMs - trailingEdgeTimeMs_;
+        // Csökkentett szóköz küszöb - 4-5 pont hossza helyett 3-4 pont hossza
+        unsigned long reducedWordGapMs = max(150UL, (unsigned long)(estimatedDotLength * 3.5f));
+
+        CW_DEBUG("CW: Szóköz ellenőrzés - space: %lu ms, küszöb: %lu ms, lastChar: '%c', processed: %s\n", spaceDuration, reducedWordGapMs, lastDecodedChar_,
+                 wordSpaceProcessed_ ? "igen" : "nem");
+
+        if (spaceDuration > reducedWordGapMs && !wordSpaceProcessed_ && lastDecodedChar_ != ' ') {
+            decodedChar = ' ';           // Szóköz karakter beszúrása
+            wordSpaceProcessed_ = true;  // Jelöljük, hogy ehhez a szünethez már adtunk szóközt
+            CW_DEBUG("CW: Szóköz beszúrva, gap: %lu ms (küszöb: %lu ms)\n", spaceDuration, reducedWordGapMs);
+        }
     }
 
     if (decodedChar != '\0') {
         CW_DEBUG("CW: Dekódolt karakter: '%c'\n", decodedChar);
+        if (decodedChar != ' ') {
+            lastDecodedChar_ = decodedChar;  // Frissítjük az utolsó karaktert (de szóközt nem)
+        }
     }
     addToBuffer(decodedChar);
     return;

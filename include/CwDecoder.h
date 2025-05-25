@@ -39,7 +39,7 @@ class CwDecoder {
     static constexpr float WORD_GAP_DOT_MULTIPLIER = 6.5f;  // Kb. 7 dit, de a char gap-nél biztosan nagyobb
     static constexpr unsigned long MIN_CHAR_GAP_MS_FALLBACK = 180;
     static constexpr unsigned long MIN_WORD_GAP_MS_FALLBACK = 400;
-    static constexpr unsigned long DOT_MIN_MS = 40;               // Minimum pont hossz (ms)
+    static constexpr unsigned long DOT_MIN_MS = 25;               // Minimum pont hossz (ms) - csökkentve a rövid jelek fogadásához
     static constexpr unsigned long DOT_MAX_MS = 200;              // Maximum pont hossz (ms)
     static constexpr unsigned long DASH_MAX_MS = DOT_MAX_MS * 7;  // Maximum vonás hossz (ms)
 
