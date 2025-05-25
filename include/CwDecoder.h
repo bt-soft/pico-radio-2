@@ -34,9 +34,15 @@ class CwDecoder {
     // Morse timing and state
     static constexpr float THRESHOLD = 250.0f;  // Adjusted threshold, experiment with this value (e.g., 200-400)
     static constexpr unsigned long MIN_MORSE_ELEMENT_DURATION_MS =
-        25;                                           // Minimum duration for a valid Morse element (ms) - Ezt lehet, hogy a DOT_MIN_MS-re kellene cserélni vagy összehangolni
-    static constexpr unsigned long DOT_MIN_MS = 40;   // Minimum pont hossz (ms)
-    static constexpr unsigned long DOT_MAX_MS = 200;  // Maximum pont hossz (ms)
+        25;  // Minimum duration for a valid Morse element (ms) - Ezt lehet, hogy a DOT_MIN_MS-re kellene cserélni vagy összehangolni
+    // Szünetek időzítéséhez konstansok
+    static constexpr float CHAR_GAP_DOT_MULTIPLIER = 3.0f;
+    static constexpr float WORD_GAP_DOT_MULTIPLIER = 6.5f;  // Kb. 7 dit, de a char gap-nél biztosan nagyobb
+    static constexpr unsigned long MIN_CHAR_GAP_MS_FALLBACK = 180;
+    static constexpr unsigned long MIN_WORD_GAP_MS_FALLBACK = 400;
+
+    static constexpr unsigned long DOT_MIN_MS = 40;               // Minimum pont hossz (ms)
+    static constexpr unsigned long DOT_MAX_MS = 200;              // Maximum pont hossz (ms)
     static constexpr unsigned long DASH_MAX_MS = DOT_MAX_MS * 7;  // Maximum vonás hossz (ms)
 
     short noiseBlankerLoops_;  // Number of confirmations for tone/no-tone
@@ -58,6 +64,10 @@ class CwDecoder {
     bool toneDetectedState_;  // True if Goertzel filter output is above threshold
 
     bool inInactiveState;  // Ha inaktív állapotban vagyunk
+
+    // Szóköz dekódoláshoz
+    char lastDecodedChar_;     // Utoljára dekódolt karakter
+    bool wordSpaceProcessed_;  // Jelzi, ha egy adott csendperiódusért már adtunk szóközt
 
     // Morse tree
     static const char MORSE_TREE_SYMBOLS[];

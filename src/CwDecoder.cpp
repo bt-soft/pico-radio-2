@@ -5,7 +5,7 @@
 #include "defines.h"  // DEBUG
 
 // CW működés debug engedélyezése de csak DEBUG módban
-#ifdef __DEBUG
+#ifdef __DEBUG__444
 #define CW_DEBUG(fmt, ...) DEBUG(fmt __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define CW_DEBUG(fmt, ...)  // Üres makró, ha __DEBUG nincs definiálva
@@ -51,6 +51,8 @@ void CwDecoder::initialize() {
     decoderStarted_ = false;
     measuringTone_ = false;
     toneDetectedState_ = false;
+    lastDecodedChar_ = '\0';
+    wordSpaceProcessed_ = false;
     inInactiveState = false;
     resetMorseTree();
     q0 = 0;
@@ -120,7 +122,7 @@ char CwDecoder::getCharFromTree() {
     if (treeIndex_ >= 0 && treeIndex_ < sizeof(MORSE_TREE_SYMBOLS)) {
         return MORSE_TREE_SYMBOLS[treeIndex_];
     }
-    return ' ';
+    return '\0';
 }
 
 void CwDecoder::processDot() {
@@ -203,14 +205,48 @@ void CwDecoder::updateReferenceTimings(unsigned long duration) {
     CW_DEBUG("CW: Ref frissítve - min: %lu, max: %lu, ref: %lu, új elem: %lu\n", toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_, duration);
 }
 
+char CwDecoder::processCollectedElements() {
+    if (toneIndex_ == 0) return '\0';
+    CW_DEBUG("CW: Feldolgozás - %d elem, ref: %lu ms\n", toneIndex_, currentReferenceMs_);
+    resetMorseTree();
+
+    for (short i = 0; i < toneIndex_; i++) {
+        unsigned long duration = rawToneDurations_[i];
+        if (duration < currentReferenceMs_) {
+            processDot();
+            CW_DEBUG("CW: [%d] Pont: %lu ms\n", i, duration);
+        } else {
+            processDash();
+            CW_DEBUG("CW: [%d] Vonás: %lu ms\n", i, duration);
+        }
+    }
+
+    // Érvényes karakter?
+    char result = getCharFromTree();
+    if (result != '\0') {       // Csak azt ellenőrizzük, hogy nem null karakter-e
+        if (isprint(result)) {  // Nyomtatható karakter
+            CW_DEBUG("CW: Érvényes karakter dekódolva: '%c'\n", result);
+            return result;
+        }
+    } else {
+        // Ha result '\0', az azt jelenti, hogy a getCharFromTree() ' '-t adott vissza, de a fa gyökerénél vagy érvénytelen indexen volt
+        CW_DEBUG("CW: Ismeretlen minta - treeIndex: %d\n", treeIndex_);
+    }
+    return '\0';
+}
+
 char CwDecoder::decodeNextCharacter() {
     static unsigned long lastActivityMs = 0;
     static const unsigned long MAX_SILENCE_MS = 4000;
     static const unsigned long ELEMENT_GAP_MIN_MS = DOT_MIN_MS / 2;
 
     unsigned long estimatedDotLength = (toneMinDurationMs_ == 9999L || toneMinDurationMs_ == 0) ? (currentReferenceMs_ / 2) : toneMinDurationMs_;
-    if (estimatedDotLength < DOT_MIN_MS) estimatedDotLength = DOT_MIN_MS;
-    unsigned long charGapMs = max(200UL, estimatedDotLength * 3);
+    if (estimatedDotLength < DOT_MIN_MS || currentReferenceMs_ == 0) estimatedDotLength = DOT_MIN_MS;  // Biztosítjuk, hogy legyen értelmes alap
+
+    unsigned long charGapMs = max(MIN_CHAR_GAP_MS_FALLBACK, (unsigned long)(estimatedDotLength * CHAR_GAP_DOT_MULTIPLIER));
+    unsigned long wordGapMs = max(MIN_WORD_GAP_MS_FALLBACK, (unsigned long)(estimatedDotLength * WORD_GAP_DOT_MULTIPLIER));
+    // Biztosítjuk, hogy a wordGapMs nagyobb legyen, mint a charGapMs
+    if (wordGapMs <= charGapMs) wordGapMs = charGapMs + max(1UL, MIN_CHAR_GAP_MS_FALLBACK / 2);
 
     bool currentToneState = sampleWithNoiseBlanking();
     unsigned long currentTimeMs = millis();
@@ -218,21 +254,16 @@ char CwDecoder::decodeNextCharacter() {
 
     if (currentToneState) {
         lastActivityMs = currentTimeMs;
+        // Ha hangot észlelünk, és előtte nem mértünk hangot (azaz egy új hang kezdődött)
+        if (!measuringTone_) {
+            wordSpaceProcessed_ = false;  // Új hang megszakítja az előző csendperiódust, reseteljük a flag-et
+        }
     }
 
     if (currentTimeMs - lastActivityMs > MAX_SILENCE_MS) {
-        if (!inInactiveState) {  // Csak akkor írjuk ki, ha még nem tettük
-            resetMorseTree();
-            toneIndex_ = 0;
-            decoderStarted_ = false;
-            measuringTone_ = false;
-            toneMinDurationMs_ = 9999L;
-            toneMaxDurationMs_ = 0L;
-            currentReferenceMs_ = startReferenceMs_;
-            memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
-
-            CW_DEBUG("CW: Reset inactivity miatt\n");
-
+        if (!inInactiveState) {   // Csak akkor írjuk ki, ha még nem tettük
+            resetDecoderState();  // Teljes reset, ami az initialize()-t hívja
+            CW_DEBUG("CW: Reset inactivity (%lu ms) miatt\n", MAX_SILENCE_MS);
             inInactiveState = true;  // Beállítjuk, hogy kiírtuk
         }
         return '\0';
@@ -243,6 +274,7 @@ char CwDecoder::decodeNextCharacter() {
         decoderStarted_ = true;
         inInactiveState = false;  // Újra aktívak vagyunk, reseteljük a flag-et
         measuringTone_ = true;
+        wordSpaceProcessed_ = false;  // Új hangjel kezdődött
 
         CW_DEBUG("CW: Első él, idő: %lu\n", currentTimeMs);
 
@@ -280,6 +312,7 @@ char CwDecoder::decodeNextCharacter() {
         measuringTone_ = false;
     } else if (decoderStarted_ && !measuringTone_ && currentToneState) {
         unsigned long gapDuration = currentTimeMs - trailingEdgeTimeMs_;
+        wordSpaceProcessed_ = false;  // Új hangjel kezdődött egy szünet után
         if (toneIndex_ >= 6) {
             CW_DEBUG("CW: Tömb tele (%d elem), kényszer dekódolás\n", toneIndex_);
             decodedChar = processCollectedElements();
@@ -287,10 +320,15 @@ char CwDecoder::decodeNextCharacter() {
             resetMorseTree();
             toneIndex_ = 0;
         }
-        if (gapDuration >= charGapMs && toneIndex_ > 0) {
+        if (gapDuration >= charGapMs && toneIndex_ > 0) {  // Karakter elválasztó szünet
             CW_DEBUG("CW: Karakterhatár detektálva, gap: %lu ms (küszöb: %lu ms)\n", gapDuration, charGapMs);
             decodedChar = processCollectedElements();
+            if (decodedChar != '\0') {
+                lastDecodedChar_ = decodedChar;
+                lastActivityMs = currentTimeMs;
+            }
             resetMorseTree();
+            // trailingEdgeTimeMs_ nem frissül itt, mert a következő hang leadingEdgeTimeMs_-e lesz a mérvadó
             toneIndex_ = 0;
             memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
             leadingEdgeTimeMs_ = currentTimeMs;
@@ -303,7 +341,10 @@ char CwDecoder::decodeNextCharacter() {
             CW_DEBUG("CW: Rövid gap: %lu ms (küszöb: %lu)\n", gapDuration, charGapMs);
             if (toneIndex_ >= 1 && gapDuration >= 150) {
                 CW_DEBUG("CW: 1+ elem 150ms+ gap-pel - karakterhatár feltételezés\n");
+                // Ez az ág potenciálisan problémás lehet, ha a 150ms rövidebb, mint a charGapMs.
+                // De meghagyjuk az eredeti logika szerint.
                 decodedChar = processCollectedElements();
+                if (decodedChar != '\0') lastDecodedChar_ = decodedChar;  // lastActivityMs frissül, ha van karakter
                 memset(rawToneDurations_, 0, sizeof(rawToneDurations_));
                 resetMorseTree();
                 toneIndex_ = 0;
@@ -329,37 +370,7 @@ char CwDecoder::decodeNextCharacter() {
     }
 
     if (decodedChar != '\0') {
-        CW_DEBUG("CW: Dekódolt karakter: '%c'\n", decodedChar);
+        DEBUG("CW: Dekódolt karakter: '%c'\n", decodedChar);
     }
     return decodedChar;
-}
-
-char CwDecoder::processCollectedElements() {
-    if (toneIndex_ == 0) return '\0';
-    CW_DEBUG("CW: Feldolgozás - %d elem, ref: %lu ms\n", toneIndex_, currentReferenceMs_);
-    resetMorseTree();
-
-    for (short i = 0; i < toneIndex_; i++) {
-        unsigned long duration = rawToneDurations_[i];
-        if (duration < currentReferenceMs_) {
-            processDot();
-            CW_DEBUG("CW: [%d] Pont: %lu ms\n", i, duration);
-        } else {
-            processDash();
-            CW_DEBUG("CW: [%d] Vonás: %lu ms\n", i, duration);
-        }
-    }
-    char result = getCharFromTree();
-
-    // Most már a szóközt is elfogadjuk érvényes karakterként
-    if (result != '\0') {                        // Csak azt ellenőrizzük, hogy nem null karakter-e
-        if (isprint(result) || result == ' ') {  // Nyomtatható karakter VAGY szóköz
-            CW_DEBUG("CW: Érvényes karakter dekódolva: '%c'\n", result);
-            return result;
-        }
-    } else {
-        // Ha result '\0', az azt jelenti, hogy a getCharFromTree() ' '-t adott vissza, de a fa gyökerénél vagy érvénytelen indexen volt
-        CW_DEBUG("CW: Ismeretlen minta - treeIndex: %d\n", treeIndex_);
-    }
-    return '\0';
 }
