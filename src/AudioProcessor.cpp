@@ -1,12 +1,16 @@
+#include "AudioProcessor.h"
+
 #include <cmath>  // std::abs, std::round
 
-#include "AudioProcessor.h"
-#include "defines.h" // DEBUG makróhoz, ha szükséges
+#include "defines.h"  // DEBUG makróhoz, ha szükséges
 
 AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double targetSamplingFrequency)
-    : FFT(), activeFftGainConfigRef(gainConfigRef), audioInputPin(audioPin),
-      targetSamplingFrequency_(targetSamplingFrequency), binWidthHz_(0.0f),
-      smoothed_auto_gain_factor_(1.0f) // Simított erősítési faktor inicializálása
+    : FFT(),
+      activeFftGainConfigRef(gainConfigRef),
+      audioInputPin(audioPin),
+      targetSamplingFrequency_(targetSamplingFrequency),
+      binWidthHz_(0.0f),
+      smoothed_auto_gain_factor_(1.0f)  // Simított erősítési faktor inicializálása
 {
 
     if (targetSamplingFrequency_ > 0) {
@@ -15,7 +19,7 @@ AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double target
     } else {
         sampleIntervalMicros_ = 25;  // Fallback to 40kHz
         binWidthHz_ = (1000000.0f / sampleIntervalMicros_) / AudioProcessorConstants::FFT_SAMPLES;
-        DEBUG("AudioProcessor: Warning - targetSamplingFrequency is zero, using fallback.");
+        DEBUG("AudioProcessor: Figyelmeztetés - targetSamplingFrequency nulla, tartalék használata.");
     }
     DEBUG("AudioProcessor: Target Fs: %.1f Hz, Sample Interval: %lu us, Bin Width: %.2f Hz\n", targetSamplingFrequency_, sampleIntervalMicros_, binWidthHz_);
 
@@ -86,8 +90,8 @@ void AudioProcessor::process(bool collectOsciSamples) {
         for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
             vReal[i] *= activeFftGainConfigRef;
         }
-    } else if (activeFftGainConfigRef == 0.0f) {     // Auto Gain
-        float target_auto_gain_factor = 1.0f; // Alapértelmezett erősítés, ha nincs jel
+    } else if (activeFftGainConfigRef == 0.0f) {  // Auto Gain
+        float target_auto_gain_factor = 1.0f;     // Alapértelmezett erősítés, ha nincs jel
 
         if (max_abs_sample_for_auto_gain > 0.001) {  // Nullával osztás és extrém erősítés elkerülése
             target_auto_gain_factor = AudioProcessorConstants::FFT_AUTO_GAIN_TARGET_PEAK / max_abs_sample_for_auto_gain;
@@ -109,15 +113,15 @@ void AudioProcessor::process(bool collectOsciSamples) {
             vReal[i] *= smoothed_auto_gain_factor_;
         }
 
-// #ifdef __DEBUG
-//         static unsigned long lastGainPrintTime = 0;
-//         if (millis() - lastGainPrintTime >= 1000) {
-//             if (activeFftGainConfigRef == 0.0f) { // Csak auto gain módban írjuk ki
-//                 DEBUG("AudioProcessor: Smoothed Auto Gain Factor: %.2f\n", smoothed_auto_gain_factor_);
-//             }
-//             lastGainPrintTime = millis();
-//         }
-// #endif
+        // #ifdef __DEBUG
+        //         static unsigned long lastGainPrintTime = 0;
+        //         if (millis() - lastGainPrintTime >= 1000) {
+        //             if (activeFftGainConfigRef == 0.0f) { // Csak auto gain módban írjuk ki
+        //                 DEBUG("AudioProcessor: Smoothed Auto Gain Factor: %.2f\n", smoothed_auto_gain_factor_);
+        //             }
+        //             lastGainPrintTime = millis();
+        //         }
+        // #endif
     }
     // 3. Ablakozás, FFT számítás, magnitúdó
     FFT.windowing(vReal, AudioProcessorConstants::FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);

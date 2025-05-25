@@ -110,16 +110,15 @@ void ScreenSaverDisplay::displayLoop() {
         if (true) {  // konfigból beállíthatóvá tenni, hogy mutassa-e a feszültséget
 
             float vSupply = PicoSensorUtils::readVBus();
-
-            uint8_t bat = map(int(vSupply * 100), MIN_BATTERRY_VOLTAGE, MAX_BATTERRY_VOLTAGE, 0, 100);
+            uint8_t bat = map(int(vSupply * 100), MIN_BATTERY_VOLTAGE, MAX_BATTERY_VOLTAGE, 0, 100);
             bat = constrain(bat, 0, 100);  // Érték korlátozása 0% és 100% közé
 
             // Szín beállítása az alacsony feszültségekhez
             uint32_t colorBatt = TFT_DARKCYAN;
             if (bat < 5) {
-                colorBatt = TFT_COLOR_DRAINED_BATTERRY;
+                colorBatt = TFT_COLOR_DRAINED_BATTERY;
             } else if (bat < 15) {
-                colorBatt = TFT_COLOR_SUMBERSIBLE_BATTERRY;
+                colorBatt = TFT_COLOR_SUBMERSIBLE_BATTERY;
             }
 
             tft.drawRect(saverX + 145, saverY, 38, 18, colorBatt);

@@ -1,8 +1,8 @@
 #include "utils.h"
 
+#include "Config.h"  // Szükséges a config objektum eléréséhez
 #include "defines.h"
 
-#include "Config.h" // Szükséges a config objektum eléréséhez
 namespace Utils {
 
 /**
@@ -31,13 +31,13 @@ void tftTouchCalibrate(TFT_eSPI &tft, uint16_t (&calData)[5]) {
     tft.fillScreen(TFT_BLACK);
     tft.setTextFont(2);
     tft.setTextSize(2);
-    const __FlashStringHelper *txt = F("TFT touch calibration required\n");
+    const __FlashStringHelper *txt = F("TFT erintokepernyo kalibracio szukseges\n");
     tft.setCursor((tft.width() - tft.textWidth(txt)) / 2, tft.height() / 2 - 60);
     tft.setTextColor(TFT_ORANGE, TFT_BLACK);
     tft.println(txt);
 
     tft.setTextSize(1);
-    txt = F("Touch the corners at the indicated places!\n");
+    txt = F("Erintsd meg a jelzett helyeken a sarkokat!\n");
     tft.setCursor((tft.width() - tft.textWidth(txt)) / 2, tft.height() / 2 + 20);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     tft.println(txt);
@@ -217,7 +217,7 @@ void trimLeadingSpaces(char *str) {
             str[j] = str[i + j];
             j++;
         }
-        str[j] = '\0'; // Új null terminátor
+        str[j] = '\0';  // Új null terminátor
     }
 }
 

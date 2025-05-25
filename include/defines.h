@@ -33,12 +33,12 @@
 #define TFT_BACKGROUND_LED_MAX_BRIGHTNESS 255
 #define TFT_BACKGROUND_LED_MIN_BRIGHTNESS 5
 
-//--- Batterry ---
-#define MIN_BATTERRY_VOLTAGE 270  // Minimum akkumulátor feszültség (V*100)
-#define MAX_BATTERRY_VOLTAGE 405  // Maximum akkumulátor feszültség (V*100)
+//--- Battery ---
+#define MIN_BATTERY_VOLTAGE 270  // Minimum akkumulátor feszültség (V*100)
+#define MAX_BATTERY_VOLTAGE 405  // Maximum akkumulátor feszültség (V*100)
 
-#define TFT_COLOR_DRAINED_BATTERRY TFT_COLOR(248, 252, 0)
-#define TFT_COLOR_SUMBERSIBLE_BATTERRY TFT_ORANGE
+#define TFT_COLOR_DRAINED_BATTERY TFT_COLOR(248, 252, 0)
+#define TFT_COLOR_SUBMERSIBLE_BATTERY TFT_ORANGE
 
 //--- ScreenSaver
 #define SCREEN_SAVER_TIMEOUT_MIN 1
