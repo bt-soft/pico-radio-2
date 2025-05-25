@@ -36,8 +36,6 @@ AmDisplay::AmDisplay(TFT_eSPI &tft, SI4735 &si4735, Band &band)
         {"AntC", TftButton::ButtonType::Pushable},                                //
     };
     uint8_t horizontalButtonCount = ARRAY_ITEM_COUNT(horizontalButtonsData);  // A targetSamplingFrequency 12000 Hz (2 * 6000 Hz) az AM FFT-hez, CW és RTTY dekódoláshoz.
-    pAudioProcessor = new AudioProcessor(config.data.miniAudioFftConfigRtty, AUDIO_INPUT_PIN,
-                                         MiniAudioFftConstants::MAX_DISPLAY_AUDIO_FREQ_AM_HZ * 2.0f);  // 12000 Hz
 
     // Szövegterület és módváltó gombok pozícióinak kiszámítása
     decodedTextAreaX = DECODER_TEXT_AREA_X_START;
@@ -81,7 +79,6 @@ AmDisplay::~AmDisplay() {
     if (pSMeter) delete pSMeter;
     if (pSevenSegmentFreq) delete pSevenSegmentFreq;
     if (pMiniAudioFft) delete pMiniAudioFft;
-    if (pAudioProcessor) delete pAudioProcessor;  // AudioProcessor törlése
 }
 
 /**

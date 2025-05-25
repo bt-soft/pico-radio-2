@@ -305,8 +305,7 @@ void CwDecoder::updateReferenceTimings(unsigned long duration) {  // Adaptív re
     currentReferenceMs_ = constrain(currentReferenceMs_, lowerBound, upperBound);
 
     // WPM becslés és debug kimenet
-    int estimatedWpm = estimateWpm();
-    CW_DEBUG("CW: Ref frissítve - min: %lu, max: %lu, ref: %lu, új elem: %lu, WPM: %d\n", toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_, duration, estimatedWpm);
+    CW_DEBUG("CW: Ref frissítve - min: %lu, max: %lu, ref: %lu, új elem: %lu, WPM: %d\n", toneMinDurationMs_, toneMaxDurationMs_, currentReferenceMs_, duration, estimateWpm());
 }
 
 /**

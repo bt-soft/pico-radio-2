@@ -6,10 +6,13 @@
 
 // Constants that are independent of the sampling rate provided at construction
 namespace AudioProcessorConstants {
+
+constexpr uint16_t MIN_FFT_SAMPLES = 64;    // Minimális FFT minták száma
+constexpr uint16_t MAX_FFT_SAMPLES = 2048;  // Maximális FFT minták száma
+
 // Default FFT sizes - these can be overridden at runtime
-constexpr uint16_t DEFAULT_FFT_SAMPLES = 256;  // Alapértelmezett FFT minták száma (2 hatványának kell lennie)
-constexpr uint16_t MIN_FFT_SAMPLES = 64;       // Minimális FFT minták száma
-constexpr uint16_t MAX_FFT_SAMPLES = 2048;     // Maximális FFT minták száma
+constexpr uint16_t DEFAULT_FFT_SAMPLES = 256;   // Alapértelmezett FFT minták száma (2 hatványának kell lennie)
+constexpr uint16_t HIGH_RES_FFT_SAMPLES = 512;  // Magas felbontású FFT minták száma
 
 // Backward compatibility
 constexpr uint16_t FFT_SAMPLES = DEFAULT_FFT_SAMPLES;  // DEPRECATED: Use setFftSize() instead

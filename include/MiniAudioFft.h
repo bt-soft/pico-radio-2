@@ -7,8 +7,7 @@
 #include <vector>  // std::vector használatához
 
 #include "AudioProcessor.h"
-#include "HighResAudioProcessor.h"  // Nagy felbontású audio feldolgozó
-#include "defines.h"                // AUDIO_INPUT_PIN és színek eléréséhez
+#include "defines.h"  // AUDIO_INPUT_PIN és színek eléréséhez
 
 // Konstansok a MiniAudioFft komponenshez
 namespace MiniAudioFftConstants {
@@ -137,9 +136,7 @@ class MiniAudioFft {
     uint8_t& configModeFieldRef;                   // Referencia a Config mezőre a mód mentéséhez
     float currentConfiguredMaxDisplayAudioFreqHz;  // Az AM/FM módnak megfelelő maximális frekvencia
     float& activeFftGainConfigRef;                 // Referencia az aktív FFT erősítés konfigurációra (AM vagy FM)
-
-    AudioProcessor* pAudioProcessor;                // Pointer az új audio feldolgozó osztályra
-    HighResAudioProcessor* pHighResAudioProcessor;  // Pointer a nagy felbontású audio feldolgozóra (TuningAid módhoz)
+    AudioProcessor* pAudioProcessor;               // Pointer az audio feldolgozó osztályra (dinamikus FFT mérettel)
 
     // Pufferek a különböző módokhoz
     int Rpeak[MiniAudioFftConstants::LOW_RES_BANDS + 1];  // Csúcsértékek az alacsony felbontású spektrumhoz

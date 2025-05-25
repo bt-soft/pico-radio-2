@@ -15,6 +15,7 @@ AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double target
       vReal(nullptr),
       vImag(nullptr),
       RvReal(nullptr) {
+
     // Validate and set FFT size
     if (!validateFftSize(fftSize)) {
         DEBUG("AudioProcessor: Invalid FFT size %d, using default %d\n", fftSize, AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
@@ -105,6 +106,7 @@ bool AudioProcessor::validateFftSize(uint16_t size) const {
 }
 
 bool AudioProcessor::setFftSize(uint16_t newSize) {
+
     if (!validateFftSize(newSize)) {
         DEBUG("AudioProcessor: Invalid FFT size %d\n", newSize);
         return false;

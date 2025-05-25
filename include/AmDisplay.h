@@ -34,7 +34,7 @@ class AmDisplay : public DisplayBase {
     String decodedTextDisplayLines[RTTY_MAX_TEXT_LINES];
     uint8_t decodedTextCurrentLineIndex = 0;
     String decodedTextCurrentLineBuffer = "";
-    uint16_t decoderCharHeight_ = 0; // Karakter magasság a dekóder szöveghez
+    uint16_t decoderCharHeight_ = 0;  // Karakter magasság a dekóder szöveghez
 
     // Dekódolási módválasztó rádiógomb csoport
     RadioButtonGroup decoderModeGroup;
@@ -43,12 +43,11 @@ class AmDisplay : public DisplayBase {
     uint8_t decoderModeStartId_ = 0;                 // Dekóder gombok kezdő ID-ja
     void setDecodeModeBasedOnButtonId(uint8_t buttonId);
 
-    AudioProcessor *pAudioProcessor;  // Audio processor példány    // A szövegterület tényleges koordinátái és méretei (konstruktorban számolva)
     uint16_t decodedTextAreaX, decodedTextAreaY, decodedTextAreaW, decodedTextAreaH;
     uint16_t decodeModeButtonsX;  // A módváltó gombok oszlopának X pozíciója    // Segédfüggvények
     void drawDecodedTextAreaBackground();
     void appendDecodedCharacter(char c);
-    void redrawCurrentInputLine();            // Csak az aktuális sort rajzolja újra
+    void redrawCurrentInputLine();  // Csak az aktuális sort rajzolja újra
     void updateDecodedTextDisplay();
     void clearDecodedTextBufferOnly();        // Csak a puffert törli
     void clearDecodedTextBufferAndDisplay();  // Törli a puffert és frissíti a kijelzőt

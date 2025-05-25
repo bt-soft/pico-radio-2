@@ -105,7 +105,7 @@ class CwDecoder {
     void addToBuffer(char c);         // Karakter hozzáadása a pufferhez
 
     // WPM sebesség becslés az aktuális pont hossz alapján
-    int estimateWpm() const {
+    uint8_t estimateWpm() const {
         if (toneMinDurationMs_ == 9999L || toneMinDurationMs_ == 0) {
             return 15;  // Alapértelmezett érték
         }

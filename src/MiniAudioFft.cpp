@@ -45,9 +45,11 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
       currentTuningAidMaxFreqHz_(0.0f),  // Inicializálás
       indicatorFontHeight_(0),           // Inicializálás      currentTuningAidType_(TuningAidType::CW_TUNING),  // Alapértelmezetten CW
       pAudioProcessor(nullptr),          // Inicializáljuk nullptr-rel
-      pHighResAudioProcessor(nullptr),   // Nagy felbontású processor inicializálása
       sprGraph(&tft),                    // Sprite inicializálása a TFT referenciával
       spriteCreated(false) {
+
+    // A mintavételezési frekvencia kétszerese, mert a nyers adatokat kétszer kell feldolgozni
+    pAudioProcessor = new AudioProcessor(activeFftGainConfigRef, AUDIO_INPUT_PIN, configuredMaxDisplayAudioFreq * 2.0f, AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
 
     // A `wabuf` (vízesés és burkológörbe buffer) inicializálása a komponens tényleges méreteivel.
     // Biztosítjuk, hogy a magasság és szélesség pozitív legyen az átméretezés előtt.
@@ -59,12 +61,6 @@ MiniAudioFft::MiniAudioFft(TFT_eSPI& tft, int x, int y, int w, int h, float conf
 
     // Pufferek nullázása
     memset(Rpeak, 0, sizeof(Rpeak));
-
-    // Standard AudioProcessor létrehozása (256 mintás FFT)
-    pAudioProcessor = new AudioProcessor(activeFftGainConfigRef, AUDIO_INPUT_PIN, configuredMaxDisplayAudioFreq * 2.0f);
-
-    // Nagy felbontású AudioProcessor létrehozása TuningAid módhoz (1024 mintás FFT)
-    pHighResAudioProcessor = new HighResAudioProcessor(activeFftGainConfigRef, AUDIO_INPUT_PIN, configuredMaxDisplayAudioFreq * 2.0f);
 
     // A módkijelző font magasságának kiszámítása és tárolása
     // Ugyanazokat a beállításokat használjuk, mint a drawModeIndicator-ban
@@ -83,10 +79,6 @@ MiniAudioFft::~MiniAudioFft() {
     if (pAudioProcessor) {
         delete pAudioProcessor;
         pAudioProcessor = nullptr;
-    }
-    if (pHighResAudioProcessor) {
-        delete pHighResAudioProcessor;
-        pHighResAudioProcessor = nullptr;
     }
 }
 
@@ -255,12 +247,8 @@ int MiniAudioFft::getIndicatorAreaY() const { return posY + getGraphHeight(); }
  * de csak akkor, ha az `isIndicatorCurrentlyVisible` igaz.
  */
 void MiniAudioFft::drawModeIndicator() {
+
     if (!isIndicatorCurrentlyVisible) {
-        // Ha nem látható, akkor a `clearArea` már a kisebb kerettel törölt.
-        // Azt a területet, ahol a módkijelző volt, expliciten feketére kell állítani,
-        // hogy eltűnjön a szöveg, amikor az `isIndicatorCurrentlyVisible` false-ra vált.
-        // Ezt a `loop` fogja kezelni a `forceRedraw` hívásával, amikor a láthatóság változik.
-        // Itt elég, ha nem rajzolunk semmit. A `forceRedraw` `clearArea`-ja gondoskodik a háttérről.
         return;
     }
 
@@ -384,14 +372,14 @@ void MiniAudioFft::loop() {
 
     // --- Csak akkor jutunk ide, ha nincs némítás, a mód nem "Off", és nem volt állapotváltozás miatti forceRedraw ---
 
-    // FFT mintavételezés és számítás az AudioProcessor segítségével
-    unsigned long fft_start_time = micros();
-    if (currentMode != DisplayMode::Off) {  // Csak akkor végezzük el, ha a kijelzési mód nem Off
-        if (pAudioProcessor) {              // Ellenőrizzük, hogy a pAudioProcessor létezik-e
+    // Csak akkor végezzük el, ha a kijelzési mód nem Off
+    if (currentMode != DisplayMode::Off) {
+
+        // Ellenőrizzük, hogy a pAudioProcessor létezik-e
+        if (pAudioProcessor) {
             pAudioProcessor->process(currentMode == DisplayMode::Oscilloscope);
         }
     }
-    unsigned long fft_duration = micros() - fft_start_time;
 
     // Grafikonok kirajzolása a nekik szánt (csökkentett) területre
     // Ezek a függvények a `posY`-tól `posY + getGraphHeight() - 1`-ig rajzolnak.
@@ -422,10 +410,6 @@ void MiniAudioFft::loop() {
         default:
             break;
     }
-    unsigned long draw_duration = micros() - draw_start_time;
-
-    // A drawModeIndicator() metódust NEM hívjuk itt minden ciklusban,
-    // csak akkor, ha a mód/láthatóság ténylegesen megváltozik (cycleMode, forceRedraw).
 
     // Segédfüggvény a DisplayMode szöveges nevének lekérdezéséhez
     static auto getModeNameString = [](MiniAudioFft::DisplayMode mode) -> const char* {
@@ -448,21 +432,6 @@ void MiniAudioFft::loop() {
                 return "Unknown";
         }
     };
-
-#ifdef __DEBUG
-    // Belső időmérés kiíratása (opcionális, csak debugoláshoz)
-    static unsigned long lastInternalTimingPrint = 0;
-    static unsigned long max_fft_loop_duration = 0;
-    static unsigned long max_draw_loop_duration = 0;
-    if (fft_duration > max_fft_loop_duration) max_fft_loop_duration = fft_duration;
-    if (draw_duration > max_draw_loop_duration) max_draw_loop_duration = draw_duration;
-    if (millis() - lastInternalTimingPrint >= 5000) {
-        //        DEBUG("MiniAudioFft elapsed (max 5s): - FFT: %lu us, Draw (%s): %lu us\n", max_fft_loop_duration, getModeNameString(currentMode), max_draw_loop_duration);
-        lastInternalTimingPrint = millis();
-        max_fft_loop_duration = 0;
-        max_draw_loop_duration = 0;
-    }
-#endif
 }
 
 /**
@@ -477,13 +446,16 @@ void MiniAudioFft::loop() {
  * @return Igaz, ha az érintést a komponens kezelte, egyébként hamis.
  */
 bool MiniAudioFft::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
+
     if (touched && (tx >= posX && tx < (posX + width) && ty >= posY && ty < (posY + height))) {
+
         // Debounce logika: Csak akkor dolgozzuk fel, ha elegendő idő telt el az utolsó feldolgozás óta
         if (millis() - lastTouchProcessTime > MiniAudioFftConstants::TOUCH_DEBOUNCE_MS) {
             lastTouchProcessTime = millis();  // Időbélyeg frissítése
             cycleMode();                      // Ez beállítja az isIndicatorCurrentlyVisible-t, a timert, és hívja a forceRedraw-t
             return true;                      // Kezeltük az érintést
         }
+
         // Ha túl gyorsan jött az érintés, akkor is jelezzük, hogy a komponens területén volt,
         // de nem váltunk módot, hogy más ne kezelje le.
         return true;
@@ -497,13 +469,16 @@ bool MiniAudioFft::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
  * Letörli a komponenst az effektív magasságnak megfelelően, és újrarajzolja a tartalmat.
  */
 void MiniAudioFft::forceRedraw() {
+
     clearArea();  // Ez már az `getEffectiveHeight()`-et használja a kerethez és a törléshez
 
     if (rtv::muteStat) {
         drawMuted();  // A drawMuted-nek is az effektív magasság közepére kell rajzolnia
+
     } else if (currentMode == DisplayMode::Off) {
         // Ha a currentMode Off, akkor az FFT configtól függetlenül "Off" jelenik meg.
         drawModeIndicator();  // "Off" kirajzolása (ha látható)
+
     } else {
         // Ha a currentMode nem Off, de az FFT config Disabled (-1.0f),
         // akkor a performFFT nem csinál semmit, és a rajzoló függvények üres adatot kapnak.
@@ -514,12 +489,21 @@ void MiniAudioFft::forceRedraw() {
         // A drawModeIndicator továbbra is a currentMode-ot írja ki.
 
         if (activeFftGainConfigRef != -1.0f) {  // Csak akkor végezzük el az FFT-t és a rajzolást, ha nincs letiltva
+
             // TuningAid mód használja a nagy felbontású processort, minden más a standard processort
             if (currentMode == DisplayMode::TuningAid) {
-                // TuningAid mód: nagy felbontású FFT feldolgozás
-                // A feldolgozás a drawTuningAid() függvényben történik
+
+                // TuningAid mód: nagy felbontású FFT feldolgozás - Átkapcsolunk ha nem abban vagyunk
+                if (pAudioProcessor && pAudioProcessor->getFftSize() != AudioProcessorConstants::HIGH_RES_FFT_SAMPLES) {
+                    pAudioProcessor->setFftSize(AudioProcessorConstants::HIGH_RES_FFT_SAMPLES);
+                }
+
             } else {
-                // Standard módok: normál FFT feldolgozás
+                // Standard módok: normál FFT feldolgozás - Átkapcsolunk ha nem abban vagyunk
+                if (pAudioProcessor && pAudioProcessor->getFftSize() != AudioProcessorConstants::DEFAULT_FFT_SAMPLES) {
+                    pAudioProcessor->setFftSize(AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
+                }
+
                 if (pAudioProcessor) {
                     pAudioProcessor->process(currentMode == DisplayMode::Oscilloscope);
                 }
@@ -547,6 +531,7 @@ void MiniAudioFft::forceRedraw() {
                 default:
                     break;  // DisplayMode::Off itt nem fordulhat elő az else ág miatt
             }
+
         } else {
             // Ha az FFT le van tiltva (-1.0f), de a currentMode nem Off,
             // akkor a grafikon területét törölhetnénk, vagy hagyhatjuk az utolsó állapotot.
@@ -554,6 +539,7 @@ void MiniAudioFft::forceRedraw() {
             // A performFFT nem futott, RvReal üres vagy régi.
             // A rajzoló függvények nem fognak semmit rajzolni.
         }
+
         drawModeIndicator();  // És a módkijelző kirajzolása (ha látható)
     }
 }
@@ -579,12 +565,6 @@ void MiniAudioFft::drawOffStatusInCenter() {
     int centerY = posY + graphH / 2;
     tft.drawString("Off", centerX, centerY);
 }
-
-// --- Rajzoló metódusok (a MiniAudioDisplay.cpp alapján adaptálva) ---
-// A grafikonrajzoló függvények (drawSpectrumLowRes, stb.) változatlanok maradnak,
-// mivel a `getGraphHeight()` által visszaadott magasságot használják,
-// ami most már konzisztensen a módkijelző feletti terület magasságát jelenti.
-// A `posY` szintén a grafikonterület tetejét jelöli.
 
 /**
  * @brief Alacsony felbontású spektrum analizátor kirajzolása.
@@ -627,7 +607,9 @@ void MiniAudioFft::drawSpectrumLowRes() {
         // mert a teljes oszlopot töröljük alább, mielőtt újrarajzolnánk.
         // Csak a csúcsérték csökkentése marad.
         if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
-    }  // 1. Sávonkénti magnitúdók összegyűjtése/maximalizálása
+    }
+
+    // 1. Sávonkénti magnitúdók összegyűjtése/maximalizálása
     float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);  // Fallback, ha pAudioProcessor null
     if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);                                 // Osztás nullával elkerülése
 
@@ -1095,20 +1077,21 @@ void MiniAudioFft::drawTuningAid() {
         for (int c = 0; c < width; ++c) {   // Minden oszlop (frekvencia bin)
             wabuf[r][c] = wabuf[r - 1][c];
         }
-    }  // 2. Nagy felbontású FFT feldolgozás végrehajtása TuningAid módhoz
-    if (pHighResAudioProcessor) {
-        pHighResAudioProcessor->processHighRes(false);
-    }  // Nagy felbontású adatok használata
-    float currentBinWidthHz = pHighResAudioProcessor ? pHighResAudioProcessor->getHighResBinWidthHz() : (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
+    }
+
+    // 2. Nagy felbontású adatok használata
+    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
     if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
 
     // Get the actual FFT size from the high-res processor or use default fallback
-    const uint16_t actualHighResFftSize = pHighResAudioProcessor ? pHighResAudioProcessor->getFftSize() : HighResAudioProcessor::HIGH_RES_FFT_SAMPLES;
+    const uint16_t actualHighResFftSize = pAudioProcessor ? pAudioProcessor->getFftSize() : AudioProcessorConstants::HIGH_RES_FFT_SAMPLES;
 
     const int min_fft_bin_for_tuning_local = std::max(1, static_cast<int>(std::round(currentTuningAidMinFreqHz_ / currentBinWidthHz)));
     const int max_fft_bin_for_tuning_local = std::min(static_cast<int>(actualHighResFftSize / 2 - 1), static_cast<int>(std::round(currentTuningAidMaxFreqHz_ / currentBinWidthHz)));
     const int num_bins_in_tuning_range = NUM_BINS(max_fft_bin_for_tuning_local, min_fft_bin_for_tuning_local);
-    if (!pHighResAudioProcessor) return;  // Biztonsági ellenőrzés - nagy felbontású processor szükséges
+
+    // Biztonsági ellenőrzés - nagy felbontású processor szükséges
+    if (!pAudioProcessor or pAudioProcessor->getFftSize() != AudioProcessorConstants::HIGH_RES_FFT_SAMPLES) return;
 
     // Iterálás a komponens teljes szélességén (minden pixel oszlop)
     for (int c = 0; c < width; ++c) {
@@ -1120,7 +1103,7 @@ void MiniAudioFft::drawTuningAid() {
         fft_bin_index = constrain(fft_bin_index, 2, static_cast<int>(actualHighResFftSize / 2 - 1));
 
         // Nagy felbontású FFT adatok használata
-        wabuf[0][c] = static_cast<uint8_t>(constrain((pHighResAudioProcessor->getHighResMagnitudeData()[fft_bin_index]) * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
+        wabuf[0][c] = static_cast<uint8_t>(constrain((pAudioProcessor->getMagnitudeData()[fft_bin_index]) * TUNING_AID_INPUT_SCALE, 0.0, 255.0));
     }
 
     // 3. Sprite görgetése és új sor kirajzolása
