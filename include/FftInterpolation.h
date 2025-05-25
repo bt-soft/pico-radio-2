@@ -23,15 +23,15 @@
  * Ez különösen hasznos CW és RTTY jelek esetén, ahol nagy frekvencia pontosság
  * szükséges a helyes hangoláshoz. A módszer sub-bin pontosságot biztosít, amely
  * jelentősen javítja a frekvencia diszkriminációt.
- *
- * @param magnitudeData FFT magnitúdó adatok tömbje (double típusú)
+ * * @param magnitudeData FFT magnitúdó adatok tömbje (double típusú)
  * @param binIndex Központi bin index (a csúcs bin), ahol az interpolációt végezzük
  * @param binWidthHz Egy FFT bin szélessége Hz-ben
+ * @param fftSamples FFT minták száma (használt az határellenőrzéshez)
  * @return Interpolált frekvencia Hz-ben (sub-bin pontossággal)
  *
  * @note A függvény ellenőrzi a bin határokat és szélső esetekben
  *       az eredeti bin frekvenciát adja vissza interpoláció nélkül
  */
-float interpolateFrequencyPeak(const double* magnitudeData, int binIndex, float binWidthHz);
+float interpolateFrequencyPeak(const double* magnitudeData, int binIndex, float binWidthHz, int fftSamples);
 
 #endif  // FFT_INTERPOLATION_H

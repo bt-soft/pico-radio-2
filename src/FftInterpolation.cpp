@@ -37,9 +37,9 @@
  * @note Ha a bin a szélen van vagy a parabola illesztés sikertelen,
  *       akkor az eredeti bin frekvenciát adja vissza
  */
-float interpolateFrequencyPeak(const double* magnitudeData, int binIndex, float binWidthHz) {
+float interpolateFrequencyPeak(const double* magnitudeData, int binIndex, float binWidthHz, int fftSamples) {
     // Határellenőrzés: legalább 1 bin távolság kell a szélek!
-    if (binIndex <= 0 || binIndex >= AudioProcessorConstants::FFT_SAMPLES / 2 - 1) {
+    if (binIndex <= 0 || binIndex >= fftSamples / 2 - 1) {
         return binIndex * binWidthHz;  // Szélső esetben nincs interpoláció lehetséges
     }
 

@@ -7,7 +7,8 @@
 #include <vector>  // std::vector használatához
 
 #include "AudioProcessor.h"
-#include "defines.h"  // AUDIO_INPUT_PIN és színek eléréséhez
+#include "HighResAudioProcessor.h"  // Nagy felbontású audio feldolgozó
+#include "defines.h"                // AUDIO_INPUT_PIN és színek eléréséhez
 
 // Konstansok a MiniAudioFft komponenshez
 namespace MiniAudioFftConstants {
@@ -86,10 +87,7 @@ class MiniAudioFft {
     };
 
     // Enum a TuningAid típusának megkülönböztetésére
-    enum class TuningAidType : uint8_t {
-        CW_TUNING,
-        RTTY_TUNING
-    };
+    enum class TuningAidType : uint8_t { CW_TUNING, RTTY_TUNING };
 
    public:
     /**
@@ -124,6 +122,7 @@ class MiniAudioFft {
      */
     void forceRedraw();
     void setTuningAidType(TuningAidType type);
+
     DisplayMode getCurrentDisplayMode() const { return currentMode; }
 
    private:
@@ -139,7 +138,8 @@ class MiniAudioFft {
     float currentConfiguredMaxDisplayAudioFreqHz;  // Az AM/FM módnak megfelelő maximális frekvencia
     float& activeFftGainConfigRef;                 // Referencia az aktív FFT erősítés konfigurációra (AM vagy FM)
 
-    AudioProcessor* pAudioProcessor;  // Pointer az új audio feldolgozó osztályra
+    AudioProcessor* pAudioProcessor;                // Pointer az új audio feldolgozó osztályra
+    HighResAudioProcessor* pHighResAudioProcessor;  // Pointer a nagy felbontású audio feldolgozóra (TuningAid módhoz)
 
     // Pufferek a különböző módokhoz
     int Rpeak[MiniAudioFftConstants::LOW_RES_BANDS + 1];  // Csúcsértékek az alacsony felbontású spektrumhoz
@@ -152,10 +152,10 @@ class MiniAudioFft {
     float envelope_prev_smoothed_max_val;  // Előző simított maximális amplitúdó az Envelope módhoz
     int indicatorFontHeight_;              // A módkijelzőhöz használt font magassága
 
-    float currentTuningAidMinFreqHz_;    // Dinamikusan számolt min frekvencia a TuningAid-hez
-    float currentTuningAidMaxFreqHz_;    // Dinamikusan számolt max frekvencia a TuningAid-hez
+    float currentTuningAidMinFreqHz_;  // Dinamikusan számolt min frekvencia a TuningAid-hez
+    float currentTuningAidMaxFreqHz_;  // Dinamikusan számolt max frekvencia a TuningAid-hez
 
-    TuningAidType currentTuningAidType_; // Aktuális hangolási segéd típus (CW vagy RTTY)
+    TuningAidType currentTuningAidType_;  // Aktuális hangolási segéd típus (CW vagy RTTY)
     // Belső segédfüggvények
     /**
      * @brief Vált a következő megjelenítési módra.

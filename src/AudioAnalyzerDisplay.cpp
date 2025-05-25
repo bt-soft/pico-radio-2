@@ -6,16 +6,13 @@
  * Az AudioAnalyzerDisplay osztály konstruktora
  */
 AudioAnalyzerDisplay::AudioAnalyzerDisplay(TFT_eSPI& tft, SI4735& si4735, Band& band, float& audioAnalyzerGainConfigRef)
-    : DisplayBase(tft, si4735, band),
-      pAudioProcessor(nullptr),
-      audioAnalyzerGainConfigRef_(audioAnalyzerGainConfigRef)
-{
+    : DisplayBase(tft, si4735, band), pAudioProcessor(nullptr), audioAnalyzerGainConfigRef_(audioAnalyzerGainConfigRef) {
     DEBUG("AudioAnalyzerDisplay::AudioAnalyzerDisplay\n");
     // A buildHorizontalScreenButtons-t a drawScreen-ben hívjuk,
     // miután a képernyő méretei és a DisplayBase inicializálása megtörtént.
 
     // AudioProcessor példányosítása
-    pAudioProcessor = new AudioProcessor(audioAnalyzerGainConfigRef_, AUDIO_INPUT_PIN, 30000.0); // 30kHz target sampling rate for 15kHz Nyquist
+    pAudioProcessor = new AudioProcessor(audioAnalyzerGainConfigRef_, AUDIO_INPUT_PIN, 30000.0);  // 30kHz target sampling rate for 15kHz Nyquist
 }
 
 /**
@@ -65,6 +62,7 @@ AudioAnalyzerDisplay::~AudioAnalyzerDisplay() {
         pAudioProcessor = nullptr;
     }
 }
+
 void AudioAnalyzerDisplay::displayLoop() {
     // Ha van dialógus ablak, akkor nem csinálunk semmit a háttérben.
     if (pDialog != nullptr) {
@@ -73,10 +71,10 @@ void AudioAnalyzerDisplay::displayLoop() {
 
     // FFT mintavételezés és számítás
     if (!pAudioProcessor) return;
-    pAudioProcessor->process(false); // false: nem gyűjtünk oszcilloszkóp mintákat
+    pAudioProcessor->process(false);  // false: nem gyűjtünk oszcilloszkóp mintákat
     const double* magnitudeData = pAudioProcessor->getMagnitudeData();
     float currentBinWidthHz = pAudioProcessor->getBinWidthHz();
-    if (currentBinWidthHz == 0) return; // Hiba elkerülése
+    if (currentBinWidthHz == 0) return;  // Hiba elkerülése
 
     // Az új spektrumvonal kirajzolása
     // Végigiterálunk a kijelző szélességén, és leképezzük az FFT "bin"-ekre (frekvenciasávokra)
@@ -84,11 +82,11 @@ void AudioAnalyzerDisplay::displayLoop() {
         // Képernyő x-koordináta leképezése FFT bin indexre
         // A kijelzendő tartomány: ANALYZER_MIN_FREQ_HZ-től ANALYZER_MAX_FREQ_HZ-ig
         int start_display_bin = static_cast<int>(roundf(AudioAnalyzerConstants::ANALYZER_MIN_FREQ_HZ / currentBinWidthHz));
-        int end_display_bin = static_cast<int>(roundf(AudioAnalyzerConstants::ANALYZER_MAX_FREQ_HZ / currentBinWidthHz));
-
-        // Biztosítjuk, hogy ne lépjük túl a maximális elérhető bin indexet
-        start_display_bin = constrain(start_display_bin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
-        end_display_bin = constrain(end_display_bin, start_display_bin, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
+        int end_display_bin =
+            static_cast<int>(roundf(AudioAnalyzerConstants::ANALYZER_MAX_FREQ_HZ / currentBinWidthHz));  // Biztosítjuk, hogy ne lépjük túl a maximális elérhető bin indexet
+        int fftSize = pAudioProcessor ? pAudioProcessor->getFftSize() : AudioProcessorConstants::DEFAULT_FFT_SAMPLES;
+        start_display_bin = constrain(start_display_bin, 0, fftSize / 2 - 1);
+        end_display_bin = constrain(end_display_bin, start_display_bin, fftSize / 2 - 1);
         int num_displayable_bins = end_display_bin - start_display_bin + 1;
 
         int fft_bin_index;

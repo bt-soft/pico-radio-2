@@ -4,37 +4,132 @@
 
 #include "defines.h"  // DEBUG makróhoz, ha szükséges
 
-AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double targetSamplingFrequency)
+AudioProcessor::AudioProcessor(float& gainConfigRef, int audioPin, double targetSamplingFrequency, uint16_t fftSize)
     : FFT(),
       activeFftGainConfigRef(gainConfigRef),
       audioInputPin(audioPin),
       targetSamplingFrequency_(targetSamplingFrequency),
       binWidthHz_(0.0f),
-      smoothed_auto_gain_factor_(1.0f)  // Simított erősítési faktor inicializálása
-{
+      smoothed_auto_gain_factor_(1.0f),  // Simított erősítési faktor inicializálása
+      currentFftSize_(0),
+      vReal(nullptr),
+      vImag(nullptr),
+      RvReal(nullptr) {
+    // Validate and set FFT size
+    if (!validateFftSize(fftSize)) {
+        DEBUG("AudioProcessor: Invalid FFT size %d, using default %d\n", fftSize, AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
+        fftSize = AudioProcessorConstants::DEFAULT_FFT_SAMPLES;
+    }
+
+    // Allocate FFT arrays
+    if (!allocateFftArrays(fftSize)) {
+        DEBUG("AudioProcessor: Failed to allocate FFT arrays, using default size\n");
+        if (!allocateFftArrays(AudioProcessorConstants::DEFAULT_FFT_SAMPLES)) {
+            DEBUG("AudioProcessor: CRITICAL: Failed to allocate even default FFT arrays!\n");
+            return;
+        }
+    }
 
     if (targetSamplingFrequency_ > 0) {
         sampleIntervalMicros_ = static_cast<uint32_t>(1000000.0 / targetSamplingFrequency_);
-        binWidthHz_ = static_cast<float>(targetSamplingFrequency_) / AudioProcessorConstants::FFT_SAMPLES;
+        binWidthHz_ = static_cast<float>(targetSamplingFrequency_) / currentFftSize_;
     } else {
         sampleIntervalMicros_ = 25;  // Fallback to 40kHz
-        binWidthHz_ = (1000000.0f / sampleIntervalMicros_) / AudioProcessorConstants::FFT_SAMPLES;
+        binWidthHz_ = (1000000.0f / sampleIntervalMicros_) / currentFftSize_;
         DEBUG("AudioProcessor: Figyelmeztetés - targetSamplingFrequency nulla, tartalék használata.");
     }
-    DEBUG("AudioProcessor: Target Fs: %.1f Hz, Sample Interval: %lu us, Bin Width: %.2f Hz\n", targetSamplingFrequency_, sampleIntervalMicros_, binWidthHz_);
+    DEBUG("AudioProcessor: FFT Size: %d, Target Fs: %.1f Hz, Sample Interval: %lu us, Bin Width: %.2f Hz\n", currentFftSize_, targetSamplingFrequency_, sampleIntervalMicros_,
+          binWidthHz_);
 
     // Oszcilloszkóp minták inicializálása középpontra (ADC nyers érték)
     for (int i = 0; i < AudioProcessorConstants::MAX_INTERNAL_WIDTH; ++i) {
         osciSamples[i] = 2048;
     }
-    // Pufferek nullázása
-    memset(vReal, 0, sizeof(vReal));
-    memset(vImag, 0, sizeof(vImag));
-    memset(RvReal, 0, sizeof(RvReal));
 }
 
-AudioProcessor::~AudioProcessor() {
-    // Dinamikusan allokált erőforrások itt szabadíthatók fel, ha lennének.
+AudioProcessor::~AudioProcessor() { deallocateFftArrays(); }
+
+bool AudioProcessor::allocateFftArrays(uint16_t size) {
+    // Validate size first
+    if (!validateFftSize(size)) {
+        return false;
+    }
+
+    // Clean up existing arrays if they exist
+    deallocateFftArrays();
+
+    // Allocate new arrays
+    vReal = new (std::nothrow) double[size];
+    vImag = new (std::nothrow) double[size];
+    RvReal = new (std::nothrow) double[size];
+
+    // Check if allocation was successful
+    if (!vReal || !vImag || !RvReal) {
+        DEBUG("AudioProcessor: Failed to allocate FFT arrays for size %d\n", size);
+        deallocateFftArrays();  // Clean up any partial allocation
+        return false;
+    }
+
+    // Initialize arrays to zero
+    memset(vReal, 0, size * sizeof(double));
+    memset(vImag, 0, size * sizeof(double));
+    memset(RvReal, 0, size * sizeof(double));
+
+    // Update FFT object with new arrays
+    FFT.setArrays(vReal, vImag, size);
+    currentFftSize_ = size;
+
+    DEBUG("AudioProcessor: Successfully allocated FFT arrays for size %d\n", size);
+    return true;
+}
+
+void AudioProcessor::deallocateFftArrays() {
+    delete[] vReal;
+    delete[] vImag;
+    delete[] RvReal;
+
+    vReal = nullptr;
+    vImag = nullptr;
+    RvReal = nullptr;
+    currentFftSize_ = 0;
+}
+
+bool AudioProcessor::validateFftSize(uint16_t size) const {
+    // Check if size is within allowed range
+    if (size < AudioProcessorConstants::MIN_FFT_SAMPLES || size > AudioProcessorConstants::MAX_FFT_SAMPLES) {
+        return false;
+    }
+
+    // Check if size is a power of 2 (required for FFT)
+    return (size > 0) && ((size & (size - 1)) == 0);
+}
+
+bool AudioProcessor::setFftSize(uint16_t newSize) {
+    if (!validateFftSize(newSize)) {
+        DEBUG("AudioProcessor: Invalid FFT size %d\n", newSize);
+        return false;
+    }
+
+    if (newSize == currentFftSize_) {
+        return true;  // No change needed
+    }
+
+    // Allocate new arrays with the new size
+    if (!allocateFftArrays(newSize)) {
+        DEBUG("AudioProcessor: Failed to set FFT size to %d\n", newSize);
+        return false;
+    }
+
+    // Update bin width with new FFT size
+    if (targetSamplingFrequency_ > 0) {
+        binWidthHz_ = static_cast<float>(targetSamplingFrequency_) / currentFftSize_;
+    } else {
+        binWidthHz_ = (1000000.0f / sampleIntervalMicros_) / currentFftSize_;
+    }
+
+    DEBUG("AudioProcessor: FFT size changed to %d, new bin width: %.2f Hz\n", currentFftSize_, binWidthHz_);
+
+    return true;
 }
 
 void AudioProcessor::process(bool collectOsciSamples) {
@@ -44,16 +139,14 @@ void AudioProcessor::process(bool collectOsciSamples) {
 
     // Ha az FFT ki van kapcsolva (-1.0f), akkor töröljük a puffereket és visszatérünk
     if (activeFftGainConfigRef == -1.0f) {
-        memset(RvReal, 0, sizeof(RvReal));  // Magnitúdó buffer törlése
+        memset(RvReal, 0, currentFftSize_ * sizeof(double));  // Magnitúdó buffer törlése
         if (collectOsciSamples) {
             for (int i = 0; i < AudioProcessorConstants::MAX_INTERNAL_WIDTH; ++i) osciSamples[i] = 2048;  // Oszcilloszkóp buffer reset
         }
         return;
-    }
-
-    // 1. Mintavételezés és középre igazítás, opcionális oszcilloszkóp mintagyűjtés
+    }  // 1. Mintavételezés és középre igazítás, opcionális oszcilloszkóp mintagyűjtés
     // A teljes mintavételezési ciklus idejét is mérhetnénk, de az egyes minták időzítése fontosabb.
-    for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
+    for (int i = 0; i < currentFftSize_; i++) {
         loopStartTimeMicros = micros();
         uint32_t sum = 0;
         for (int j = 0; j < 4; j++) {  // 4 minta átlagolása
@@ -83,11 +176,9 @@ void AudioProcessor::process(bool collectOsciSamples) {
         if (processingTimeMicros < sampleIntervalMicros_) {
             delayMicroseconds(sampleIntervalMicros_ - processingTimeMicros);
         }
-    }
-
-    // 2. Erősítés alkalmazása (manuális vagy automatikus)
+    }  // 2. Erősítés alkalmazása (manuális vagy automatikus)
     if (activeFftGainConfigRef > 0.0f) {  // Manual Gain
-        for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
+        for (int i = 0; i < currentFftSize_; i++) {
             vReal[i] *= activeFftGainConfigRef;
         }
     } else if (activeFftGainConfigRef == 0.0f) {  // Auto Gain
@@ -109,7 +200,7 @@ void AudioProcessor::process(bool collectOsciSamples) {
         // Biztosítjuk, hogy a simított faktor is a határokon belül maradjon
         smoothed_auto_gain_factor_ = constrain(smoothed_auto_gain_factor_, AudioProcessorConstants::FFT_AUTO_GAIN_MIN_FACTOR, AudioProcessorConstants::FFT_AUTO_GAIN_MAX_FACTOR);
 
-        for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; i++) {
+        for (int i = 0; i < currentFftSize_; i++) {
             vReal[i] *= smoothed_auto_gain_factor_;
         }
 
@@ -122,14 +213,11 @@ void AudioProcessor::process(bool collectOsciSamples) {
         //             lastGainPrintTime = millis();
         //         }
         // #endif
-    }
-    // 3. Ablakozás, FFT számítás, magnitúdó
-    FFT.windowing(vReal, AudioProcessorConstants::FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-    FFT.compute(vReal, vImag, AudioProcessorConstants::FFT_SAMPLES, FFT_FORWARD);
-    FFT.complexToMagnitude(vReal, vImag, AudioProcessorConstants::FFT_SAMPLES);  // Az eredmény a vReal-be kerül
-
-    // Magnitúdók átmásolása az RvReal tömbbe
-    for (int i = 0; i < AudioProcessorConstants::FFT_SAMPLES; ++i) {
+    }  // 3. Ablakozás, FFT számítás, magnitúdó
+    FFT.windowing(vReal, currentFftSize_, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+    FFT.compute(vReal, vImag, currentFftSize_, FFT_FORWARD);
+    FFT.complexToMagnitude(vReal, vImag, currentFftSize_);  // Az eredmény a vReal-be kerül    // Magnitúdók átmásolása az RvReal tömbbe
+    for (int i = 0; i < currentFftSize_; ++i) {
         RvReal[i] = vReal[i];
     }
 
@@ -137,7 +225,7 @@ void AudioProcessor::process(bool collectOsciSamples) {
     // A binWidthHz_ már tagváltozóként rendelkezésre áll
     const int attenuation_cutoff_bin = static_cast<int>(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ / binWidthHz_);
 
-    for (int i = 0; i < (AudioProcessorConstants::FFT_SAMPLES / 2); ++i) {  // Csak a releváns (nem tükrözött) frekvencia bin-eken iterálunk
+    for (int i = 0; i < (currentFftSize_ / 2); ++i) {  // Csak a releváns (nem tükrözött) frekvencia bin-eken iterálunk
         if (i < attenuation_cutoff_bin) {
             RvReal[i] /= AudioProcessorConstants::LOW_FREQ_ATTENUATION_FACTOR;
         }

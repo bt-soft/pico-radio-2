@@ -86,14 +86,14 @@ class TuningAidUtils {
      * Megkeresi a legnagyobb magnitúdójú bin-t a megadott tartományban,
      * majd parabolikus interpolációt alkalmaz a pontos frekvencia meghatározásához.
      * Ez sub-bin pontosságot biztosít.
-     *
-     * @param magnitudeData FFT magnitúdó adatok tömbje
+     *     * @param magnitudeData FFT magnitúdó adatok tömbje
      * @param minBin Keresési tartomány alsó határa (bin index)
      * @param maxBin Keresési tartomány felső határa (bin index)
      * @param binWidthHz FFT bin szélessége Hz-ben
+     * @param fftSamples FFT minták száma (határellenőrzéshez)
      * @return Precíz csúcs frekvencia Hz-ben (sub-bin pontossággal)
      */
-    static float findPrecisePeakFrequency(const double* magnitudeData, int minBin, int maxBin, float binWidthHz);
+    static float findPrecisePeakFrequency(const double* magnitudeData, int minBin, int maxBin, float binWidthHz, int fftSamples);
 
     /**
      * @brief CW jel fejlett elemzése javított precizitással

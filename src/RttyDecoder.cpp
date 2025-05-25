@@ -175,12 +175,12 @@ bool RttyDecoder::attemptAutoDetectFrequencies() {
     float binWidthHz = audioProcessor.getBinWidthHz();
 
     if (binWidthHz == 0 || !magnitudeData) return false;
-
     std::vector<PeakInfo> peaks;
     int min_bin = static_cast<int>(round(MIN_RTTY_FREQ_HZ_FOR_DETECT / binWidthHz));
     int max_bin = static_cast<int>(round(MAX_RTTY_FREQ_HZ_FOR_DETECT / binWidthHz));
-    min_bin = constrain(min_bin, 1, AudioProcessorConstants::FFT_SAMPLES / 2 - 2);
-    max_bin = constrain(max_bin, min_bin, AudioProcessorConstants::FFT_SAMPLES / 2 - 2);
+    int fftSize = audioProcessor.getFftSize();
+    min_bin = constrain(min_bin, 1, fftSize / 2 - 2);
+    max_bin = constrain(max_bin, min_bin, fftSize / 2 - 2);
 
     for (int i = min_bin; i <= max_bin; ++i) {
         if (magnitudeData[i] > magnitudeData[i - 1] && magnitudeData[i] > magnitudeData[i + 1] && magnitudeData[i] > AUTO_DETECT_MIN_PEAK_MAGNITUDE) {
@@ -264,7 +264,8 @@ void RttyDecoder::getSignalState(bool& outIsSignalPresent, bool& outIsMarkTone) 
         for (int offset = -halfWindow; offset <= halfWindow; ++offset) {
             int bin = centerBin + offset;
             // Biztosítjuk, hogy a bin indexek a magnitúdó tömb határain belül legyenek
-            bin = constrain(bin, 0, AudioProcessorConstants::FFT_SAMPLES / 2 - 1);
+            int fftSize = audioProcessor.getFftSize();
+            bin = constrain(bin, 0, fftSize / 2 - 1);
             sumMag += magnitudeData[bin];
             count++;
         }
@@ -282,7 +283,8 @@ void RttyDecoder::getSignalState(bool& outIsSignalPresent, bool& outIsMarkTone) 
         outIsSignalPresent = true;
         outIsMarkTone = avgMarkMagnitude > avgSpaceMagnitude;
     }
- DEBUG("RTTY SignalState: MarkAvg=%.1f, SpaceAvg=%.1f, Present=%d, IsMark=%d (M:%.1f, S:%.1f)\n", avgMarkMagnitude, avgSpaceMagnitude, outIsSignalPresent, outIsMarkTone, rttyMarkFreqHz_, rttySpaceFreqHz_);
+    DEBUG("RTTY SignalState: MarkAvg=%.1f, SpaceAvg=%.1f, Present=%d, IsMark=%d (M:%.1f, S:%.1f)\n", avgMarkMagnitude, avgSpaceMagnitude, outIsSignalPresent, outIsMarkTone,
+          rttyMarkFreqHz_, rttySpaceFreqHz_);
 }
 
 // Baudot -> ASCII tábla inicializálása

@@ -57,14 +57,16 @@ int TuningAidUtils::findPeakBin(const double* magnitudeData, int minBin, int max
  * @param minBin Keresési tartomány alsó határa
  * @param maxBin Keresési tartomány felső határa
  * @param binWidthHz FFT bin szélessége Hz-ben
+ * @param fftSamples FFT minták száma az interpolációs határok ellenőrzéséhez
  * @return Precíz csúcs frekvencia Hz-ben
  */
-float TuningAidUtils::findPrecisePeakFrequency(const double* magnitudeData, int minBin, int maxBin, float binWidthHz) {
+float TuningAidUtils::findPrecisePeakFrequency(const double* magnitudeData, int minBin, int maxBin, float binWidthHz, int fftSamples) {
     // 1. lépés: Legnagyobb magnitúdójú bin megkeresése
     int peakBin = findPeakBin(magnitudeData, minBin, maxBin);
 
     // 2. lépés: Parabolikus interpoláció alkalmazása sub-bin pontosságért
-    return interpolateFrequencyPeak(magnitudeData, peakBin, binWidthHz);
+    // Az interpoláció során a bin határok ellenőrzése az interpolateFrequencyPeak függvényben történik
+    return interpolateFrequencyPeak(magnitudeData, peakBin, binWidthHz, fftSamples);
 }
 
 /**
@@ -103,10 +105,8 @@ TuningAidUtils::SignalInfo TuningAidUtils::analyzeCwSignal(const double* magnitu
     int maxBin = std::min(fftSamples / 2 - 1, static_cast<int>(maxFreq / binWidthHz));
 
     // Érvényes tartomány ellenőrzése
-    if (minBin >= maxBin) return info;
-
-    // Precíz csúcs frekvencia keresése interpolációval
-    info.peakFrequency = findPrecisePeakFrequency(magnitudeData, minBin, maxBin, binWidthHz);
+    if (minBin >= maxBin) return info;  // Precíz csúcs frekvencia keresése interpolációval
+    info.peakFrequency = findPrecisePeakFrequency(magnitudeData, minBin, maxBin, binWidthHz, fftSamples);
 
     // Jelerősség számítása a csúcs bin-nél
     int peakBin = findPeakBin(magnitudeData, minBin, maxBin);
@@ -176,9 +176,8 @@ TuningAidUtils::RttyInfo TuningAidUtils::analyzeRttySignal(const double* magnitu
     float markMaxFreq = expectedMarkFreq + tolerance;
     int markMinBin = std::max(1, static_cast<int>(markMinFreq / binWidthHz));
     int markMaxBin = std::min(fftSamples / 2 - 1, static_cast<int>(markMaxFreq / binWidthHz));
-
     if (markMinBin < markMaxBin) {
-        info.markFrequency = findPrecisePeakFrequency(magnitudeData, markMinBin, markMaxBin, binWidthHz);
+        info.markFrequency = findPrecisePeakFrequency(magnitudeData, markMinBin, markMaxBin, binWidthHz, fftSamples);
         int markPeakBin = findPeakBin(magnitudeData, markMinBin, markMaxBin);
         info.markStrength = static_cast<float>(magnitudeData[markPeakBin]);
     }
@@ -188,9 +187,8 @@ TuningAidUtils::RttyInfo TuningAidUtils::analyzeRttySignal(const double* magnitu
     float spaceMaxFreq = expectedSpaceFreq + tolerance;
     int spaceMinBin = std::max(1, static_cast<int>(spaceMinFreq / binWidthHz));
     int spaceMaxBin = std::min(fftSamples / 2 - 1, static_cast<int>(spaceMaxFreq / binWidthHz));
-
     if (spaceMinBin < spaceMaxBin) {
-        info.spaceFrequency = findPrecisePeakFrequency(magnitudeData, spaceMinBin, spaceMaxBin, binWidthHz);
+        info.spaceFrequency = findPrecisePeakFrequency(magnitudeData, spaceMinBin, spaceMaxBin, binWidthHz, fftSamples);
         int spacePeakBin = findPeakBin(magnitudeData, spaceMinBin, spaceMaxBin);
         info.spaceStrength = static_cast<float>(magnitudeData[spacePeakBin]);
     }
