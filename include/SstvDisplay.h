@@ -4,7 +4,6 @@
 #include <ArduinoFFT.h>
 
 #include "DisplayBase.h"
-#include "FftBase.h"  // A meglévő FFT bázis osztály használata
 
 class SstvDisplay : public DisplayBase {
    public:
