@@ -7,8 +7,32 @@ const char* SplashScreen::APP_NAME = PROGRAM_NAME;
 const char* SplashScreen::APP_VERSION = PROGRAM_VERSION;
 const char* SplashScreen::APP_AUTHOR = PROGRAM_AUTHOR;
 
+/**
+ * @brief SplashScreen konstruktor
+ *
+ * Inicializálja a splash képernyő objektumot a megadott TFT és SI4735 referenciákkal.
+ * A konstruktor csak a referenciákat tárolja el, nem végez grafikai műveletet.
+ *
+ * @param tft TFT_eSPI objektum referencia a kijelző kezeléséhez
+ * @param si4735 SI4735 objektum referencia a rádió chip információk lekérdezéséhez
+ */
 SplashScreen::SplashScreen(TFT_eSPI& tft, SI4735& si4735) : tft(tft), si4735(si4735) {}
 
+/**
+ * @brief Splash képernyő megjelenítése
+ *
+ * Megjeleníti a teljes splash képernyőt az összes komponensével:
+ * - Töröli a képernyőt fekete háttérrel
+ * - Díszes keretet rajzol a képernyő körül
+ * - Címet jelenít meg aláhúzással
+ * - SI4735 chip információkat mutat be
+ * - Build információkat (fordítás dátuma, ideje) jeleníti meg
+ * - Program információkat (verzió, szerző) mutatja
+ * - Opcionálisan progress bar-t inicializál
+ *
+ * @param showProgress true: progress bar megjelenítése, false: nincs progress bar
+ * @param progressSteps progress lépések száma (jelenleg nem használt)
+ */
 void SplashScreen::show(bool showProgress, uint8_t progressSteps) {
     // Képernyő törlése
     tft.fillScreen(BACKGROUND_COLOR);
@@ -25,6 +49,17 @@ void SplashScreen::show(bool showProgress, uint8_t progressSteps) {
     }
 }
 
+/**
+ * @brief Díszes keret rajzolása a képernyő körül
+ *
+ * Egy dupla vonalú keretet rajzol a képernyő szélére, kék színnel.
+ * A keret 2-3 pixel vastag és speciális díszítéssel rendelkezik a sarkoknál:
+ * - Külső és belső keret vonalak
+ * - Mind a négy sarokban diagonális díszítő pixelek
+ * - A sarkok 8x8 pixeles díszítő mintázattal
+ *
+ * A keret 2 pixel margót hagy a képernyő szélétől.
+ */
 void SplashScreen::drawBorder() {
     // Díszes keret rajzolása
     int16_t w = tft.width();
@@ -50,6 +85,18 @@ void SplashScreen::drawBorder() {
     }
 }
 
+/**
+ * @brief Program címének megjelenítése
+ *
+ * A képernyő tetején középre igazítva megjeleníti a program nevét:
+ * - Nagy betűkkel (2x méret), cián színnel
+ * - Középre igazított szöveg (TC_DATUM)
+ * - 20 pixel magasságban a képernyő tetejétől
+ * - Aláhúzás 3 vonallal a cím alatt 2 pixel távolságra
+ *
+ * Az aláhúzás pontosan a szöveg szélességében készül, és
+ * három egymás alatti vízszintes vonalból áll.
+ */
 void SplashScreen::drawTitle() {
     tft.setFreeFont();
     tft.setTextSize(2);
@@ -70,6 +117,25 @@ void SplashScreen::drawTitle() {
     }
 }
 
+/**
+ * @brief SI4735 chip információk megjelenítése
+ *
+ * A képernyő középső részén táblázatos formában jeleníti meg
+ * a SI4735 rádió chip részletes firmware információit:
+ *
+ * Megjelenített adatok:
+ * - Part Number: A chip alkatrész azonosítója (hex formában)
+ * - Firmware: Nagy és kis verziócode (major.minor formátum)
+ * - Patch ID: Firmware patch azonosító (hex, 4 karakter)
+ * - Component: Komponens verzió (major.minor formátum)
+ * - Chip Rev: Chip revízió száma
+ *
+ * Formátum:
+ * - Címsor: "SI4735 Firmware:" sárga színnel
+ * - Címkék: bal oldal, fehér színnel
+ * - Értékek: jobb oldal (180px), fehér színnel
+ * - 20 pixel magasság soronként, 70px-től indul
+ */
 void SplashScreen::drawSI4735Info() {
     tft.setFreeFont();
     tft.setTextSize(1);
@@ -118,6 +184,22 @@ void SplashScreen::drawSI4735Info() {
     tft.drawString(String(si4735.getFirmwareCHIPREV()), rightX, currentY);
 }
 
+/**
+ * @brief Build információk megjelenítése
+ *
+ * A program fordítási információit jeleníti meg a képernyő alsó részén:
+ * - Fordítás dátuma (__DATE__ makró)
+ * - Fordítás időpontja (__TIME__ makró)
+ *
+ * Formátum:
+ * - Címsor: "Build Information:" sárga színnel
+ * - Címkék: bal oldal (15px), fehér színnel
+ * - Értékek: jobb oldal (120px), fehér színnel
+ * - 16 pixel magasság soronként, 200px magasságtól indul
+ * - Kompakt elrendezés 3 pixel extra térközzel a címsor alatt
+ *
+ * Ez a funkció a fordítás idejének nyomonkövetésére szolgál.
+ */
 void SplashScreen::drawBuildInfo() {
     tft.setFreeFont();
     tft.setTextSize(1);
@@ -146,6 +228,21 @@ void SplashScreen::drawBuildInfo() {
     tft.drawString(__TIME__, rightX, currentY);
 }
 
+/**
+ * @brief Program információk megjelenítése
+ *
+ * A képernyő alján középre igazítva megjeleníti a program
+ * alapvető azonosító információit:
+ *
+ * - Program verzió: "Version X.Y.Z" formátumban, zöld színnel
+ * - Szerző neve: magenta/lila színnel
+ *
+ * Formátum:
+ * - Alsó középre igazított szöveg (BC_DATUM)
+ * - A képernyő aljától 50 pixel magasságban kezdődik
+ * - 15 pixel távolság a verzió és szerző között
+ * - A defines.h fájlból származó konstansokat használja
+ */
 void SplashScreen::drawProgramInfo() {
     tft.setFreeFont();
     tft.setTextSize(1);
@@ -162,6 +259,25 @@ void SplashScreen::drawProgramInfo() {
     tft.drawString(APP_AUTHOR, tft.width() / 2, bottomY + 15);
 }
 
+/**
+ * @brief Progress bar megjelenítése
+ *
+ * A képernyő alján egy vízszintes progress bar-t jelenít meg
+ * a betöltési folyamat vizualizálására:
+ *
+ * Jellemzők:
+ * - 200 pixel széles, 8 pixel magas
+ * - Középre igazítva
+ * - Képernyő aljától 25 pixel magasságban
+ * - Fehér keret a progress bar körül
+ * - Fekete háttér
+ * - Zöld kitöltés a progress szerint
+ *
+ * A progress érték 0-100% között lehet, és ennek megfelelően
+ * töltődik fel zöld színnel a bar.
+ *
+ * @param progress Jelenlegi haladás százalékban (0-100)
+ */
 void SplashScreen::drawProgressBar(uint8_t progress) {
     int16_t barWidth = 200;
     int16_t barHeight = 8;
@@ -179,6 +295,28 @@ void SplashScreen::drawProgressBar(uint8_t progress) {
     }
 }
 
+/**
+ * @brief Progress frissítése üzenettel
+ *
+ * Frissíti a progress bar állását és opcionálisan megjeleníti
+ * az aktuális művelet leírását:
+ *
+ * Funkciók:
+ * - Kiszámítja a progress százalékot a lépések alapján
+ * - Újrarajzolja a progress bar-t az új értékkel
+ * - Ha üzenet van megadva, törli az előző üzenetet
+ * - Az új üzenetet középre igazítva, sárga színnel jeleníti meg
+ *
+ * Üzenet pozíció:
+ * - A képernyő aljától 45 pixel magasságban
+ * - Középre igazítva (TC_DATUM)
+ * - 10px margóval bal és jobb oldalon
+ * - Sárga szöveg fekete háttéren
+ *
+ * @param step Aktuális lépés száma (1-től számozva)
+ * @param totalSteps Összes lépés száma
+ * @param message Megjelenítendő üzenet (ha nullptr, nincs üzenet)
+ */
 void SplashScreen::updateProgress(uint8_t step, uint8_t totalSteps, const char* message) {
     uint8_t progress = (step * 100) / totalSteps;
     drawProgressBar(progress);
@@ -196,4 +334,13 @@ void SplashScreen::updateProgress(uint8_t step, uint8_t totalSteps, const char* 
     }
 }
 
+/**
+ * @brief Splash képernyő eltüntetése
+ *
+ * Egyszerűen fekete színnel kitölti a teljes képernyőt,
+ * ezzel eltüntetve az összes splash képernyő elemet.
+ *
+ * Ez a legegyszerűbb módja a splash képernyő bezárásának,
+ * mivel fekete háttérrel töröl mindent.
+ */
 void SplashScreen::hide() { tft.fillScreen(TFT_BLACK); }
