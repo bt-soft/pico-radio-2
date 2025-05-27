@@ -257,17 +257,15 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
                                                              // Nincs szükség további műveletre.
                                                          });
             break;
-
         case SetupList::ItemAction::INACTIVE_DIGIT_LIGHT:
-            DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Inactive Digit Segments"), F("State:"), &config.data.tftDigitLigth, false, true, true,
-                                                         [this](bool newValue) {
+            DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Inactive Digit Segments"), F("State:"), &config.data.tftDigitLigth, false, true,
+                                                         false, [this](double newValue) {
                                                              // Nincs szükség további műveletre.
                                                          });
             break;
-
         case SetupList::ItemAction::BEEPER_ENABLED:
             DisplayBase::pDialog =
-                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Beeper"), F("State:"), &config.data.beeperEnabled, false, true, true, [this](bool newValue) {
+                new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("Beeper"), F("State:"), &config.data.beeperEnabled, false, true, false, [this](double newValue) {
                     // A ValueChangeDialog már beállította a config.data.beeperEnabled értékét.
                     // Ha az új érték true, csipogunk egyet.
                     if (newValue) {
@@ -338,44 +336,38 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
             // Az aktuális értékek a lista nézetben jelennek meg és frissülnek.
             // A MultiButtonDialog címe statikus marad, mivel annak dinamikus frissítése
             // a MultiButtonDialog osztály módosítását igényelné.
-            const char* options[] = {"Mark", "Shift"}; // Feliratok módosítása
+            const char *options[] = {"Mark", "Shift"};  // Feliratok módosítása
             DisplayBase::pDialog = new MultiButtonDialog(
-                this, DisplayBase::tft, 300, 80, F("RTTY Frequencies"), options, 2, // A dialógus mérete maradhat
-                [this, itemIndex](TftButton::ButtonTouchEvent ev) { // Lambda callback
+                this, DisplayBase::tft, 300, 80, F("RTTY Frequencies"), options, 2,  // A dialógus mérete maradhat
+                [this, itemIndex](TftButton::ButtonTouchEvent ev) {                  // Lambda callback
                     // A MultiButtonDialog-ot nem zárjuk be, amikor a ValueChangeDialog megnyílik.
                     // A pendingCloseDialog lesz a MultiButtonDialog, a pDialog pedig a ValueChangeDialog.
                     // A nestedDialogOpened = true jelzi ezt az állapotot.
                     // Gombfeliratok ellenőrzésének frissítése
                     if (STREQ(ev.label, "Mark")) {
                         this->pendingCloseDialog = DisplayBase::pDialog;
-                        DisplayBase::pDialog = new ValueChangeDialog(
-                            this, DisplayBase::tft, 270, 150, F("RTTY Mark Frequency"), F("Hz (1000-3000):"),
-                            &config.data.rttyMarkFrequencyHz, 1000.0f, 3000.0f, 5.0f,
-                            [this, itemIndex](double newValue) {
-                                // A listaelemet a processDialogButtonResponse-ban frissítjük
-                            }
-                        );
+                        DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("RTTY Mark Frequency"), F("Hz (1000-3000):"),
+                                                                     &config.data.rttyMarkFrequencyHz, 1000.0f, 3000.0f, 5.0f, [this, itemIndex](double newValue) {
+                                                                         // A listaelemet a processDialogButtonResponse-ban frissítjük
+                                                                     });
                         this->nestedDialogOpened = true;
                         return;
                     } else if (STREQ(ev.label, "Shift")) {
                         this->pendingCloseDialog = DisplayBase::pDialog;
-                        DisplayBase::pDialog = new ValueChangeDialog(
-                            this, DisplayBase::tft, 270, 150, F("RTTY Shift"), F("Hz (50-1000):"),
-                            &config.data.rttyShiftHz, 50.0f, 1000.0f, 5.0f, // Shift általában pozitív
-                            [this, itemIndex](double newValue) {
-                                // A listaelemet a processDialogButtonResponse-ban frissítjük
-                            }
-                        );
+                        DisplayBase::pDialog = new ValueChangeDialog(this, DisplayBase::tft, 270, 150, F("RTTY Shift"), F("Hz (50-1000):"), &config.data.rttyShiftHz, 50.0f,
+                                                                     1000.0f, 5.0f,  // Shift általában pozitív
+                                                                     [this, itemIndex](double newValue) {
+                                                                         // A listaelemet a processDialogButtonResponse-ban frissítjük
+                                                                     });
                         this->nestedDialogOpened = true;
                         return;
                     }
                     // A lista frissítése a MultiButtonDialog bezárása után történik
                     // a processDialogButtonResponse-ban, ami meghívja a drawScreen()-t.
                 },
-                nullptr // Nincs alapértelmezetten aktív gomb a MultiButtonDialog-ban
+                nullptr  // Nincs alapértelmezetten aktív gomb a MultiButtonDialog-ban
             );
         } break;
-
 
         case SetupList::ItemAction::FACTORY_RESET:
             // Megerősítő dialógus megnyitása
@@ -399,13 +391,20 @@ void SetupDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent &even
     // akkor az eredeti MultiButtonDialog válaszát nem szabad úgy feldolgozni,
     // hogy az bezárja az újonnan megnyitott ValueChangeDialog-ot.
     if (nestedDialogOpened) {
+        DEBUG("SetupDisplay: Nested dialog opened, handling transition...\n");
         nestedDialogOpened = false;  // Jelzőbit visszaállítása
         if (pendingCloseDialog) {
+            DEBUG("SetupDisplay: Deleting pending dialog (MultiButtonDialog)\n");
             delete pendingCloseDialog;
             pendingCloseDialog = nullptr;
         }
         // Nem hívjuk meg a DisplayBase::processDialogButtonResponse-t,
         // hogy ne záródjon be a pDialog (ami most a ValueChangeDialog).
+        // Viszont újra kell rajzolni a képernyőt, hogy a ValueChangeDialog megjelenjen
+        if (pDialog) {
+            DEBUG("SetupDisplay: Drawing ValueChangeDialog\n");
+            pDialog->drawDialog();
+        }
         return;
     }
 
@@ -421,8 +420,7 @@ void SetupDisplay::processDialogButtonResponse(TftButton::ButtonTouchEvent &even
                 config.checkSave();              // Mentés indítása (ez menti az EEPROM-ba)
                 Utils::beepTick();               // Visszajelzés
             }
-        }
-        // Más dialógusok (pl. ValueChangeDialog, MultiButtonDialog, InfoDialog) esetén
+        }  // Más dialógusok (pl. ValueChangeDialog, MultiButtonDialog, InfoDialog) esetén
         // az értékek frissítését maga a dialógus vagy annak callback függvénye kezeli
         // mielőtt ez a metódus meghívódna. Itt csak a bezárásukról és a képernyő
         // frissítéséről kell gondoskodnunk.
