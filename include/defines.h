@@ -57,9 +57,12 @@
 #define CW_DECODER_MAX_FREQUENCY 1500     // Maximum CW dekóder frekvencia (Hz)
 
 //--- RTTY mód adatai
-#define RTTY_DEFAULT_SPACE_FREQUENCY 2125.0f                                       // RTTY tér frekvencia (Hz) - Alapértelmezett a dekódernek
-#define RTTY_DEFAULT_MARKER_FREQUENCY 2295.0f                                      // RTTY jelölő frekvencia (Hz) - Alapértelmezett a dekódernek
-#define RTTY_DEFAULT_SHIFT_FREQUENCY RTTY_DEFAULT_MARKER_FREQUENCY - RTTY_DEFAULT_SPACE_FREQUENCY  // RTTY eltolás frekvencia (170Hz) - Alapértelmezett
+// #define RTTY_DEFAULT_MARKER_FREQUENCY 2295.0f                                      // RTTY jelölő frekvencia (Hz)
+// #define RTTY_DEFAULT_SHIFT_FREQUENCY RTTY_DEFAULT_MARKER_FREQUENCY - RTTY_DEFAULT_SPACE_FREQUENCY  // RTTY eltolás frekvencia (170Hz)
+// #define RTTY_DEFAULT_SPACE_FREQUENCY 2125.0f                                       // RTTY tér frekvencia (Hz)
+#define RTTY_DEFAULT_MARKER_FREQUENCY 1100.0f                                                      // RTTY jelölő frekvencia (Hz)
+#define RTTY_DEFAULT_SHIFT_FREQUENCY 425.0f                                                        // RTTY eltolás frekvencia (170Hz)
+#define RTTY_DEFAULT_SPACE_FREQUENCY RTTY_DEFAULT_MARKER_FREQUENCY - RTTY_DEFAULT_SHIFT_FREQUENCY  // RTTY space frekvencia (Hz)
 
 //--- Debug ---
 #define __DEBUG  // Debug mód bekapcsolása
