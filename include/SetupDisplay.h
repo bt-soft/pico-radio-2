@@ -16,6 +16,7 @@ enum class ItemAction {
     FFT_CONFIG_AM,       // Új, összevont
     FFT_CONFIG_FM,       // Új, összevont
     CW_RECEIVER_OFFSET,  // CW vételi eltolás
+    RTTY_FREQUENCIES,    // RTTY Mark és Shift frekvenciák
     FACTORY_RESET,
     NONE
 };
@@ -32,7 +33,7 @@ class SetupDisplay : public DisplayBase, public IScrollableListDataSource {
     DisplayBase::DisplayType prevDisplay = DisplayBase::DisplayType::none;
 
     // Lista alapú menühöz
-    static const int MAX_SETTINGS = 10;  // CW_RECEIVER_OFFSET hozzáadva
+    static const int MAX_SETTINGS = 11;  // RTTY_FREQUENCIES hozzáadva
     SetupList::SettingItem settingItems[MAX_SETTINGS];
     ScrollableListComponent scrollListComponent;
     bool nestedDialogOpened = false;           // Beágyazott dialógus nyitva van-e?

@@ -78,6 +78,8 @@ void DebugDataInspector::printConfigData(const Config_t& configData) {
     } else {
         DEBUG("  miniAudioFftConfigFm: Manual Gain %.1fx\n", configData.miniAudioFftConfigFm);
     }
+    DEBUG("  rttyMarkFrequencyHz: %.1f Hz\n", configData.rttyMarkFrequencyHz);
+    DEBUG("  rttyShiftHz: %.1f Hz\n", configData.rttyShiftHz);
     DEBUG("====================\n");
 #endif
 }

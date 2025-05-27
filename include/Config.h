@@ -67,6 +67,10 @@ struct Config_t {
     float miniAudioFftConfigRtty;      // MiniAudioFft erősítés konfigurációja az RTTY-hez
 
     uint16_t cwReceiverOffsetHz;  // CW vételi eltolás Hz-ben
+
+    // RTTY frekvenciák
+    float rttyMarkFrequencyHz;  // RTTY Mark frekvencia Hz-ben
+    float rttyShiftHz;          // RTTY Shift Hz-ben (pozitív érték)
 };
 
 // Alapértelmezett konfigurációs adatok (readonly, const)

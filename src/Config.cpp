@@ -60,4 +60,8 @@ const Config_t DEFAULT_CONFIG = {
 
     // CW vételi eltolás
     .cwReceiverOffsetHz = CW_DECODER_DEFAULT_FREQUENCY,  // Default CW vételi eltolás Hz-ben
+
+    // RTTY frekvenciák
+    .rttyMarkFrequencyHz = RTTY_DEFAULT_MARKER_FREQUENCY, // Alapértelmezett RTTY Mark frekvencia
+    .rttyShiftHz = RTTY_DEFAULT_SHIFT_FREQUENCY,          // Alapértelmezett RTTY Shift (pozitív érték)
 };

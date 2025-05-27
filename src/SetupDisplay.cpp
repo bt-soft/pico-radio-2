@@ -39,9 +39,10 @@ SetupDisplay::SetupDisplay(TFT_eSPI &tft_ref, SI4735 &si4735_ref, Band &band_ref
     settingItems[4] = {"Beeper", ItemAction::BEEPER_ENABLED};                         // Beeper engedélyezése (4)
     settingItems[5] = {"FFT Config (AM)", ItemAction::FFT_CONFIG_AM};                 // ÚJ, összevont
     settingItems[6] = {"FFT Config (FM)", ItemAction::FFT_CONFIG_FM};                 // ÚJ, összevont
-    settingItems[7] = {"CW Offset", ItemAction::CW_RECEIVER_OFFSET};                  // CW vételi eltolás
-    settingItems[8] = {"Info", ItemAction::INFO};                                     // Információ
-    settingItems[9] = {"Factory Reset", ItemAction::FACTORY_RESET};                   // Gyári beállítások visszaállítása
+    settingItems[7] = {"CW Offset", ItemAction::CW_RECEIVER_OFFSET};                  // CW vételi eltolás (7)
+    settingItems[8] = {"RTTY Frequencies", ItemAction::RTTY_FREQUENCIES};             // RTTY Frekvenciák (8)
+    settingItems[9] = {"Info", ItemAction::INFO};                                     // Információ (9)
+    settingItems[10] = {"Factory Reset", ItemAction::FACTORY_RESET};                  // Gyári beállítások visszaállítása (10)
 
     // Csak az "Exit" gombot hozzuk létre a horizontális gombsorból
     DisplayBase::BuildButtonData exitButtonData[] = {
@@ -166,6 +167,12 @@ void SetupDisplay::drawListItem(TFT_eSPI &tft_ref, int itemIndex, int x, int y, 
         case SetupList::ItemAction::CW_RECEIVER_OFFSET:
             valueStr = String(config.data.cwReceiverOffsetHz) + " Hz";
             break;
+        case SetupList::ItemAction::RTTY_FREQUENCIES: {
+            float mark = config.data.rttyMarkFrequencyHz;
+            float shift = config.data.rttyShiftHz;
+            float space = mark - shift;
+            valueStr = "M:" + String(round(mark)) + " S:" + String(round(space)) + " Sh:" + String(round(shift));
+        } break;
         case SetupList::ItemAction::INFO:
         case SetupList::ItemAction::FACTORY_RESET:
         case SetupList::ItemAction::NONE:
@@ -326,6 +333,50 @@ void SetupDisplay::activateSetting(SetupList::ItemAction action, int itemIndex) 
                                                              // A ValueChangeDialog már beállította a config értékét.
                                                          });
             break;
+
+        case SetupList::ItemAction::RTTY_FREQUENCIES: {
+            // Az aktuális értékek a lista nézetben jelennek meg és frissülnek.
+            // A MultiButtonDialog címe statikus marad, mivel annak dinamikus frissítése
+            // a MultiButtonDialog osztály módosítását igényelné.
+            const char* options[] = {"Mark", "Shift"}; // Feliratok módosítása
+            DisplayBase::pDialog = new MultiButtonDialog(
+                this, DisplayBase::tft, 300, 80, F("RTTY Frequencies"), options, 2, // A dialógus mérete maradhat
+                [this, itemIndex](TftButton::ButtonTouchEvent ev) { // Lambda callback
+                    // A MultiButtonDialog-ot nem zárjuk be, amikor a ValueChangeDialog megnyílik.
+                    // A pendingCloseDialog lesz a MultiButtonDialog, a pDialog pedig a ValueChangeDialog.
+                    // A nestedDialogOpened = true jelzi ezt az állapotot.
+                    // Gombfeliratok ellenőrzésének frissítése
+                    if (STREQ(ev.label, "Mark")) {
+                        this->pendingCloseDialog = DisplayBase::pDialog;
+                        DisplayBase::pDialog = new ValueChangeDialog(
+                            this, DisplayBase::tft, 270, 150, F("RTTY Mark Frequency"), F("Hz (1000-3000):"),
+                            &config.data.rttyMarkFrequencyHz, 1000.0f, 3000.0f, 5.0f,
+                            [this, itemIndex](double newValue) {
+                                // A listaelemet a processDialogButtonResponse-ban frissítjük
+                            }
+                        );
+                        this->nestedDialogOpened = true;
+                        return;
+                    } else if (STREQ(ev.label, "Shift")) {
+                        this->pendingCloseDialog = DisplayBase::pDialog;
+                        DisplayBase::pDialog = new ValueChangeDialog(
+                            this, DisplayBase::tft, 270, 150, F("RTTY Shift"), F("Hz (50-1000):"),
+                            &config.data.rttyShiftHz, 50.0f, 1000.0f, 5.0f, // Shift általában pozitív
+                            [this, itemIndex](double newValue) {
+                                // A listaelemet a processDialogButtonResponse-ban frissítjük
+                            }
+                        );
+                        this->nestedDialogOpened = true;
+                        return;
+                    }
+                    // A lista frissítése a MultiButtonDialog bezárása után történik
+                    // a processDialogButtonResponse-ban, ami meghívja a drawScreen()-t.
+                },
+                nullptr // Nincs alapértelmezetten aktív gomb a MultiButtonDialog-ban
+            );
+        } break;
+
+
         case SetupList::ItemAction::FACTORY_RESET:
             // Megerősítő dialógus megnyitása
             pDialog = new MessageDialog(this, tft, 250, 120, F("Confirm"), F("Reset to factory defaults?"), "Yes", "No");

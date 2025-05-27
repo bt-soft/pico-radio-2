@@ -64,15 +64,15 @@ void RttyDecoder::initialize() {
     bitDurationMs_ = DEFAULT_BIT_DURATION_MS;
     lastBitTimeMs_ = 0;
     startBitTimeMs_ = 0;
-    bitsReceived_ = 0;
+    bitsReceived_ = 0; // NOLINT(readability-magic-numbers)
     currentByte_ = 0;
     currentToneState_ = false;
     lastToneState_ = false;  // Automatikus detektálás
     autoDetectActive_ = true;
     autoDetectStartMs_ = millis();
-    detectedMarkFreq_ = RTTY_MARKER_FREQUENCY;
-    detectedSpaceFreq_ = RTTY_SPACE_FREQUENCY;
-    detectedShiftFreq_ = RTTY_SHIFT_FREQUENCY;
+    detectedMarkFreq_ = RTTY_DEFAULT_MARKER_FREQUENCY;
+    detectedSpaceFreq_ = RTTY_DEFAULT_SPACE_FREQUENCY;
+    detectedShiftFreq_ = RTTY_DEFAULT_SHIFT_FREQUENCY;
     detectedBaudRate_ = MIN_BAUD_RATE;
 
     // Baudrate detektálás

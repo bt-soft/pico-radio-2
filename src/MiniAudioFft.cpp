@@ -790,8 +790,8 @@ void MiniAudioFft::setTuningAidType(TuningAidType type) {
             currentTuningAidMaxFreqHz_ = config.data.cwReceiverOffsetHz + (CW_TUNING_AID_SPAN_HZ / 2.0f);
 
         } else if (currentTuningAidType_ == TuningAidType::RTTY_TUNING) {
-            float f_space = RTTY_SPACE_FREQUENCY;
-            float f_mark = RTTY_MARKER_FREQUENCY;
+            float f_mark = config.data.rttyMarkFrequencyHz;
+            float f_space = config.data.rttyMarkFrequencyHz - config.data.rttyShiftHz; // Számított Space
             float f_low = std::min(f_space, f_mark);
             float f_high = std::max(f_space, f_mark);
             float delta_f = std::abs(f_high - f_low);  // Ensure positive delta
@@ -1153,25 +1153,25 @@ void MiniAudioFft::drawTuningAid() {
                 sprGraph.drawString(String(static_cast<int>(config.data.cwReceiverOffsetHz)) + "Hz", line_x_on_sprite, graphH - 2);
 
             } else if (currentTuningAidType_ == TuningAidType::RTTY_TUNING) {
-                float f_space = RTTY_SPACE_FREQUENCY;
-                float f_mark = RTTY_MARKER_FREQUENCY;  // Space vonal
-                if (f_space >= min_freq_displayed_actual && f_space <= max_freq_displayed_actual) {
-                    float ratio_space = (f_space - min_freq_displayed_actual) / displayed_span_hz;
+                float f_mark_cfg = config.data.rttyMarkFrequencyHz;
+                float f_space_cfg = config.data.rttyMarkFrequencyHz - config.data.rttyShiftHz;
+                // Space vonal
+                if (f_space_cfg >= min_freq_displayed_actual && f_space_cfg <= max_freq_displayed_actual) {
+                    float ratio_space = (f_space_cfg - min_freq_displayed_actual) / displayed_span_hz;
                     int line_x_space = static_cast<int>(std::round(ratio_space * (width - 1)));  // width-1, ha 0-tól width-1-ig terjed
                     line_x_space = constrain(line_x_space, 0, width - 1);                        // Biztosítjuk, hogy a sprite-on belül legyen
                     sprGraph.drawFastVLine(line_x_space, 0, graphH, TUNING_AID_RTTY_SPACE_LINE_COLOR);
                     sprGraph.setTextColor(TUNING_AID_RTTY_SPACE_LINE_COLOR, TFT_BLACK);
-                    sprGraph.drawString(String(static_cast<int>(f_space)) + "Hz", line_x_space, graphH - 2);
+                    sprGraph.drawString(String(static_cast<int>(round(f_space_cfg))) + "Hz", line_x_space, graphH - 2);
                 }
-
                 // Mark vonal
-                if (f_mark >= min_freq_displayed_actual && f_mark <= max_freq_displayed_actual) {
-                    float ratio_mark = (f_mark - min_freq_displayed_actual) / displayed_span_hz;
+                if (f_mark_cfg >= min_freq_displayed_actual && f_mark_cfg <= max_freq_displayed_actual) {
+                    float ratio_mark = (f_mark_cfg - min_freq_displayed_actual) / displayed_span_hz;
                     int line_x_mark = static_cast<int>(std::round(ratio_mark * (width - 1)));
                     line_x_mark = constrain(line_x_mark, 0, width - 1);
                     sprGraph.drawFastVLine(line_x_mark, 0, graphH, TUNING_AID_RTTY_MARK_LINE_COLOR);
                     sprGraph.setTextColor(TUNING_AID_RTTY_MARK_LINE_COLOR, TFT_BLACK);
-                    sprGraph.drawString(String(static_cast<int>(f_mark)) + "Hz", line_x_mark, graphH - 2);
+                    sprGraph.drawString(String(static_cast<int>(round(f_mark_cfg))) + "Hz", line_x_mark, graphH - 2);
                 }
             }
         }
