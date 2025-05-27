@@ -1,12 +1,5 @@
 #include "SplashScreen.h"
 
-#include "defines.h"
-
-// Program konstansok
-const char* SplashScreen::APP_NAME = PROGRAM_NAME;
-const char* SplashScreen::APP_VERSION = PROGRAM_VERSION;
-const char* SplashScreen::APP_AUTHOR = PROGRAM_AUTHOR;
-
 /**
  * @brief SplashScreen konstruktor
  *
@@ -104,10 +97,10 @@ void SplashScreen::drawTitle() {
     tft.setTextDatum(TC_DATUM);  // Felső közép igazítás
 
     int16_t titleY = 20;
-    tft.drawString(APP_NAME, tft.width() / 2, titleY);
+    tft.drawString(PROGRAM_NAME, tft.width() / 2, titleY);
 
     // Aláhúzás
-    int16_t textWidth = tft.textWidth(APP_NAME);
+    int16_t textWidth = tft.textWidth(PROGRAM_NAME);
     int16_t lineY = titleY + tft.fontHeight() + 2;
     int16_t lineStartX = (tft.width() - textWidth) / 2;
     int16_t lineEndX = lineStartX + textWidth;
@@ -252,11 +245,11 @@ void SplashScreen::drawProgramInfo() {
 
     // Program verzió
     tft.setTextColor(VERSION_COLOR, BACKGROUND_COLOR);
-    tft.drawString("Version " + String(APP_VERSION), tft.width() / 2, bottomY);
+    tft.drawString("Version " + String(PROGRAM_VERSION), tft.width() / 2, bottomY);
 
     // Szerző
     tft.setTextColor(AUTHOR_COLOR, BACKGROUND_COLOR);
-    tft.drawString(APP_AUTHOR, tft.width() / 2, bottomY + 15);
+    tft.drawString(PROGRAM_AUTHOR, tft.width() / 2, bottomY + 15);
 }
 
 /**

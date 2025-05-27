@@ -5,6 +5,8 @@
 #include <SI4735.h>
 #include <TFT_eSPI.h>
 
+#include "defines.h"
+
 /**
  * @brief Splash képernyő a program indulásakor
  */
@@ -12,10 +14,6 @@ class SplashScreen {
    private:
     TFT_eSPI& tft;
     SI4735& si4735;
-    // Program verzió konstansok (defines.h-ból jönnek)
-    static const char* APP_NAME;
-    static const char* APP_VERSION;
-    static const char* APP_AUTHOR;
 
     // Színek
     static const uint16_t BACKGROUND_COLOR = TFT_BLACK;
