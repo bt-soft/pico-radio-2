@@ -139,7 +139,7 @@ bool AmDisplay::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
         return true;
     }
     uint8_t pressedRadioBtnId = 0xFF;
-    if (decoderModeGroup.handleTouch(touched, tx, ty, pressedRadioBtnId)) {
+    if (!DisplayBase::pDialog && decoderModeGroup.handleTouch(touched, tx, ty, pressedRadioBtnId)) {
         if (pressedRadioBtnId != 0xFF) {
             setDecodeModeBasedOnButtonId(pressedRadioBtnId);
         }
