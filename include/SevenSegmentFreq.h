@@ -38,7 +38,7 @@ class SevenSegmentFreq {
      * @param colors A szegmensek színei.
      * @param unit A mértékegység.
      */
-    void drawFrequency(const String& freq, const __FlashStringHelper* mask, const SegmentColors& colors, const __FlashStringHelper* unit = nullptr);
+    void drawFrequency(const String& freq, const char* mask, const SegmentColors& colors, const char* unit = nullptr);
 
     /**
      * @brief Kiválasztja a megfelelő szegmens színeket az aktuális mód alapján.
@@ -114,6 +114,11 @@ class SevenSegmentFreq {
      * @return true, ha az eseményt kezeltük, false, ha nem.
      */
     bool handleTouch(bool touched, uint16_t tx, uint16_t ty);
+
+    // --- Egység kiírás helper ---
+    // Hozzáadjuk a deklarációt a headerhez is!
+    // SevenSegmentFreq.h-ban: public: void drawUnitLabel(uint16_t x, uint16_t y, const char* unit, uint16_t color, uint16_t bg);
+    void drawUnitLabel(uint16_t x, uint16_t y, const char* unit, uint16_t color, uint16_t bg);
 };
 
 #endif  //__SEVENSEGMENTFREQ_H
