@@ -1030,28 +1030,22 @@ void MiniAudioFft::drawEnvelope() {
 
         // Csak akkor rajzolunk, ha van jel vagy a simított érték számottevő
         if (column_has_signal || envelope_prev_smoothed_max_val > 0.5f) {
-            // A simított amplitúdó skálázása a grafikon magasságára (0-255 -> 0-half_graph_h)
-            // Az ENVELOPE_THICKNESS_SCALER-t itt nem használjuk közvetlenül,
-            // a vastagságot a `y_offset_pixels` adja. Ha vastagabb görbét szeretnénk,
-            // az `ENVELOPE_INPUT_GAIN`-t kell növelni, vagy a skálázást módosítani.
-            float y_offset_float = (envelope_prev_smoothed_max_val / 255.0f) * (half_graph_h - 1.0f) / 2048.0;  // A 2048.0 itt a maximális elméleti ADC eltérésre skáláz
+            // A simított amplitúdó skálázása a grafikon magasságára (0-255 -> 0-graphH)
+            float y_offset_float = (envelope_prev_smoothed_max_val / 255.0f) * (graphH / 2 - 1);  // 0-255 amplitúdó a grafikon feléig
 
             int y_offset_pixels = static_cast<int>(round(y_offset_float));
-            y_offset_pixels = std::min(y_offset_pixels, half_graph_h - 1);  // Biztosítjuk, hogy a határokon belül maradjon
+            y_offset_pixels = std::min(y_offset_pixels, graphH / 2 - 1);
             if (y_offset_pixels < 0) y_offset_pixels = 0;
 
-            if (y_offset_pixels >= 0) {  // Ha van vastagság
-                // Y koordináták a sprite-on belül (0-tól graphH-1-ig)
-                int yCenter_on_sprite = half_graph_h;
+            if (y_offset_pixels >= 0) {
+                int yCenter_on_sprite = graphH / 2;
                 int yUpper_on_sprite = yCenter_on_sprite - y_offset_pixels;
                 int yLower_on_sprite = yCenter_on_sprite + y_offset_pixels;
 
                 yUpper_on_sprite = constrain(yUpper_on_sprite, 0, graphH - 1);
                 yLower_on_sprite = constrain(yLower_on_sprite, 0, graphH - 1);
 
-                if (yUpper_on_sprite <= yLower_on_sprite) {  // Biztosítjuk, hogy van mit rajzolni
-                    // Kitöltött burkológörbe rajzolása
-                    // Az X koordináta 'c' (0-tól width-1-ig)
+                if (yUpper_on_sprite <= yLower_on_sprite) {
                     sprGraph.drawFastVLine(c, yUpper_on_sprite, yLower_on_sprite - yUpper_on_sprite + 1, TFT_WHITE);
                 }
             }
