@@ -441,6 +441,35 @@ void MiniAudioFft::loop() {
     };
 }
 
+// Segédfüggvény: frekvencia skála címkék rajzolása
+void MiniAudioFft::drawFrequencyScaleLabels(float min_freq, float max_freq, int x0, int y, int w, bool show) {
+    if (!show) return;
+    int num_labels = 5;
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(1);
+    for (int i = 0; i < num_labels; ++i) {
+        float frac = (float)i / (num_labels - 1);
+        float freq = min_freq + frac * (max_freq - min_freq);
+        int x;
+        if (i == 0) {
+            tft.setTextDatum(TL_DATUM);
+            x = x0;
+        } else if (i == num_labels - 1) {
+            tft.setTextDatum(TR_DATUM);
+            x = x0 + w - 1;
+        } else {
+            tft.setTextDatum(TC_DATUM);
+            x = x0 + (int)(frac * (w - 1));
+        }
+        char buf[12];
+        if (freq >= 1000.0f)
+            snprintf(buf, sizeof(buf), "%dk", (int)(freq / 1000.0f));
+        else
+            snprintf(buf, sizeof(buf), "%d", (int)freq);
+        tft.drawString(buf, x, y, 1);
+    }
+}
+
 /**
  * @brief Érintési események kezelése a komponensen.
  *
@@ -632,45 +661,17 @@ void MiniAudioFft::drawSpectrumLowRes() {
         int x_pos_for_bar = current_draw_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
         tft.fillRect(x_pos_for_bar, posY, dynamic_bar_width_pixels, graphH, TFT_BLACK);
         drawSpectrumBar(band_idx, band_magnitudes[band_idx], current_draw_x_on_screen, actual_low_res_peak_max_height, dynamic_bar_width_pixels);
-        // Peak (csúcs) kirajzolása sárga színnel, csak ha >0
+
+        // Peak (csúcs) kirajzolása más színnel, csak ha nagyobb mint 3
         int peak = Rpeak[band_idx];
-        if (peak > 0) {
+        if (peak > 3) {
             int y_peak = posY + graphH - peak;
-            tft.fillRect(x_pos_for_bar, y_peak, dynamic_bar_width_pixels, 2, TFT_YELLOW);  // 2 pixel magas sárga csík
+            tft.fillRect(x_pos_for_bar, y_peak, dynamic_bar_width_pixels, 2, TFT_CYAN);  // 2 pixel magas sárga csík
         }
     }
 
     // Frekvencia skála címkék kirajzolása CSAK ha nincs módfelirat
-    if (!isIndicatorCurrentlyVisible) {
-        int label_area_y = posY + graphH + 2;
-        int num_labels = 5;
-        float min_freq = LOW_RES_SPECTRUM_MIN_FREQ_HZ;
-        float max_freq = currentConfiguredMaxDisplayAudioFreqHz;
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(1);
-        for (int i = 0; i < num_labels; ++i) {
-            float frac = (float)i / (num_labels - 1);
-            float freq = min_freq + frac * (max_freq - min_freq);
-            int x;
-            if (i == 0) {
-                tft.setTextDatum(TL_DATUM);
-                x = posX;
-            } else if (i == num_labels - 1) {
-                tft.setTextDatum(TR_DATUM);
-                x = posX + width - 1;
-            } else {
-                tft.setTextDatum(TC_DATUM);
-                x = posX + (int)(frac * (width - 1));
-            }
-            char buf[12];
-            if (freq >= 1000.0f)
-                // snprintf(buf, sizeof(buf), "%.1fk", freq / 1000.0f);
-                snprintf(buf, sizeof(buf), "%dk", (int)(freq / 1000.0f));
-            else
-                snprintf(buf, sizeof(buf), "%d", (int)freq);
-            tft.drawString(buf, x, label_area_y, 1);
-        }
-    }
+    drawFrequencyScaleLabels(LOW_RES_SPECTRUM_MIN_FREQ_HZ, currentConfiguredMaxDisplayAudioFreqHz, posX, posY + graphH + 2, width, !isIndicatorCurrentlyVisible);
 }
 
 /**
@@ -779,36 +780,8 @@ void MiniAudioFft::drawSpectrumHighRes() {
         }
     }
     // Frekvencia skála címkék kirajzolása CSAK ha nincs módfelirat
-    if (!isIndicatorCurrentlyVisible) {
-        int label_area_y = posY + graphH + 2;
-        int num_labels = 5;
-        float min_freq = AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ;
-        float max_freq = currentConfiguredMaxDisplayAudioFreqHz;
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(1);
-        for (int i = 0; i < num_labels; ++i) {
-            float frac = (float)i / (num_labels - 1);
-            float freq = min_freq + frac * (max_freq - min_freq);
-            int x;
-            if (i == 0) {
-                tft.setTextDatum(TL_DATUM);
-                x = posX;
-            } else if (i == num_labels - 1) {
-                tft.setTextDatum(TR_DATUM);
-                x = posX + width - 1;
-            } else {
-                tft.setTextDatum(TC_DATUM);
-                x = posX + (int)(frac * (width - 1));
-            }
-            char buf[12];
-            if (freq >= 1000.0f)
-                // snprintf(buf, sizeof(buf), "%.1fk", freq / 1000.0f);
-                snprintf(buf, sizeof(buf), "%dk", (int)(freq / 1000.0f));
-            else
-                snprintf(buf, sizeof(buf), "%d", (int)freq);
-            tft.drawString(buf, x, label_area_y, 1);
-        }
-    }
+    drawFrequencyScaleLabels(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ, currentConfiguredMaxDisplayAudioFreqHz, posX, posY + graphH + 2, width,
+                             !isIndicatorCurrentlyVisible);
 }
 
 /**

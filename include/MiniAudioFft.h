@@ -206,6 +206,9 @@ class MiniAudioFft {
     void drawOffStatusInCenter();  // ÚJ: "Off" státusz kirajzolása középre
 
     void drawMuted();
+
+    // Segédfüggvény: frekvencia skála címkék rajzolása
+    void drawFrequencyScaleLabels(float min_freq, float max_freq, int x0, int y, int w, bool show);
 };
 
 #endif  // MINI_AUDIO_FFT_H
