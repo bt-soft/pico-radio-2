@@ -255,6 +255,7 @@ void MiniAudioFft::drawModeIndicator() {
 
     int indicatorH = getIndicatorAreaHeight();
     int indicatorYstart = getIndicatorAreaY();  // A módkijelző sávjának teteje
+    indicatorYstart += 2;                       // x pixellel lejjebb
 
     if (width < 20 || indicatorH < 8) return;
 
@@ -313,8 +314,8 @@ void MiniAudioFft::drawModeIndicator() {
     tft.fillRect(posX, indicatorYstart, width, indicatorH, TFT_BLACK);
 
     // Szöveg kirajzolása a komponens aljára, középre.
-    // Az Y koordináta a szöveg alapvonala lesz. A `posY + height - 2` a teljes komponensmagasság aljára igazít.
-    tft.drawString(modeText + gainText, posX + width / 2, posY + height - 2);
+    // Az Y koordináta a szöveg alapvonala lesz.
+    tft.drawString(modeText + gainText, posX + width / 2, posY + height);
 }
 
 /**
@@ -491,8 +492,7 @@ void MiniAudioFft::forceRedraw() {
         // akkor a performFFT nem csinál semmit, és a rajzoló függvények üres adatot kapnak.
         // Ideális esetben a currentMode-ot Off-ra kellene állítani, ha az FFT config -1.0f.
         // Ezt a SetupDisplay-nek kellene kezelnie.
-        // Jelenlegi logika: ha az FFT config -1.0f, a performFFT nem tölti fel RvReal-t,
-        // így a rajzoló függvények nem rajzolnak semmit (vagy feketét).
+        // Jelenlegi logika: ha az FFT config -1.0f, de a currentMode nem Off, akkor is rajzolna.
         // A drawModeIndicator továbbra is a currentMode-ot írja ki.
 
         if (activeFftGainConfigRef != -1.0f) {  // Csak akkor végezzük el az FFT-t és a rajzolást, ha nincs letiltva
@@ -639,6 +639,38 @@ void MiniAudioFft::drawSpectrumLowRes() {
             tft.fillRect(x_pos_for_bar, y_peak, dynamic_bar_width_pixels, 2, TFT_YELLOW);  // 2 pixel magas sárga csík
         }
     }
+
+    // Frekvencia skála címkék kirajzolása CSAK ha nincs módfelirat
+    if (!isIndicatorCurrentlyVisible) {
+        int label_area_y = posY + graphH + 2;
+        int num_labels = 5;
+        float min_freq = LOW_RES_SPECTRUM_MIN_FREQ_HZ;
+        float max_freq = currentConfiguredMaxDisplayAudioFreqHz;
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(1);
+        for (int i = 0; i < num_labels; ++i) {
+            float frac = (float)i / (num_labels - 1);
+            float freq = min_freq + frac * (max_freq - min_freq);
+            int x;
+            if (i == 0) {
+                tft.setTextDatum(TL_DATUM);
+                x = posX;
+            } else if (i == num_labels - 1) {
+                tft.setTextDatum(TR_DATUM);
+                x = posX + width - 1;
+            } else {
+                tft.setTextDatum(TC_DATUM);
+                x = posX + (int)(frac * (width - 1));
+            }
+            char buf[12];
+            if (freq >= 1000.0f)
+                // snprintf(buf, sizeof(buf), "%.1fk", freq / 1000.0f);
+                snprintf(buf, sizeof(buf), "%dk", (int)(freq / 1000.0f));
+            else
+                snprintf(buf, sizeof(buf), "%d", (int)freq);
+            tft.drawString(buf, x, label_area_y, 1);
+        }
+    }
 }
 
 /**
@@ -712,45 +744,31 @@ void MiniAudioFft::drawSpectrumHighRes() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
-    // Grafikon területének törlése
-    tft.fillRect(posX, posY, width, graphH, TFT_BLACK);  // FFT bin szélessége és a megjelenítendő bin-ek tartománya
+    tft.fillRect(posX, posY, width, graphH, TFT_BLACK);
     float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
     if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
-
-    // Get the actual FFT size from the processor or use default fallback
     const uint16_t actualFftSize = pAudioProcessor ? pAudioProcessor->getFftSize() : AudioProcessorConstants::DEFAULT_FFT_SAMPLES;
-
     const int min_bin_idx_for_display = std::max(2, static_cast<int>(std::round(AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ / currentBinWidthHz)));
     const int max_bin_idx_for_display = std::min(static_cast<int>(actualFftSize / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / currentBinWidthHz)));
     const int num_bins_in_display_range = NUM_BINS(max_bin_idx_for_display, min_bin_idx_for_display);
     if (!pAudioProcessor) return;
 
-    // Iterálás a komponens minden egyes vízszintes pixelén
     for (int screen_pixel_x = 0; screen_pixel_x < width; ++screen_pixel_x) {
-        // Képernyő pixel X koordinátájának leképezése FFT bin indexre
         int fft_bin_index;
-        if (width == 1) {  // Osztás nullával elkerülése, ha a szélesség 1
+        if (width == 1) {
             fft_bin_index = min_bin_idx_for_display;
         } else {
             float ratio = static_cast<float>(screen_pixel_x) / (width - 1);
             fft_bin_index = min_bin_idx_for_display + static_cast<int>(std::round(ratio * (num_bins_in_display_range - 1)));
         }
-        // Biztosítjuk, hogy az fft_bin_index az RvReal tömb érvényes tartományán belül maradjon
         fft_bin_index = constrain(fft_bin_index, 0, static_cast<int>(actualFftSize / 2 - 1));
-
-        // Magnitúdó kiolvasása és skálázása
         double magnitude = pAudioProcessor ? pAudioProcessor->getMagnitudeData()[fft_bin_index] : 0.0;
         int scaled_magnitude = static_cast<int>(magnitude / AudioProcessorConstants::AMPLITUDE_SCALE);
         scaled_magnitude = constrain(scaled_magnitude, 0, graphH - 1);
-
-        // X koordináta a TFT-n
         int x_coord_on_tft = posX + screen_pixel_x;
-
-        // Vonal kirajzolása
         if (scaled_magnitude > 0) {
-            int y_bar_start = posY + graphH - 1 - scaled_magnitude;  // Vonal teteje
-            int bar_actual_height = scaled_magnitude + 1;            // Vonal magassága
-            // Biztosítjuk, hogy a vonal a grafikon területén belül kezdődjön
+            int y_bar_start = posY + graphH - 1 - scaled_magnitude;
+            int bar_actual_height = scaled_magnitude + 1;
             if (y_bar_start < posY) {
                 bar_actual_height -= (posY - y_bar_start);
                 y_bar_start = posY;
@@ -758,6 +776,36 @@ void MiniAudioFft::drawSpectrumHighRes() {
             if (bar_actual_height > 0) {
                 tft.drawFastVLine(x_coord_on_tft, y_bar_start, bar_actual_height, TFT_SKYBLUE);
             }
+        }
+    }
+    // Frekvencia skála címkék kirajzolása CSAK ha nincs módfelirat
+    if (!isIndicatorCurrentlyVisible) {
+        int label_area_y = posY + graphH + 2;
+        int num_labels = 5;
+        float min_freq = AudioProcessorConstants::LOW_FREQ_ATTENUATION_THRESHOLD_HZ;
+        float max_freq = currentConfiguredMaxDisplayAudioFreqHz;
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(1);
+        for (int i = 0; i < num_labels; ++i) {
+            float frac = (float)i / (num_labels - 1);
+            float freq = min_freq + frac * (max_freq - min_freq);
+            int x;
+            if (i == 0) {
+                tft.setTextDatum(TL_DATUM);
+                x = posX;
+            } else if (i == num_labels - 1) {
+                tft.setTextDatum(TR_DATUM);
+                x = posX + width - 1;
+            } else {
+                tft.setTextDatum(TC_DATUM);
+                x = posX + (int)(frac * (width - 1));
+            }
+            char buf[12];
+            if (freq >= 1000.0f)
+                snprintf(buf, sizeof(buf), "%.1fk", freq / 1000.0f);
+            else
+                snprintf(buf, sizeof(buf), "%d", (int)freq);
+            tft.drawString(buf, x, label_area_y, 1);
         }
     }
 }
@@ -1128,7 +1176,8 @@ void MiniAudioFft::drawTuningAid() {
         float displayed_span_hz = max_freq_displayed_actual - min_freq_displayed_actual;  // Szöveg beállítások a frekvencia kiíráshoz (a sprite-ra rajzolunk)
         sprGraph.setFreeFont();                                                           // Alapértelmezett vagy válassz egy kisebb, jól olvasható fontot a sprite-hoz
         sprGraph.setTextSize(1);                                                          // Megfelelő méret a sprite-on
-        sprGraph.setTextDatum(BC_DATUM);                                                  // Bottom-Center igazítás a vonal alatti kiíráshoz
+
+        sprGraph.setTextDatum(BC_DATUM);  // Bottom-Center igazítás a vonal alatti kiíráshoz
 
         if (displayed_span_hz > 0) {
             if (currentTuningAidType_ == TuningAidType::CW_TUNING) {
