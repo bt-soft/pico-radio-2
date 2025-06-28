@@ -101,9 +101,29 @@ void SevenSegmentFreq::drawFrequency(const String& freq, const __FlashStringHelp
         spr.drawString(mask, contentWidth, FREQ_7SEGMENT_HEIGHT);  // Jobbra igazítva a sprite-on belül
     }
 
+    // --- Frekvencia string igazítása a maszkhoz ---
+    String freqPadded;
+    if (mask != nullptr) {
+        String maskStr(mask);
+        int freqIdx = freq.length() - 1;
+        for (int i = maskStr.length() - 1; i >= 0; --i) {
+            if (maskStr[i] == ' ') {
+                freqPadded = ' ' + freqPadded;
+            } else {
+                if (freqIdx >= 0) {
+                    freqPadded = freq[freqIdx--] + freqPadded;
+                } else {
+                    freqPadded = ' ' + freqPadded;
+                }
+            }
+        }
+    } else {
+        freqPadded = freq;
+    }
+
     // Majd utána a frekvenciát
     spr.setTextColor(colors.active);
-    spr.drawString(freq, contentWidth, FREQ_7SEGMENT_HEIGHT);  // Jobbra igazítva a sprite-on belül
+    spr.drawString(freqPadded, contentWidth, FREQ_7SEGMENT_HEIGHT);  // Jobbra igazítva a sprite-on belül
 
     // Megjelenítés
     spr.pushSprite(spritePushX, spritePushY);
