@@ -802,7 +802,8 @@ void MiniAudioFft::drawSpectrumHighRes() {
             }
             char buf[12];
             if (freq >= 1000.0f)
-                snprintf(buf, sizeof(buf), "%.1fk", freq / 1000.0f);
+                // snprintf(buf, sizeof(buf), "%.1fk", freq / 1000.0f);
+                snprintf(buf, sizeof(buf), "%dk", (int)(freq / 1000.0f));
             else
                 snprintf(buf, sizeof(buf), "%d", (int)freq);
             tft.drawString(buf, x, label_area_y, 1);
@@ -1054,9 +1055,6 @@ void MiniAudioFft::drawEnvelope() {
     }
 
     // 3. Burkológörbe kirajzolása
-    const int half_graph_h = graphH / 2;
-    // Az 'envelope_prev_smoothed_max_val' tagváltozót használjuk a simításhoz
-
     for (int c = 0; c < width; ++c) {
         int max_val_in_col = 0;
         bool column_has_signal = false;
