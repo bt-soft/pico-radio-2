@@ -336,7 +336,8 @@ void setup() {
 
     // EEPROM inicializálása (A fordítónak muszáj megadni egy típust, itt most egy Config_t-t használunk, igaziból mindegy)
     tft.drawString("Loading EEPROM...", tft.width() / 2, 160);
-    EepromManager<Config_t>::init();  // Meghívjuk a statikus init metódust    // Ha a bekapcsolás alatt nyomva tartjuk a rotary gombját, akkor töröljük a konfigot
+    EepromManager<Config_t>::init();  // Meghívjuk a statikus init metódust    
+	// Ha a bekapcsolás alatt nyomva tartjuk a rotary gombját, akkor töröljük a konfigot
     if (digitalRead(PIN_ENCODER_SW) == LOW) {
         tft.drawString("Reset detected...", tft.width() / 2, 180);
         Utils::beepTick();
@@ -470,7 +471,9 @@ void loop() {
         debugMemoryInfo();
         lasDebugMemoryInfo = millis();
     }
-#endif  // Rotary Encoder olvasása
+#endif  
+
+	// Rotary Encoder olvasása
     RotaryEncoder::EncoderState encoderState = rotaryEncoder.read();
 
     // Ha folyamatosan nyomva tartják a rotary gombját akkor kikapcsolunk
