@@ -472,7 +472,7 @@ bool MiniAudioFft::handleTouch(bool touched, uint16_t tx, uint16_t ty) {
 /**
  * @brief Kényszeríti a komponens teljes újrarajzolását az aktuális módban.
  *
- * Letörli a komponenst az effektív magasságnak megfelelően, és újrarajzolja a tartalmat.
+ * Letörli a komponenst az effektív magasságának megfelelően, és újrarajzolja a tartalmat.
  */
 void MiniAudioFft::forceRedraw() {
 
@@ -553,7 +553,7 @@ void MiniAudioFft::forceRedraw() {
 
 /**
  * @brief Kirajzolja az "Off" státuszt a grafikon területének közepére,
- * ha a komponens Off módban van és a normál módkijelző nem látható.
+ * ha a komponens Off módban van és a normál módkijelző nem látszik.
  */
 void MiniAudioFft::drawOffStatusInCenter() {
     int graphH = getGraphHeight();
@@ -583,70 +583,61 @@ void MiniAudioFft::drawSpectrumLowRes() {
     int graphH = getGraphHeight();
     if (width == 0 || graphH <= 0) return;
 
-    int actual_low_res_peak_max_height = graphH - 1;  // graphH can be 0, so -1 is possible. Constrain dsize later.
-
-    // Dinamikus sávszélesség számítása, hogy kitöltse a helyet
-    constexpr int bar_gap_pixels = 1;                // Kisebb rés a sávok között, hogy több elférjen
-    int bands_to_display_on_screen = LOW_RES_BANDS;  // Alapértelmezetten a LOW_RES_BANDS számú sávot akarjuk megjeleníteni
-
-    // Ha a szélesség túl kicsi még a minimális sávszélességhez (1px) és résekhez is, csökkentjük a sávok számát
+    int actual_low_res_peak_max_height = graphH - 1;
+    constexpr int bar_gap_pixels = 1;
+    int bands_to_display_on_screen = LOW_RES_BANDS;
     if (width < (bands_to_display_on_screen + (bands_to_display_on_screen - 1) * bar_gap_pixels)) {
         bands_to_display_on_screen = (width + bar_gap_pixels) / (1 + bar_gap_pixels);
     }
-    if (bands_to_display_on_screen <= 0) bands_to_display_on_screen = 1;  // Legalább egy sáv legyen
-
-    int dynamic_bar_width_pixels = 1;  // Minimum 1 pixel
+    if (bands_to_display_on_screen <= 0) bands_to_display_on_screen = 1;
+    int dynamic_bar_width_pixels = 1;
     if (bands_to_display_on_screen > 0) {
         dynamic_bar_width_pixels = (width - (std::max(0, bands_to_display_on_screen - 1) * bar_gap_pixels)) / bands_to_display_on_screen;
     }
-    if (dynamic_bar_width_pixels < 1) dynamic_bar_width_pixels = 1;  // Biztosítjuk, hogy legalább 1 pixel legyen
-
+    if (dynamic_bar_width_pixels < 1) dynamic_bar_width_pixels = 1;
     int bar_total_width_pixels_dynamic = dynamic_bar_width_pixels + bar_gap_pixels;
-
     int total_drawn_width = (bands_to_display_on_screen * dynamic_bar_width_pixels) + (std::max(0, bands_to_display_on_screen - 1) * bar_gap_pixels);
     int x_offset = (width - total_drawn_width) / 2;
     int current_draw_x_on_screen = posX + x_offset;
 
-    // Grafikon területének törlése (csak a grafikon sávja)
-    // A csúcsok "esését" kezeljük, de a tényleges törlést a teljes oszlop törlése végzi.
+    // Lassabb peak ereszkedés: csak minden 3. hívásnál csökkentjük
+    static uint8_t peak_fall_counter = 0;
+    peak_fall_counter = (peak_fall_counter + 1) % 3;
+
     for (int band_idx = 0; band_idx < bands_to_display_on_screen; band_idx++) {
-        // A csúcsjelzők explicit törlése (fillRect) itt már nem szükséges,
-        // mert a teljes oszlopot töröljük alább, mielőtt újrarajzolnánk.
-        // Csak a csúcsérték csökkentése marad.
-        if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
+        if (peak_fall_counter == 0) {
+            if (Rpeak[band_idx] >= 1) Rpeak[band_idx] -= 1;
+        }
     }
 
-    // 1. Sávonkénti magnitúdók összegyűjtése/maximalizálása
-    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);  // Fallback, ha pAudioProcessor null
-    if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);                                 // Osztás nullával elkerülése
-
-    // Get the actual FFT size from the processor or use default fallback
+    float currentBinWidthHz = pAudioProcessor ? pAudioProcessor->getBinWidthHz() : (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
+    if (currentBinWidthHz == 0) currentBinWidthHz = (40000.0f / AudioProcessorConstants::DEFAULT_FFT_SAMPLES);
     const uint16_t actualFftSize = pAudioProcessor ? pAudioProcessor->getFftSize() : AudioProcessorConstants::DEFAULT_FFT_SAMPLES;
-
     const int min_bin_idx_low_res = std::max(2, static_cast<int>(std::round(LOW_RES_SPECTRUM_MIN_FREQ_HZ / currentBinWidthHz)));
     const int max_bin_idx_low_res = std::min(static_cast<int>(actualFftSize / 2 - 1), static_cast<int>(std::round(currentConfiguredMaxDisplayAudioFreqHz / currentBinWidthHz)));
     const int num_bins_in_low_res_range = NUM_BINS(max_bin_idx_low_res, min_bin_idx_low_res);
-
-    double band_magnitudes[LOW_RES_BANDS] = {0.0};  // Inicializálás nullával
-    if (!pAudioProcessor) {                         // Ha nincs audio processzor, ne csináljunk semmit
+    double band_magnitudes[LOW_RES_BANDS] = {0.0};
+    if (!pAudioProcessor) {
         memset(band_magnitudes, 0, sizeof(band_magnitudes));
-        // return; // Vagy csak nullázzuk és a ciklusok nem futnak le
     }
-
     for (int i = min_bin_idx_low_res; i <= max_bin_idx_low_res; i++) {
         byte band_idx = getBandVal(i, min_bin_idx_low_res, num_bins_in_low_res_range);
-        if (band_idx < LOW_RES_BANDS) {  // Biztosítjuk, hogy a band_idx érvényes legyen
+        if (band_idx < LOW_RES_BANDS) {
             band_magnitudes[band_idx] = std::max(band_magnitudes[band_idx], pAudioProcessor ? pAudioProcessor->getMagnitudeData()[i] : 0.0);
         }
     }
 
-    // 2. Sávok kirajzolása a kiszámított magnitúdók alapján
+    // Sávok kirajzolása
     for (int band_idx = 0; band_idx < bands_to_display_on_screen; band_idx++) {
         int x_pos_for_bar = current_draw_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
-        // Oszlop törlése a háttérszínnel
         tft.fillRect(x_pos_for_bar, posY, dynamic_bar_width_pixels, graphH, TFT_BLACK);
-        // Sáv kirajzolása (ez frissíti Rpeak-et is)
         drawSpectrumBar(band_idx, band_magnitudes[band_idx], current_draw_x_on_screen, actual_low_res_peak_max_height, dynamic_bar_width_pixels);
+        // Peak (csúcs) kirajzolása sárga színnel, csak ha >0
+        int peak = Rpeak[band_idx];
+        if (peak > 0) {
+            int y_peak = posY + graphH - peak;
+            tft.fillRect(x_pos_for_bar, y_peak, dynamic_bar_width_pixels, 2, TFT_YELLOW);  // 2 pixel magas sárga csík
+        }
     }
 }
 
@@ -682,32 +673,32 @@ void MiniAudioFft::drawSpectrumBar(int band_idx, double magnitude, int actual_st
     int graphH = getGraphHeight();
     if (graphH <= 0) return;
 
-    // A magnitúdó (double) osztása a float AMPLITUDE_SCALE-lel, majd int-re kasztolás
     int dsize = static_cast<int>(magnitude / AudioProcessorConstants::AMPLITUDE_SCALE);
-    dsize = constrain(dsize, 0, peak_max_height_for_mode);  // peak_max_height_for_mode már graphH-1
-
-    // constexpr int bar_width_pixels = 3; // Ezt most paraméterként kapjuk
-    constexpr int bar_gap_pixels = 1;  // Javítva 1-re, hogy konzisztens legyen a hívóval
+    dsize = constrain(dsize, 0, peak_max_height_for_mode);
+    constexpr int bar_gap_pixels = 1;
     int bar_total_width_pixels_dynamic = current_bar_width_pixels + bar_gap_pixels;
     int xPos = actual_start_x_on_screen + bar_total_width_pixels_dynamic * band_idx;
 
-    if (xPos + current_bar_width_pixels > posX + width || xPos < posX) return;  // Ne rajzoljunk a komponensen kívülre
+    if (xPos + current_bar_width_pixels > posX + width || xPos < posX) return;
 
     if (dsize > 0) {
-        int y_start_bar = posY + graphH - dsize;  // Y a grafikon területén belül
-        int bar_h_visual = dsize;                 // A ténylegesen kirajzolandó magasság
-        // Biztosítjuk, hogy a sáv a grafikon területén belül maradjon
+        int y_start_bar = posY + graphH - dsize;
+        int bar_h_visual = dsize;
         if (y_start_bar < posY) {
             bar_h_visual -= (posY - y_start_bar);
             y_start_bar = posY;
         }
         if (bar_h_visual > 0) {
-            tft.fillRect(xPos, y_start_bar, current_bar_width_pixels, bar_h_visual, TFT_YELLOW);
+            tft.fillRect(xPos, y_start_bar, current_bar_width_pixels, bar_h_visual, TFT_GREEN);  // Zöld bar
         }
     }
 
     if (dsize > Rpeak[band_idx]) {
         Rpeak[band_idx] = dsize;
+    }
+    // Ha a peak érték 0-ra csökkent, töröljük (biztosítjuk, hogy ne jelenjen meg)
+    if (Rpeak[band_idx] < 1) {
+        Rpeak[band_idx] = 0;
     }
 }
 
@@ -791,7 +782,7 @@ void MiniAudioFft::setTuningAidType(TuningAidType type) {
 
         } else if (currentTuningAidType_ == TuningAidType::RTTY_TUNING) {
             float f_mark = config.data.rttyMarkFrequencyHz;
-            float f_space = config.data.rttyMarkFrequencyHz - config.data.rttyShiftHz; // Számított Space
+            float f_space = config.data.rttyMarkFrequencyHz - config.data.rttyShiftHz;  // Számított Space
             float f_low = std::min(f_space, f_mark);
             float f_high = std::max(f_space, f_mark);
             float delta_f = std::abs(f_high - f_low);  // Ensure positive delta
@@ -1043,7 +1034,8 @@ void MiniAudioFft::drawEnvelope() {
             // Az ENVELOPE_THICKNESS_SCALER-t itt nem használjuk közvetlenül,
             // a vastagságot a `y_offset_pixels` adja. Ha vastagabb görbét szeretnénk,
             // az `ENVELOPE_INPUT_GAIN`-t kell növelni, vagy a skálázást módosítani.
-            float y_offset_float = (envelope_prev_smoothed_max_val / 255.0f) * (half_graph_h - 1.0f);
+            float y_offset_float = (envelope_prev_smoothed_max_val / 255.0f) * (half_graph_h - 1.0f) / 2048.0;  // A 2048.0 itt a maximális elméleti ADC eltérésre skáláz
+
             int y_offset_pixels = static_cast<int>(round(y_offset_float));
             y_offset_pixels = std::min(y_offset_pixels, half_graph_h - 1);  // Biztosítjuk, hogy a határokon belül maradjon
             if (y_offset_pixels < 0) y_offset_pixels = 0;
