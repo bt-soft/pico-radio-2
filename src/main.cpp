@@ -1,7 +1,6 @@
 #include <Arduino.h>
 
 #include "PicoSensorUtils.h"
-#include "core1_logic.h"  // Core1 logika
 #include "defines.h"
 #include "pico/multicore.h"  // Core1 kezeléséhez
 #include "rtVars.h"
@@ -53,7 +52,6 @@ AmStationStore amStationStore;
 #include "SetupDisplay.h"
 #include "SplashScreen.h"
 #include "SstvDisplay.h"
-#include "core1_logic.h"  // Core1 belépési pontja
 DisplayBase *pDisplay = nullptr;
 
 //---- Dekóderek
@@ -336,8 +334,8 @@ void setup() {
 
     // EEPROM inicializálása (A fordítónak muszáj megadni egy típust, itt most egy Config_t-t használunk, igaziból mindegy)
     tft.drawString("Loading EEPROM...", tft.width() / 2, 160);
-    EepromManager<Config_t>::init();  // Meghívjuk a statikus init metódust    
-	// Ha a bekapcsolás alatt nyomva tartjuk a rotary gombját, akkor töröljük a konfigot
+    EepromManager<Config_t>::init();  // Meghívjuk a statikus init metódust
+                                      // Ha a bekapcsolás alatt nyomva tartjuk a rotary gombját, akkor töröljük a konfigot
     if (digitalRead(PIN_ENCODER_SW) == LOW) {
         tft.drawString("Reset detected...", tft.width() / 2, 180);
         Utils::beepTick();
@@ -471,9 +469,9 @@ void loop() {
         debugMemoryInfo();
         lasDebugMemoryInfo = millis();
     }
-#endif  
+#endif
 
-	// Rotary Encoder olvasása
+    // Rotary Encoder olvasása
     RotaryEncoder::EncoderState encoderState = rotaryEncoder.read();
 
     // Ha folyamatosan nyomva tartják a rotary gombját akkor kikapcsolunk
@@ -527,26 +525,4 @@ void loop() {
             }
         }
     }
-}
-
-/**
- * Core1 belépési pontja
- */
-void setup1() {
-    // Core1 belépési pontja, itt indítjuk el a Core1 logikát
-    DEBUG("Core1: Setup started.\n");
-
-    // // Végtelen loop a Core1-en
-    // FONTOS!!!: Ezt azért kell itt, mert felébredés után a Core1 nem indul újra automatikusan, csak ha itt van egy loop
-    while (true) {
-        loop1();
-    }
-}
-
-/**
- * @brief Core1 logika futtatása a loop-ban.
- */
-void loop1() {
-    // Core1 logika indítása
-    core1_main();
 }

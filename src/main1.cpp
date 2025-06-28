@@ -1,5 +1,3 @@
-#include "core1_logic.h"
-
 #include <Arduino.h>         // Serial, millis stb. (debugoláshoz)
 #include <pico/multicore.h>  // FIFO kommunikációhoz
 
@@ -32,10 +30,24 @@ void deleteDecoders() {
 }
 
 /**
- * @brief A Core1 belépési pontja, ahol a Core1 logika fut.
+ * Core1 belépési pontja
  */
-void core1_main() {
+void setup1() {
+    // Core1 belépési pontja, itt indítjuk el a Core1 logikát
+    DEBUG("Core1: Setup started.\n");
 
+    // // Végtelen loop a Core1-en
+    // FONTOS!!!: Ezt azért kell itt, mert felébredés után a Core1 nem indul újra automatikusan, csak ha itt van egy loop
+    while (true) {
+        loop1();
+    }
+}
+
+/**
+ * @brief Core1 logika futtatása a loop-ban.
+ */
+void loop1() {
+    // Core1 logika indítása
     // Várakozás parancsra Core0-tól
     if (rp2040.fifo.available() > 0) {
         uint32_t raw_command;
